@@ -1,0 +1,146 @@
+// internal/sentinel/rpc/collector_test.go
+package rpc_test
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/gnolang/val-companion/internal/sentinel/rpc"
+	"github.com/gnolang/val-companion/pkg/protocol"
+)
+
+// buildMockNode returns a test server that simulates a gnoland RPC node.
+// height is incremented after each /status call to trigger new-block fetches.
+func buildMockNode(t *testing.T) *httptest.Server {
+	t.Helper()
+	var height atomic.Int64
+	height.Store(1)
+
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		h := height.Add(1)
+		respond := func(result any) {
+			type env struct {
+				JSONRPC string `json:"jsonrpc"`
+				Result  any    `json:"result"`
+			}
+			b, _ := json.Marshal(env{JSONRPC: "2.0", Result: result})
+			w.Write(b)
+		}
+		switch r.URL.Path {
+		case "/status":
+			respond(map[string]any{
+				"sync_info": map[string]any{
+					"latest_block_height": fmt.Sprintf("%d", h),
+					"catching_up":         false,
+				},
+			})
+		case "/net_info":
+			respond(map[string]any{"n_peers": "3"})
+		case "/num_unconfirmed_txs":
+			respond(map[string]any{"n_txs": "0"})
+		case "/dump_consensus_state":
+			respond(map[string]any{"round_state": map[string]any{}})
+		case "/validators":
+			respond(map[string]any{"validators": []any{}})
+		case "/block", "/block_results":
+			respond(map[string]any{"block_id": "abc"})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+}
+
+func TestCollector_EmitsPayloads(t *testing.T) {
+	srv := buildMockNode(t)
+	defer srv.Close()
+
+	out := make(chan protocol.RPCPayload, 10)
+	c := rpc.NewCollector(rpc.NewClient(srv.URL), 50*time.Millisecond, 1*time.Hour, out)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+
+	go c.Run(ctx)
+
+	var received []protocol.RPCPayload
+	deadline := time.After(300 * time.Millisecond)
+loop:
+	for {
+		select {
+		case p := <-out:
+			received = append(received, p)
+			if len(received) >= 2 {
+				break loop
+			}
+		case <-deadline:
+			break loop
+		}
+	}
+
+	if len(received) < 2 {
+		t.Fatalf("expected at least 2 payloads, got %d", len(received))
+	}
+	// First payload must contain status (always present on first poll).
+	if _, ok := received[0].Data["status"]; !ok {
+		t.Error("first payload missing 'status'")
+	}
+}
+
+func TestCollector_DeltaSkipsUnchangedEndpoints(t *testing.T) {
+	// Server always returns the same net_info response.
+	callCount := map[string]int{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount[r.URL.Path]++
+		w.Header().Set("Content-Type", "application/json")
+		// Return static responses — status height never changes to avoid block fetches.
+		type env struct {
+			JSONRPC string `json:"jsonrpc"`
+			Result  any    `json:"result"`
+		}
+		result := map[string]any{
+			"sync_info": map[string]any{"latest_block_height": "5", "catching_up": false},
+			"n_peers":   "3",
+			"n_txs":     "0",
+			"round_state": map[string]any{},
+		}
+		b, _ := json.Marshal(env{JSONRPC: "2.0", Result: result})
+		w.Write(b)
+	}))
+	defer srv.Close()
+
+	out := make(chan protocol.RPCPayload, 10)
+	c := rpc.NewCollector(rpc.NewClient(srv.URL), 50*time.Millisecond, 1*time.Hour, out)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	go c.Run(ctx)
+	<-ctx.Done()
+
+	// Drain channel.
+	var payloads []protocol.RPCPayload
+	for len(out) > 0 {
+		payloads = append(payloads, <-out)
+	}
+
+	// After the first payload, subsequent ones should be empty (all unchanged).
+	for i, p := range payloads[1:] {
+		if len(p.Data) > 0 {
+			t.Errorf("payload %d should have empty data (delta unchanged), got keys: %v", i+1, keys(p.Data))
+		}
+	}
+}
+
+func keys(m map[string]json.RawMessage) []string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	return ks
+}
