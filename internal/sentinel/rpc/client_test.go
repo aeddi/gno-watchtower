@@ -16,7 +16,10 @@ func rpcResponse(result any) []byte {
 		ID      string `json:"id"`
 		Result  any    `json:"result"`
 	}
-	b, _ := json.Marshal(envelope{JSONRPC: "2.0", Result: result})
+	b, err := json.Marshal(envelope{JSONRPC: "2.0", Result: result})
+	if err != nil {
+		panic("rpcResponse: marshal failed: " + err.Error())
+	}
 	return b
 }
 
@@ -91,5 +94,68 @@ func TestClient_Block(t *testing.T) {
 	}
 	if len(raw) == 0 {
 		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestClient_Validators(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/validators" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Query().Get("height") != "10" {
+			http.Error(w, "bad height", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(rpcResponse(map[string]any{"validators": []any{}}))
+	}))
+	defer srv.Close()
+
+	c := rpc.NewClient(srv.URL)
+	raw, err := c.Validators(10)
+	if err != nil {
+		t.Fatalf("Validators: %v", err)
+	}
+	if len(raw) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestClient_BlockResults(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/block_results" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Query().Get("height") != "7" {
+			http.Error(w, "bad height", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(rpcResponse(map[string]any{"txs_results": nil}))
+	}))
+	defer srv.Close()
+
+	c := rpc.NewClient(srv.URL)
+	raw, err := c.BlockResults(7)
+	if err != nil {
+		t.Fatalf("BlockResults: %v", err)
+	}
+	if len(raw) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestClient_HTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "bad gateway", http.StatusBadGateway)
+	}))
+	defer srv.Close()
+
+	c := rpc.NewClient(srv.URL)
+	_, err := c.Status()
+	if err == nil {
+		t.Fatal("expected error for non-200 HTTP status")
 	}
 }
