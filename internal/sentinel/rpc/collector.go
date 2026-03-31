@@ -4,7 +4,6 @@ package rpc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -31,15 +30,17 @@ type Collector struct {
 	out          chan<- protocol.RPCPayload
 	lastHeight   int64
 	lastDump     time.Time
+	logf         func(string, ...any)
 }
 
-func NewCollector(client *Client, pollInterval, dumpInterval time.Duration, out chan<- protocol.RPCPayload) *Collector {
+func NewCollector(client *Client, pollInterval, dumpInterval time.Duration, out chan<- protocol.RPCPayload, logf func(string, ...any)) *Collector {
 	return &Collector{
 		client:       client,
 		delta:        NewDelta(),
 		pollInterval: pollInterval,
 		dumpInterval: dumpInterval,
 		out:          out,
+		logf:         logf,
 	}
 }
 
@@ -54,7 +55,7 @@ func (c *Collector) Run(ctx context.Context) error {
 		case <-ticker.C:
 			if err := c.collect(ctx); err != nil {
 				// Log and continue — transient RPC errors should not stop the collector.
-				fmt.Printf("collect error: %v\n", err)
+				c.logf("collect error: %v\n", err)
 			}
 		}
 	}
