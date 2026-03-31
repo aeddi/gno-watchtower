@@ -1,0 +1,11 @@
+# Binaries
+/sentinel
+/watchtower
+
+# Go build artifacts
+*.test
+*.out
+/vendor/
+
+# OS
+.DS_Store
