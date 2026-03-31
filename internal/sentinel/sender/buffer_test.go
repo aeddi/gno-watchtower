@@ -43,6 +43,9 @@ func TestBuffer_DropOldestWhenFull(t *testing.T) {
 	if !dropped {
 		t.Fatal("expected drop=true when buffer full")
 	}
+	if b.Len() != 3 {
+		t.Errorf("Len after overflow: got %d, want 3", b.Len())
+	}
 
 	items := b.Drain()
 	if len(items) != 3 {
@@ -51,6 +54,24 @@ func TestBuffer_DropOldestWhenFull(t *testing.T) {
 	// Oldest (1) should have been dropped; items should be [2, 3, 4].
 	if items[0] != 2 || items[1] != 3 || items[2] != 4 {
 		t.Errorf("unexpected items after overflow: %v", items)
+	}
+}
+
+func TestBuffer_ConcurrentSafe(t *testing.T) {
+	b := sender.NewBuffer[int](10)
+	done := make(chan struct{})
+	for i := 0; i < 10; i++ {
+		go func(i int) {
+			b.Push(i)
+			done <- struct{}{}
+		}(i)
+	}
+	go func() {
+		b.Drain()
+		done <- struct{}{}
+	}()
+	for i := 0; i < 11; i++ {
+		<-done
 	}
 }
 

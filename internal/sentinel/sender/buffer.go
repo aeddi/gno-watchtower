@@ -12,6 +12,9 @@ type Buffer[T any] struct {
 }
 
 func NewBuffer[T any](maxSize int) *Buffer[T] {
+	if maxSize <= 0 {
+		panic("sender.NewBuffer: maxSize must be > 0")
+	}
 	return &Buffer[T]{
 		items:   make([]T, 0, maxSize),
 		maxSize: maxSize,
@@ -39,7 +42,7 @@ func (b *Buffer[T]) Drain() []T {
 	}
 	out := make([]T, len(b.items))
 	copy(out, b.items)
-	b.items = b.items[:0]
+	b.items = b.items[:0:0]
 	return out
 }
 
