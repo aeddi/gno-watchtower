@@ -1,6 +1,7 @@
 package protocol_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 	"time"
@@ -43,7 +44,20 @@ func TestRPCPayload_EmptyData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if string(b) == "" {
-		t.Fatal("expected non-empty JSON")
+	// Empty map must marshal as {} — not omitted, not null.
+	if !bytes.Contains(b, []byte(`"data":{}`)) {
+		t.Errorf("expected data:{} in JSON, got: %s", b)
+	}
+}
+
+func TestRPCPayload_NilData(t *testing.T) {
+	p := protocol.RPCPayload{CollectedAt: time.Now().UTC()}
+	b, err := json.Marshal(p)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	// nil map marshals as null — callers must always initialise Data.
+	if !bytes.Contains(b, []byte(`"data":null`)) {
+		t.Errorf("expected data:null in JSON for nil map, got: %s", b)
 	}
 }
