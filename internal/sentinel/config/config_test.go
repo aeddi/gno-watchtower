@@ -72,11 +72,29 @@ poll_interval = "notaduration"
 		t.Fatal(err)
 	}
 	defer os.Remove(f.Name())
-	f.WriteString(content)
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
 	f.Close()
 
 	_, err = config.Load(f.Name())
 	if err == nil {
 		t.Fatal("expected error for invalid duration")
+	}
+}
+
+func TestExample_IsValidTOML(t *testing.T) {
+	f, err := os.CreateTemp("", "sentinel-example-*.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(config.Example); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	if _, err := config.Load(f.Name()); err != nil {
+		t.Fatalf("Example constant is not valid TOML: %v", err)
 	}
 }
