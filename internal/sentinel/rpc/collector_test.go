@@ -24,7 +24,6 @@ func buildMockNode(t *testing.T) *httptest.Server {
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		h := height.Add(1)
 		respond := func(result any) {
 			type env struct {
 				JSONRPC string `json:"jsonrpc"`
@@ -35,6 +34,7 @@ func buildMockNode(t *testing.T) *httptest.Server {
 		}
 		switch r.URL.Path {
 		case "/status":
+			h := height.Add(1)
 			respond(map[string]any{
 				"sync_info": map[string]any{
 					"latest_block_height": fmt.Sprintf("%d", h),
@@ -95,9 +95,7 @@ loop:
 
 func TestCollector_DeltaSkipsUnchangedEndpoints(t *testing.T) {
 	// Server always returns the same net_info response.
-	callCount := map[string]int{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount[r.URL.Path]++
 		w.Header().Set("Content-Type", "application/json")
 		// Return static responses — status height never changes to avoid block fetches.
 		type env struct {
