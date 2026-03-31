@@ -21,7 +21,11 @@ func TestSender_SendSuccess(t *testing.T) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		received, _ = io.ReadAll(r.Body)
+		var readErr error
+		received, readErr = io.ReadAll(r.Body)
+		if readErr != nil {
+			t.Errorf("read body: %v", readErr)
+		}
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()

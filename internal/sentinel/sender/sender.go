@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -45,6 +46,7 @@ func (s *Sender) Send(ctx context.Context, path string, payload any) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		io.Copy(io.Discard, resp.Body)
 		return fmt.Errorf("post %s: unexpected status %d", path, resp.StatusCode)
 	}
 	return nil
