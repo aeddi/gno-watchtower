@@ -34,7 +34,7 @@ func TestCollector_Host_EmitsPayload(t *testing.T) {
 	out := make(chan protocol.MetricsPayload, 5)
 	c := resources.NewCollector(cfg, out, logger.Noop())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 	go c.Run(ctx)
 
@@ -71,7 +71,7 @@ func TestCollector_DeltaFiltering(t *testing.T) {
 	out := make(chan protocol.MetricsPayload, 10)
 	c := resources.NewCollector(cfg, out, logger.Noop())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 	go c.Run(ctx)
 

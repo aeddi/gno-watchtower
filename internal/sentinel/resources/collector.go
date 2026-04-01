@@ -79,7 +79,9 @@ func (c *Collector) collect(ctx context.Context) error {
 
 func (c *Collector) collectHost(ctx context.Context, data map[string]json.RawMessage) {
 	if percents, err := gopsutilcpu.PercentWithContext(ctx, 0, false); err == nil {
-		if b, err := json.Marshal(percents); err == nil && c.delta.Changed("cpu", b) {
+		if b, err := json.Marshal(percents); err != nil {
+			c.log.Warn("cpu marshal error", "err", err)
+		} else if c.delta.Changed("cpu", b) {
 			data["cpu"] = b
 		}
 	} else {
@@ -87,7 +89,9 @@ func (c *Collector) collectHost(ctx context.Context, data map[string]json.RawMes
 	}
 
 	if vm, err := gopsutilmem.VirtualMemoryWithContext(ctx); err == nil {
-		if b, err := json.Marshal(vm); err == nil && c.delta.Changed("memory", b) {
+		if b, err := json.Marshal(vm); err != nil {
+			c.log.Warn("memory marshal error", "err", err)
+		} else if c.delta.Changed("memory", b) {
 			data["memory"] = b
 		}
 	} else {
@@ -95,7 +99,9 @@ func (c *Collector) collectHost(ctx context.Context, data map[string]json.RawMes
 	}
 
 	if usage, err := gopsutildisk.UsageWithContext(ctx, "/"); err == nil {
-		if b, err := json.Marshal(usage); err == nil && c.delta.Changed("disk", b) {
+		if b, err := json.Marshal(usage); err != nil {
+			c.log.Warn("disk marshal error", "err", err)
+		} else if c.delta.Changed("disk", b) {
 			data["disk"] = b
 		}
 	} else {
@@ -103,7 +109,9 @@ func (c *Collector) collectHost(ctx context.Context, data map[string]json.RawMes
 	}
 
 	if counters, err := gopsutilnet.IOCountersWithContext(ctx, false); err == nil {
-		if b, err := json.Marshal(counters); err == nil && c.delta.Changed("network", b) {
+		if b, err := json.Marshal(counters); err != nil {
+			c.log.Warn("network marshal error", "err", err)
+		} else if c.delta.Changed("network", b) {
 			data["network"] = b
 		}
 	} else {
