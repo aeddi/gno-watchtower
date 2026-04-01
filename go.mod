@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/docker/docker v28.5.2+incompatible
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/klauspost/compress v1.18.5
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/systemd/slog-journal v0.1.2
