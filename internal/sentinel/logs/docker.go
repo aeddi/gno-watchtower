@@ -48,6 +48,7 @@ func (s *DockerSource) Tail(ctx context.Context, out chan<- LogLine) error {
 	// Docker multiplexes stdout/stderr with an 8-byte header per frame.
 	// stdcopy.StdCopy demultiplexes both streams into a single writer.
 	pr, pw := io.Pipe()
+	defer pr.Close()
 	go func() {
 		_, err := stdcopy.StdCopy(pw, pw, logStream)
 		pw.CloseWithError(err)
