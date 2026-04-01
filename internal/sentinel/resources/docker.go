@@ -10,6 +10,12 @@ import (
 	dockerclient "github.com/docker/docker/client"
 )
 
+// ContainerStats returns the one-shot Docker stats snapshot for the named container as raw JSON bytes.
+// It wraps dockerContainerStats for use by external packages.
+func ContainerStats(ctx context.Context, name string) ([]byte, error) {
+	return dockerContainerStats(ctx, name)
+}
+
 // dockerContainerStats returns the one-shot Docker stats snapshot for the named container as raw JSON bytes.
 func dockerContainerStats(ctx context.Context, containerName string) ([]byte, error) {
 	cli, err := dockerclient.NewClientWithOpts(

@@ -21,8 +21,8 @@ import (
 	"github.com/gnolang/val-companion/pkg/protocol"
 )
 
-// configKeys is the list of gnoland config keys collected by the metadata collector.
-var configKeys = []string{
+// ConfigKeys is the list of gnoland config keys collected by the metadata collector.
+var ConfigKeys = []string{
 	"moniker",
 	"db_backend",
 	"p2p.laddr",
@@ -139,9 +139,9 @@ func (c *Collector) collectBinary(data map[string]json.RawMessage) {
 	var err error
 	switch {
 	case c.cfg.BinaryPath != "":
-		checksum, err = sha256File(c.cfg.BinaryPath)
+		checksum, err = SHA256File(c.cfg.BinaryPath)
 	case c.cfg.BinaryChecksumCmd != "":
-		checksum, err = runCmd(c.cfg.BinaryChecksumCmd)
+		checksum, err = RunCmd(c.cfg.BinaryChecksumCmd)
 	default:
 		return
 	}
@@ -168,9 +168,9 @@ func (c *Collector) collectGenesis(data map[string]json.RawMessage) {
 	var err error
 	switch {
 	case c.cfg.GenesisPath != "":
-		checksum, err = sha256File(c.cfg.GenesisPath)
+		checksum, err = SHA256File(c.cfg.GenesisPath)
 	case c.cfg.GenesisChecksumCmd != "":
-		checksum, err = runCmd(c.cfg.GenesisChecksumCmd)
+		checksum, err = RunCmd(c.cfg.GenesisChecksumCmd)
 	default:
 		return
 	}
@@ -197,14 +197,14 @@ func (c *Collector) collectConfig(data map[string]json.RawMessage) {
 		return
 	}
 	values := make(map[string]string)
-	for _, key := range configKeys {
+	for _, key := range ConfigKeys {
 		var val string
 		var err error
 		if c.cfg.ConfigPath != "" {
-			val, err = readConfigKey(c.cfg.ConfigPath, key)
+			val, err = ReadConfigKey(c.cfg.ConfigPath, key)
 		} else {
 			cmd := strings.ReplaceAll(c.cfg.ConfigGetCmd, "%s", key)
-			val, err = runCmd(cmd)
+			val, err = RunCmd(cmd)
 		}
 		if err != nil {
 			c.log.Warn("config key error", "key", key, "err", err)
@@ -225,8 +225,8 @@ func (c *Collector) collectConfig(data map[string]json.RawMessage) {
 	}
 }
 
-// sha256File returns the hex-encoded SHA-256 checksum of the file at path.
-func sha256File(path string) (string, error) {
+// SHA256File returns the hex-encoded SHA-256 checksum of the file at path.
+func SHA256File(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", fmt.Errorf("open %s: %w", path, err)
@@ -239,8 +239,8 @@ func sha256File(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// runCmd runs cmd via sh -c and returns the trimmed stdout.
-func runCmd(cmd string) (string, error) {
+// RunCmd runs cmd via sh -c and returns the trimmed stdout.
+func RunCmd(cmd string) (string, error) {
 	out, err := exec.Command("sh", "-c", cmd).Output()
 	if err != nil {
 		return "", fmt.Errorf("run %q: %w", cmd, err)
@@ -248,10 +248,10 @@ func runCmd(cmd string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// readConfigKey reads a key from a TOML config file by scanning for section headers and key lines.
+// ReadConfigKey reads a key from a TOML config file by scanning for section headers and key lines.
 // Key is a dot-separated path like "p2p.laddr": it looks for the [p2p] section, then matches "laddr = value".
 // Single-segment keys (e.g. "moniker") are matched at the top level (before any section header).
-func readConfigKey(configPath, key string) (string, error) {
+func ReadConfigKey(configPath, key string) (string, error) {
 	b, err := os.ReadFile(configPath)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", configPath, err)
