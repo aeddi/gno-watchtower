@@ -17,7 +17,7 @@ func CheckMetadataBinary(cfg config.MetadataConfig) CheckResult {
 	case cfg.BinaryPath == "" && cfg.BinaryChecksumCmd == "":
 		return CheckResult{Name: name, Status: StatusOrange, Detail: "not configured"}
 	case cfg.BinaryPath != "" && cfg.BinaryChecksumCmd != "":
-		return CheckResult{Name: name, Status: StatusRed, Detail: "conflict: binary_path and binary_checksum_cmd both set"}
+		return CheckResult{Name: name, Status: StatusOrange, Detail: "skipped: see Metadata conflicts"}
 	case cfg.BinaryPath != "":
 		sum, err := metadata.SHA256File(cfg.BinaryPath)
 		if err != nil {
@@ -40,7 +40,7 @@ func CheckMetadataGenesis(cfg config.MetadataConfig) CheckResult {
 	case cfg.GenesisPath == "" && cfg.GenesisChecksumCmd == "":
 		return CheckResult{Name: name, Status: StatusOrange, Detail: "not configured"}
 	case cfg.GenesisPath != "" && cfg.GenesisChecksumCmd != "":
-		return CheckResult{Name: name, Status: StatusRed, Detail: "conflict: genesis_path and genesis_checksum_cmd both set"}
+		return CheckResult{Name: name, Status: StatusOrange, Detail: "skipped: see Metadata conflicts"}
 	case cfg.GenesisPath != "":
 		sum, err := metadata.SHA256File(cfg.GenesisPath)
 		if err != nil {
@@ -64,7 +64,7 @@ func CheckMetadataConfig(cfg config.MetadataConfig) CheckResult {
 	case cfg.ConfigPath == "" && cfg.ConfigGetCmd == "":
 		return CheckResult{Name: name, Status: StatusOrange, Detail: "not configured"}
 	case cfg.ConfigPath != "" && cfg.ConfigGetCmd != "":
-		return CheckResult{Name: name, Status: StatusRed, Detail: "conflict: config_path and config_get_cmd both set"}
+		return CheckResult{Name: name, Status: StatusOrange, Detail: "skipped: see Metadata conflicts"}
 	case cfg.ConfigPath != "":
 		f, err := os.Open(cfg.ConfigPath)
 		if err != nil {
