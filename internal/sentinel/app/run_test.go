@@ -106,3 +106,45 @@ func TestRun_LogsEnabled_DockerUnavailable(t *testing.T) {
 	// Must return without panic when Docker is unavailable.
 	app.Run(ctx, cfg, logger.Noop())
 }
+
+func TestRun_OTLPEnabled_ListenerFails(t *testing.T) {
+	// When the OTLP listen address is valid (port 0 assigned by OS), Run starts and exits cleanly.
+	cfg := &config.Config{
+		Server: config.ServerConfig{URL: "http://localhost", Token: "tok"},
+		OTLP: config.OTLPConfig{
+			Enabled:    true,
+			ListenAddr: "localhost:0", // port 0 is valid and will be assigned by OS
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	app.Run(ctx, cfg, logger.Noop())
+}
+
+func TestRun_ResourcesEnabled(t *testing.T) {
+	cfg := &config.Config{
+		Server: config.ServerConfig{URL: "http://localhost", Token: "tok"},
+		Resources: config.ResourcesConfig{
+			Enabled:      true,
+			PollInterval: config.Duration{Duration: 10 * time.Millisecond},
+			Source:       "host",
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	app.Run(ctx, cfg, logger.Noop())
+}
+
+func TestRun_MetadataEnabled(t *testing.T) {
+	cfg := &config.Config{
+		Server: config.ServerConfig{URL: "http://localhost", Token: "tok"},
+		Metadata: config.MetadataConfig{
+			Enabled:       true,
+			CheckInterval: config.Duration{Duration: 10 * time.Millisecond},
+			// No paths or commands set — no items to collect, exits cleanly.
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	app.Run(ctx, cfg, logger.Noop())
+}

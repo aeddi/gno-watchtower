@@ -9,6 +9,9 @@ import (
 
 	"github.com/gnolang/val-companion/internal/sentinel/config"
 	"github.com/gnolang/val-companion/internal/sentinel/logs"
+	"github.com/gnolang/val-companion/internal/sentinel/metadata"
+	"github.com/gnolang/val-companion/internal/sentinel/otlp"
+	"github.com/gnolang/val-companion/internal/sentinel/resources"
 	"github.com/gnolang/val-companion/internal/sentinel/rpc"
 	"github.com/gnolang/val-companion/internal/sentinel/sender"
 	"github.com/gnolang/val-companion/internal/sentinel/stats"
@@ -16,12 +19,16 @@ import (
 )
 
 const (
-	rpcBufferSize   = 100
-	logsBufferSize  = 50
-	maxSendAttempts = 5
-	initialBackoff  = time.Second
-	statsInterval   = time.Minute
-	logSendInterval = time.Second
+	rpcBufferSize       = 100
+	logsBufferSize      = 50
+	resourcesBufferSize = 20
+	metadataBufferSize  = 10
+	otlpChannelSize     = 10
+	maxSendAttempts     = 5
+	initialBackoff      = time.Second
+	statsInterval       = time.Minute
+	logSendInterval     = time.Second
+	metricsSendInterval = time.Second
 )
 
 // Run starts all enabled collectors and drains their output to the sender.
@@ -32,7 +39,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 	st := stats.New()
 	s := sender.New(cfg.Server.URL, cfg.Server.Token)
 
-	if !cfg.RPC.Enabled && !cfg.Logs.Enabled {
+	if !cfg.RPC.Enabled && !cfg.Logs.Enabled && !cfg.OTLP.Enabled && !cfg.Resources.Enabled && !cfg.Metadata.Enabled {
 		<-ctx.Done()
 		return
 	}
@@ -119,6 +126,97 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 		}
 	}
 
+	// ---- OTLP relay
+	// OTLP bytes are forwarded immediately as received — no send ticker needed.
+	if cfg.OTLP.Enabled {
+		otlpOut := make(chan []byte, otlpChannelSize)
+		relay := otlp.NewRelay(cfg.OTLP.ListenAddr, otlpOut, log)
+		go func() {
+			if err := relay.Run(ctx); err != nil && ctx.Err() == nil {
+				appLog.Error("otlp relay stopped", "err", err)
+			}
+		}()
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case b := <-otlpOut:
+					go func(b []byte) {
+						senderLog.Debug("sending payload", "type", "otlp", "bytes", len(b))
+						if err := s.SendRawWithRetry(ctx, "/otlp", b, "application/x-protobuf", maxSendAttempts, initialBackoff); err != nil && ctx.Err() == nil {
+							senderLog.Error("send otlp payload", "err", err)
+							return
+						}
+						st.Record("otlp", len(b))
+					}(b)
+				}
+			}
+		}()
+	}
+
+	// ---- Resource collector
+	var resourcesBuf *sender.Buffer[protocol.MetricsPayload]
+	var resourcesSendCh <-chan time.Time
+	if cfg.Resources.Enabled {
+		resourcesBuf = sender.NewBuffer[protocol.MetricsPayload](resourcesBufferSize)
+		resourcesOut := make(chan protocol.MetricsPayload, resourcesBufferSize)
+
+		rc := resources.NewCollector(cfg.Resources, resourcesOut, log)
+		go func() {
+			if err := rc.Run(ctx); err != nil && ctx.Err() == nil {
+				appLog.Error("resource collector stopped", "err", err)
+			}
+		}()
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case p := <-resourcesOut:
+					if dropped := resourcesBuf.Push(p); dropped {
+						appLog.Warn("resources buffer full: oldest payload dropped")
+					}
+				}
+			}
+		}()
+
+		t := time.NewTicker(metricsSendInterval)
+		defer t.Stop()
+		resourcesSendCh = t.C
+	}
+
+	// ---- Metadata collector
+	var metadataBuf *sender.Buffer[protocol.MetricsPayload]
+	var metadataSendCh <-chan time.Time
+	if cfg.Metadata.Enabled {
+		metadataBuf = sender.NewBuffer[protocol.MetricsPayload](metadataBufferSize)
+		metadataOut := make(chan protocol.MetricsPayload, metadataBufferSize)
+
+		mc := metadata.NewCollector(cfg.Metadata, metadataOut, log)
+		go func() {
+			if err := mc.Run(ctx); err != nil && ctx.Err() == nil {
+				appLog.Error("metadata collector stopped", "err", err)
+			}
+		}()
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case p := <-metadataOut:
+					if dropped := metadataBuf.Push(p); dropped {
+						appLog.Warn("metadata buffer full: oldest payload dropped")
+					}
+				}
+			}
+		}()
+
+		t := time.NewTicker(metricsSendInterval)
+		defer t.Stop()
+		metadataSendCh = t.C
+	}
+
 	statsTicker := time.NewTicker(statsInterval)
 	defer statsTicker.Stop()
 
@@ -134,6 +232,12 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 		case <-logSendCh:
 			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
 			go flushLogs(ctx, s, logBuf, senderLog, st)
+		case <-resourcesSendCh:
+			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
+			go flushMetrics(ctx, s, resourcesBuf, "resources", senderLog, st)
+		case <-metadataSendCh:
+			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
+			go flushMetrics(ctx, s, metadataBuf, "metadata", senderLog, st)
 		}
 	}
 }
@@ -175,6 +279,26 @@ func flushLogs(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protoco
 			continue
 		}
 		st.Record("logs", len(b))
+	}
+}
+
+func flushMetrics(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protocol.MetricsPayload], typ string, log *slog.Logger, st *stats.Stats) {
+	items := buf.Drain()
+	for _, p := range items {
+		b, err := json.Marshal(p)
+		if err != nil {
+			log.Error("marshal metrics payload", "err", err)
+			continue
+		}
+		log.Debug("sending payload", "type", typ, "uncompressed_bytes", len(b))
+		if err := s.SendWithRetry(ctx, "/metrics", p, maxSendAttempts, initialBackoff); err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			log.Error("send metrics payload", "err", err, "type", typ)
+			continue
+		}
+		st.Record(typ, len(b))
 	}
 }
 
