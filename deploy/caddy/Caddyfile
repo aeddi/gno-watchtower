@@ -1,0 +1,11 @@
+{$DOMAIN} {
+    # Watchtower API — must match before the catch-all below
+    handle /api/v1/* {
+        reverse_proxy watchtower:8080
+    }
+
+    # Grafana — everything else
+    handle {
+        reverse_proxy grafana:3000
+    }
+}
