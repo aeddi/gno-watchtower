@@ -74,3 +74,14 @@ func TestRun_PostsRPCDataToServer(t *testing.T) {
 		t.Error("expected at least one POST to /rpc, got none")
 	}
 }
+
+func TestRun_RPCDisabled(t *testing.T) {
+	cfg := &config.Config{
+		Server: config.ServerConfig{URL: "http://localhost", Token: "x"},
+		RPC:    config.RPCConfig{Enabled: false},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	// Must return without panic when RPC is disabled.
+	app.Run(ctx, cfg)
+}

@@ -56,6 +56,10 @@ func Run(ctx context.Context, cfg *config.Config) {
 	}()
 
 	// Flush buffer to watchtower on each poll interval.
+	if !cfg.RPC.Enabled {
+		<-ctx.Done()
+		return
+	}
 	ticker := time.NewTicker(cfg.RPC.PollInterval.Duration)
 	defer ticker.Stop()
 	for {
@@ -63,7 +67,8 @@ func Run(ctx context.Context, cfg *config.Config) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			flush(ctx, s, buf)
+			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
+			go flush(ctx, s, buf)
 		}
 	}
 }
