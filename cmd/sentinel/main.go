@@ -4,13 +4,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/gnolang/val-companion/internal/sentinel/app"
 	"github.com/gnolang/val-companion/internal/sentinel/config"
+	"github.com/gnolang/val-companion/pkg/logger"
 )
 
 func main() {
@@ -39,13 +40,20 @@ func runCmd() {
 	}
 	cfg, err := config.Load(os.Args[2])
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		fmt.Fprintf(os.Stderr, "load config: %v\n", err)
+		os.Exit(1)
+	}
+
+	log, err := logger.New(logger.FormatConsole, slog.LevelInfo)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "init logger: %v\n", err)
+		os.Exit(1)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	app.Run(ctx, cfg)
+	app.Run(ctx, cfg, log)
 }
 
 func usage() {

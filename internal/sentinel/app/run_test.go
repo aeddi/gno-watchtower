@@ -13,6 +13,7 @@ import (
 
 	"github.com/gnolang/val-companion/internal/sentinel/app"
 	"github.com/gnolang/val-companion/internal/sentinel/config"
+	"github.com/gnolang/val-companion/pkg/logger"
 )
 
 func TestRun_PostsRPCDataToServer(t *testing.T) {
@@ -67,7 +68,7 @@ func TestRun_PostsRPCDataToServer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
 	defer cancel()
 
-	go app.Run(ctx, cfg)
+	go app.Run(ctx, cfg, logger.Noop())
 	<-ctx.Done()
 
 	if received.Load() == 0 {
@@ -83,5 +84,5 @@ func TestRun_RPCDisabled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	// Must return without panic when RPC is disabled.
-	app.Run(ctx, cfg)
+	app.Run(ctx, cfg, logger.Noop())
 }
