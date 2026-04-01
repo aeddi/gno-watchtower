@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/gnolang/val-companion/internal/sentinel/delta"
 	"github.com/gnolang/val-companion/pkg/protocol"
 )
 
@@ -21,7 +22,7 @@ type statusResult struct {
 // /block and /block_results are always emitted when a new block is detected.
 type Collector struct {
 	client       *Client
-	delta        *Delta
+	delta        *delta.Delta
 	pollInterval time.Duration
 	dumpInterval time.Duration
 	out          chan<- protocol.RPCPayload
@@ -33,7 +34,7 @@ type Collector struct {
 func NewCollector(client *Client, pollInterval, dumpInterval time.Duration, out chan<- protocol.RPCPayload, log *slog.Logger) *Collector {
 	return &Collector{
 		client:       client,
-		delta:        NewDelta(),
+		delta:        delta.NewDelta(),
 		pollInterval: pollInterval,
 		dumpInterval: dumpInterval,
 		out:          out,

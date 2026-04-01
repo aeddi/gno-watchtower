@@ -25,7 +25,7 @@ func main() {
 	case "run":
 		runCmd(os.Args[2:])
 	case "generate-config":
-		fmt.Print(config.Example)
+		os.Stdout.WriteString(config.Example) //nolint:errcheck
 	case "doctor":
 		fmt.Fprintln(os.Stderr, "doctor: not yet implemented")
 		os.Exit(1)

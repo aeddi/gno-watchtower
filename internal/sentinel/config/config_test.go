@@ -176,3 +176,96 @@ func TestByteSize_UnmarshalText_Invalid(t *testing.T) {
 		t.Error("expected error for invalid byte size")
 	}
 }
+
+func TestLoad_OTLPConfig(t *testing.T) {
+	const content = `
+[server]
+url   = "https://example.com"
+token = "tok"
+
+[otlp]
+enabled     = true
+listen_addr = "localhost:4317"
+`
+	cfg := mustLoadTOML(t, content)
+	if !cfg.OTLP.Enabled {
+		t.Error("OTLP.Enabled: want true")
+	}
+	if cfg.OTLP.ListenAddr != "localhost:4317" {
+		t.Errorf("OTLP.ListenAddr: got %q, want %q", cfg.OTLP.ListenAddr, "localhost:4317")
+	}
+}
+
+func TestLoad_ResourcesConfig(t *testing.T) {
+	const content = `
+[server]
+url   = "https://example.com"
+token = "tok"
+
+[resources]
+enabled        = true
+poll_interval  = "10s"
+source         = "host"
+container_name = ""
+`
+	cfg := mustLoadTOML(t, content)
+	if !cfg.Resources.Enabled {
+		t.Error("Resources.Enabled: want true")
+	}
+	if cfg.Resources.PollInterval.Duration != 10*time.Second {
+		t.Errorf("Resources.PollInterval: got %v, want 10s", cfg.Resources.PollInterval.Duration)
+	}
+	if cfg.Resources.Source != "host" {
+		t.Errorf("Resources.Source: got %q, want %q", cfg.Resources.Source, "host")
+	}
+}
+
+func TestLoad_MetadataConfig(t *testing.T) {
+	const content = `
+[server]
+url   = "https://example.com"
+token = "tok"
+
+[metadata]
+enabled        = true
+check_interval = "10m"
+binary_path    = "/usr/local/bin/gnoland"
+config_path    = "/etc/gnoland/config.toml"
+genesis_path   = "/etc/gnoland/genesis.json"
+`
+	cfg := mustLoadTOML(t, content)
+	if !cfg.Metadata.Enabled {
+		t.Error("Metadata.Enabled: want true")
+	}
+	if cfg.Metadata.CheckInterval.Duration != 10*time.Minute {
+		t.Errorf("Metadata.CheckInterval: got %v, want 10m", cfg.Metadata.CheckInterval.Duration)
+	}
+	if cfg.Metadata.BinaryPath != "/usr/local/bin/gnoland" {
+		t.Errorf("Metadata.BinaryPath: got %q", cfg.Metadata.BinaryPath)
+	}
+	if cfg.Metadata.ConfigPath != "/etc/gnoland/config.toml" {
+		t.Errorf("Metadata.ConfigPath: got %q", cfg.Metadata.ConfigPath)
+	}
+	if cfg.Metadata.GenesisPath != "/etc/gnoland/genesis.json" {
+		t.Errorf("Metadata.GenesisPath: got %q", cfg.Metadata.GenesisPath)
+	}
+}
+
+// mustLoadTOML is a test helper that writes content to a temp file and loads it.
+func mustLoadTOML(t *testing.T, content string) *config.Config {
+	t.Helper()
+	f, err := os.CreateTemp("", "sentinel-config-*.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	cfg, err := config.Load(f.Name())
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	return cfg
+}

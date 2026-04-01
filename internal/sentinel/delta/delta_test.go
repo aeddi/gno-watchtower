@@ -1,22 +1,22 @@
-package rpc_test
+// internal/sentinel/delta/delta_test.go
+package delta_test
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/gnolang/val-companion/internal/sentinel/rpc"
+	"github.com/gnolang/val-companion/internal/sentinel/delta"
 )
 
 func TestDelta_FirstCallAlwaysChanged(t *testing.T) {
-	d := rpc.NewDelta()
-	raw := []byte(`{"height":"1"}`)
-	if !d.Changed("status", raw) {
+	d := delta.NewDelta()
+	if !d.Changed("status", []byte(`{"height":"1"}`)) {
 		t.Error("first call should always return changed=true")
 	}
 }
 
 func TestDelta_UnchangedDataReturnsFalse(t *testing.T) {
-	d := rpc.NewDelta()
+	d := delta.NewDelta()
 	raw := []byte(`{"height":"1"}`)
 	d.Changed("status", raw)
 	if d.Changed("status", raw) {
@@ -25,7 +25,7 @@ func TestDelta_UnchangedDataReturnsFalse(t *testing.T) {
 }
 
 func TestDelta_ChangedDataReturnsTrue(t *testing.T) {
-	d := rpc.NewDelta()
+	d := delta.NewDelta()
 	d.Changed("status", []byte(`{"height":"1"}`))
 	if !d.Changed("status", []byte(`{"height":"2"}`)) {
 		t.Error("different data should return changed=true")
@@ -33,7 +33,7 @@ func TestDelta_ChangedDataReturnsTrue(t *testing.T) {
 }
 
 func TestDelta_IndependentKeysAreTrackedSeparately(t *testing.T) {
-	d := rpc.NewDelta()
+	d := delta.NewDelta()
 	raw := []byte(`{"v":1}`)
 	d.Changed("a", raw)
 	d.Changed("b", raw)
@@ -46,7 +46,7 @@ func TestDelta_IndependentKeysAreTrackedSeparately(t *testing.T) {
 }
 
 func TestDelta_ConcurrentSafe(t *testing.T) {
-	d := rpc.NewDelta()
+	d := delta.NewDelta()
 	done := make(chan struct{})
 	for i := 0; i < 10; i++ {
 		go func(i int) {

@@ -57,9 +57,12 @@ func (b *ByteSize) UnmarshalText(text []byte) error {
 }
 
 type Config struct {
-	Server ServerConfig `toml:"server"`
-	RPC    RPCConfig    `toml:"rpc"`
-	Logs   LogsConfig   `toml:"logs"`
+	Server    ServerConfig    `toml:"server"`
+	RPC       RPCConfig       `toml:"rpc"`
+	Logs      LogsConfig      `toml:"logs"`
+	OTLP      OTLPConfig      `toml:"otlp"`
+	Resources ResourcesConfig `toml:"resources"`
+	Metadata  MetadataConfig  `toml:"metadata"`
 }
 
 type ServerConfig struct {
@@ -83,6 +86,36 @@ type LogsConfig struct {
 	BatchSize     ByteSize `toml:"batch_size"`
 	BatchTimeout  Duration `toml:"batch_timeout"`
 	MinLevel      string   `toml:"min_level"` // "debug" | "info" | "warn" | "error"
+}
+
+// OTLPConfig holds OTLP relay settings.
+type OTLPConfig struct {
+	Enabled    bool   `toml:"enabled"`
+	ListenAddr string `toml:"listen_addr"` // default: "localhost:4317"
+}
+
+// ResourcesConfig holds resource monitor settings.
+type ResourcesConfig struct {
+	Enabled       bool     `toml:"enabled"`
+	PollInterval  Duration `toml:"poll_interval"`
+	Source        string   `toml:"source"`         // "host" | "docker" | "both"
+	ContainerName string   `toml:"container_name"` // docker only
+}
+
+// MetadataConfig holds metadata collector settings.
+// For each item, set exactly one of _path or _cmd — setting both is an error detected at runtime.
+type MetadataConfig struct {
+	Enabled       bool     `toml:"enabled"`
+	CheckInterval Duration `toml:"check_interval"`
+
+	BinaryPath        string `toml:"binary_path"`
+	BinaryChecksumCmd string `toml:"binary_checksum_cmd"`
+
+	ConfigPath   string `toml:"config_path"`
+	ConfigGetCmd string `toml:"config_get_cmd"` // use %s as placeholder for key name
+
+	GenesisPath        string `toml:"genesis_path"`
+	GenesisChecksumCmd string `toml:"genesis_checksum_cmd"`
 }
 
 func Load(path string) (*Config, error) {

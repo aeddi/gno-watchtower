@@ -1,4 +1,5 @@
-package rpc
+// internal/sentinel/delta/delta.go
+package delta
 
 import (
 	"crypto/sha256"
