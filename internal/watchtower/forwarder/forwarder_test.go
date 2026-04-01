@@ -157,7 +157,9 @@ func zstdCompress(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	w.Write(data)
+	if _, err := w.Write(data); err != nil {
+		return nil, err
+	}
 	w.Close()
 	return buf.Bytes(), nil
 }

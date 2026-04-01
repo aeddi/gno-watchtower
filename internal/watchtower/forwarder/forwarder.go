@@ -152,7 +152,7 @@ func (f *Forwarder) post(ctx context.Context, url string, body []byte, contentTy
 		return fmt.Errorf("post %s: %w", url, err)
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body) //nolint:errcheck
+	_, _ = io.Copy(io.Discard, resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("post %s: unexpected status %d", url, resp.StatusCode)
 	}
