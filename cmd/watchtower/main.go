@@ -90,7 +90,9 @@ func runCmd(args []string) {
 		<-ctx.Done()
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		httpSrv.Shutdown(shutCtx) //nolint:errcheck
+		if err := httpSrv.Shutdown(shutCtx); err != nil {
+			logger.Error("shutdown", "err", err)
+		}
 	}()
 
 	logger.Info("watchtower starting", "addr", cfg.Server.ListenAddr)
