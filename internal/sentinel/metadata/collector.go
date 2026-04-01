@@ -81,6 +81,7 @@ func (c *Collector) Run(ctx context.Context) error {
 			c.collectAndSend(ctx)
 		case event, ok := <-watcher.Events:
 			if !ok {
+				c.log.Warn("watcher events channel closed unexpectedly")
 				return nil
 			}
 			if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) {
@@ -89,6 +90,7 @@ func (c *Collector) Run(ctx context.Context) error {
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
+				c.log.Warn("watcher errors channel closed unexpectedly")
 				return nil
 			}
 			c.log.Warn("watcher error", "err", err)
@@ -147,7 +149,12 @@ func (c *Collector) collectBinary(data map[string]json.RawMessage) {
 		c.log.Warn("binary checksum error", "err", err)
 		return
 	}
-	if b, err := json.Marshal(checksum); err == nil && c.delta.Changed("binary_checksum", b) {
+	b, err := json.Marshal(checksum)
+	if err != nil {
+		c.log.Warn("binary checksum marshal error", "err", err)
+		return
+	}
+	if c.delta.Changed("binary_checksum", b) {
 		data["binary_checksum"] = b
 	}
 }
@@ -171,7 +178,12 @@ func (c *Collector) collectGenesis(data map[string]json.RawMessage) {
 		c.log.Warn("genesis checksum error", "err", err)
 		return
 	}
-	if b, err := json.Marshal(checksum); err == nil && c.delta.Changed("genesis_checksum", b) {
+	b, err := json.Marshal(checksum)
+	if err != nil {
+		c.log.Warn("genesis checksum marshal error", "err", err)
+		return
+	}
+	if c.delta.Changed("genesis_checksum", b) {
 		data["genesis_checksum"] = b
 	}
 }
@@ -203,7 +215,12 @@ func (c *Collector) collectConfig(data map[string]json.RawMessage) {
 	if len(values) == 0 {
 		return
 	}
-	if b, err := json.Marshal(values); err == nil && c.delta.Changed("config", b) {
+	b, err := json.Marshal(values)
+	if err != nil {
+		c.log.Warn("config marshal error", "err", err)
+		return
+	}
+	if c.delta.Changed("config", b) {
 		data["config"] = b
 	}
 }
@@ -231,20 +248,46 @@ func runCmd(cmd string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// readConfigKey reads a key from a TOML config file by scanning for `leafKey = value` lines.
-// Key is a dot-separated path (e.g. "p2p.laddr"); only the leaf segment is matched.
+// readConfigKey reads a key from a TOML config file by scanning for section headers and key lines.
+// Key is a dot-separated path like "p2p.laddr": it looks for the [p2p] section, then matches "laddr = value".
+// Single-segment keys (e.g. "moniker") are matched at the top level (before any section header).
 func readConfigKey(configPath, key string) (string, error) {
 	b, err := os.ReadFile(configPath)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", configPath, err)
 	}
-	leaf := key
+
+	var section, leaf string
 	if idx := strings.LastIndex(key, "."); idx >= 0 {
+		section = key[:idx]
 		leaf = key[idx+1:]
+	} else {
+		section = ""
+		leaf = key
 	}
+
+	// inSection tracks whether we are currently inside the target section.
+	// For top-level keys (section == ""), we are always "in section" until the first header.
+	inSection := section == ""
 	for _, line := range strings.Split(string(b), "\n") {
-		line = strings.TrimSpace(line)
-		parts := strings.SplitN(line, "=", 2)
+		trimmed := strings.TrimSpace(line)
+
+		// Detect section headers like [p2p] or [telemetry].
+		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
+			currentSection := trimmed[1 : len(trimmed)-1]
+			inSection = currentSection == section
+			if section == "" {
+				// top-level key: stop searching once we hit any section header
+				inSection = false
+			}
+			continue
+		}
+
+		if !inSection {
+			continue
+		}
+
+		parts := strings.SplitN(trimmed, "=", 2)
 		if len(parts) != 2 || strings.TrimSpace(parts[0]) != leaf {
 			continue
 		}

@@ -14,18 +14,6 @@ import (
 	"github.com/gnolang/val-companion/pkg/protocol"
 )
 
-func TestNewCollector_ReturnsNonNil(t *testing.T) {
-	cfg := config.MetadataConfig{
-		Enabled:       true,
-		CheckInterval: config.Duration{Duration: time.Minute},
-	}
-	out := make(chan protocol.MetricsPayload, 1)
-	c := metadata.NewCollector(cfg, out, logger.Noop())
-	if c == nil {
-		t.Fatal("expected non-nil Collector")
-	}
-}
-
 func TestCollector_BinaryPath_EmitsChecksum(t *testing.T) {
 	// Write a temp file to use as the "binary".
 	tmpDir := t.TempDir()
