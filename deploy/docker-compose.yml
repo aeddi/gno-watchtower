@@ -1,0 +1,73 @@
+services:
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    env_file: config.env
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  watchtower:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    volumes:
+      - ./watchtower.toml:/etc/watchtower/config.toml:ro
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics:v1.115.0
+    command:
+      - "-retentionPeriod=${METRICS_RETENTION}"
+      - "-storageDataPath=/data"
+      - "-storage.minFreeDiskSpaceBytes=10737418240"
+    volumes:
+      - vm_data:/data
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.4.4
+    command: -config.file=/etc/loki/loki-config.yml -config.expand-env=true
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    env_file: config.env
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    env_file: config.env
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  vm_data:
+  loki_data:
+  grafana_data:
