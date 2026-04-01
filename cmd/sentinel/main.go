@@ -13,6 +13,7 @@ import (
 
 	"github.com/gnolang/val-companion/internal/sentinel/app"
 	"github.com/gnolang/val-companion/internal/sentinel/config"
+	"github.com/gnolang/val-companion/internal/sentinel/doctor"
 	pkglogger "github.com/gnolang/val-companion/pkg/logger"
 )
 
@@ -27,8 +28,7 @@ func main() {
 	case "generate-config":
 		os.Stdout.WriteString(config.Example) //nolint:errcheck
 	case "doctor":
-		fmt.Fprintln(os.Stderr, "doctor: not yet implemented")
-		os.Exit(1)
+		doctorCmd(os.Args[2:])
 	default:
 		usage()
 		os.Exit(1)
@@ -69,6 +69,32 @@ func runCmd(args []string) {
 	defer stop()
 
 	app.Run(ctx, cfg, logger)
+}
+
+func doctorCmd(args []string) {
+	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "Usage: sentinel doctor <config-file>")
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	if fs.NArg() < 1 {
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	cfg, err := config.Load(fs.Arg(0))
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	code := doctor.Run(ctx, cfg, fs.Arg(0), os.Stdout)
+	os.Exit(code)
 }
 
 func parseLevel(s string) (slog.Level, error) {
