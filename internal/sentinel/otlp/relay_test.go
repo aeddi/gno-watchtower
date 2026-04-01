@@ -16,14 +16,6 @@ import (
 	"github.com/gnolang/val-companion/pkg/logger"
 )
 
-func TestNewRelay_ReturnsNonNil(t *testing.T) {
-	out := make(chan []byte, 1)
-	r := otlp.NewRelay("localhost:0", out, logger.Noop())
-	if r == nil {
-		t.Fatal("expected non-nil Relay")
-	}
-}
-
 func TestRelay_ForwardsExportToChannel(t *testing.T) {
 	out := make(chan []byte, 1)
 
