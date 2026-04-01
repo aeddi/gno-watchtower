@@ -9,4 +9,7 @@ require (
 	github.com/systemd/slog-journal v0.1.2
 )
 
-require golang.org/x/sys v0.39.0 // indirect
+require (
+	github.com/klauspost/compress v1.18.5 // indirect
+	golang.org/x/sys v0.39.0 // indirect
+)

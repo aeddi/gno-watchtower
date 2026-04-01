@@ -2,6 +2,7 @@
 package sender_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/klauspost/compress/zstd"
 
 	"github.com/gnolang/val-companion/internal/sentinel/sender"
 )
@@ -107,5 +110,64 @@ func TestSender_SendWithRetry_RespectsContextCancel(t *testing.T) {
 	err := s.SendWithRetry(ctx, "/rpc", map[string]string{}, 10, 100*time.Millisecond)
 	if err == nil {
 		t.Fatal("expected error when context cancelled")
+	}
+}
+
+func TestSender_SendCompressed_SetsHeader(t *testing.T) {
+	var gotEncoding string
+	var gotBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotEncoding = r.Header.Get("Content-Encoding")
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	s := sender.New(srv.URL, "tok")
+	payload := map[string]string{"level": "warn"}
+	if err := s.SendCompressed(context.Background(), "/logs", payload); err != nil {
+		t.Fatalf("SendCompressed: %v", err)
+	}
+	if gotEncoding != "zstd" {
+		t.Errorf("Content-Encoding: got %q, want %q", gotEncoding, "zstd")
+	}
+	// Body must be valid zstd-compressed JSON.
+	r, err := zstd.NewReader(bytes.NewReader(gotBody))
+	if err != nil {
+		t.Fatalf("zstd reader: %v", err)
+	}
+	defer r.Close()
+	decompressed, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("decompress: %v", err)
+	}
+	var got map[string]string
+	if err := json.Unmarshal(decompressed, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got["level"] != "warn" {
+		t.Errorf("payload level: got %q, want %q", got["level"], "warn")
+	}
+}
+
+func TestSender_SendCompressedWithRetry_RetriesOnFailure(t *testing.T) {
+	var attempts atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := attempts.Add(1)
+		if n < 3 {
+			http.Error(w, "not ready", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	s := sender.New(srv.URL, "tok")
+	err := s.SendCompressedWithRetry(context.Background(), "/logs", map[string]string{}, 5, 10*time.Millisecond)
+	if err != nil {
+		t.Fatalf("SendCompressedWithRetry: %v", err)
+	}
+	if attempts.Load() != 3 {
+		t.Errorf("expected 3 attempts, got %d", attempts.Load())
 	}
 }
