@@ -2,22 +2,13 @@ package config
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/gnolang/val-companion/pkg/tomlutil"
 )
 
 // Duration wraps time.Duration for TOML string unmarshaling.
-type Duration struct{ time.Duration }
-
-func (d *Duration) UnmarshalText(text []byte) error {
-	dur, err := time.ParseDuration(string(text))
-	if err != nil {
-		return fmt.Errorf("invalid duration %q: %w", text, err)
-	}
-	d.Duration = dur
-	return nil
-}
+type Duration = tomlutil.Duration
 
 // ValidatorConfig holds per-validator settings.
 type ValidatorConfig struct {
@@ -34,7 +25,7 @@ type TokenEntry struct {
 
 // Config is the root watchtower configuration.
 type Config struct {
-	Server          ServerConfig
+	Server          ServerConfig          `toml:"server"`
 	Security        SecurityConfig
 	VictoriaMetrics VictoriaMetricsConfig `toml:"victoria_metrics"`
 	Loki            LokiConfig

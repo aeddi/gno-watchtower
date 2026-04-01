@@ -4,26 +4,13 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/gnolang/val-companion/pkg/tomlutil"
 )
 
 // Duration wraps time.Duration to support TOML string values like "3s", "30s".
-type Duration struct{ time.Duration }
-
-func (d *Duration) UnmarshalText(text []byte) error {
-	dur, err := time.ParseDuration(string(text))
-	if err != nil {
-		return fmt.Errorf("invalid duration %q: %w", text, err)
-	}
-	d.Duration = dur
-	return nil
-}
-
-func (d Duration) MarshalText() ([]byte, error) {
-	return []byte(d.Duration.String()), nil
-}
+type Duration = tomlutil.Duration
 
 // ByteSize is an int64 that unmarshals from TOML strings like "1MB", "512KB", "1GB".
 // Plain integers are also accepted (e.g. "1024" = 1024 bytes).

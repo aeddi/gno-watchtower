@@ -72,8 +72,15 @@ func TestLoad_ParsesAllFields(t *testing.T) {
 	if v01.Token != "secret-token-1" {
 		t.Errorf("val-01 token: got %q", v01.Token)
 	}
-	if len(v01.Permissions) != 4 {
-		t.Errorf("val-01 permissions: got %v", v01.Permissions)
+	wantPerms := []string{"rpc", "metrics", "logs", "otlp"}
+	if len(v01.Permissions) != len(wantPerms) {
+		t.Errorf("val-01 permissions length: want %d, got %d", len(wantPerms), len(v01.Permissions))
+	} else {
+		for i, p := range wantPerms {
+			if v01.Permissions[i] != p {
+				t.Errorf("val-01 permissions[%d]: want %q, got %q", i, p, v01.Permissions[i])
+			}
+		}
 	}
 	if v01.LogsMinLevel != "info" {
 		t.Errorf("val-01 logs_min_level: got %q", v01.LogsMinLevel)
@@ -101,11 +108,17 @@ func TestLoad_BuildsTokenIndex(t *testing.T) {
 	if entry.Config.LogsMinLevel != "info" {
 		t.Errorf("logs_min_level: got %q", entry.Config.LogsMinLevel)
 	}
+	if _, ok := cfg.TokenIndex["secret-token-2"]; !ok {
+		t.Error("secret-token-2 not found in token index")
+	}
 }
 
 func TestLoad_MissingFile_ReturnsError(t *testing.T) {
 	_, err := config.Load("/nonexistent/config.toml")
 	if err == nil {
 		t.Error("expected error for missing file")
+	}
+	if err != nil && err.Error() == "" {
+		t.Error("error message must be non-empty")
 	}
 }
