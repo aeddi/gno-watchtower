@@ -171,3 +171,48 @@ func TestSender_SendCompressedWithRetry_RetriesOnFailure(t *testing.T) {
 		t.Errorf("expected 3 attempts, got %d", attempts.Load())
 	}
 }
+
+func TestSender_SendRaw_SetsContentType(t *testing.T) {
+	var gotContentType string
+	var gotBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotContentType = r.Header.Get("Content-Type")
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	s := sender.New(srv.URL, "tok")
+	body := []byte{0x0a, 0x05, 0x68, 0x65, 0x6c, 0x6c, 0x6f} // arbitrary bytes
+	if err := s.SendRaw(context.Background(), "/otlp", body, "application/x-protobuf"); err != nil {
+		t.Fatalf("SendRaw: %v", err)
+	}
+	if gotContentType != "application/x-protobuf" {
+		t.Errorf("Content-Type: got %q, want %q", gotContentType, "application/x-protobuf")
+	}
+	if string(gotBody) != string(body) {
+		t.Errorf("body mismatch: got %x, want %x", gotBody, body)
+	}
+}
+
+func TestSender_SendRawWithRetry_RetriesOnFailure(t *testing.T) {
+	var attempts atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := attempts.Add(1)
+		if n < 3 {
+			http.Error(w, "not ready", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	s := sender.New(srv.URL, "tok")
+	err := s.SendRawWithRetry(context.Background(), "/otlp", []byte("data"), "application/x-protobuf", 5, 10*time.Millisecond)
+	if err != nil {
+		t.Fatalf("SendRawWithRetry: %v", err)
+	}
+	if attempts.Load() != 3 {
+		t.Errorf("expected 3 attempts, got %d", attempts.Load())
+	}
+}

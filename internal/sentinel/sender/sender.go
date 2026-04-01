@@ -65,6 +65,19 @@ func (s *Sender) SendCompressedWithRetry(ctx context.Context, path string, paylo
 	})
 }
 
+// SendRaw makes a single POST attempt with raw bytes and a specific Content-Type.
+// Use for non-JSON payloads such as protobuf (Content-Type: application/x-protobuf).
+func (s *Sender) SendRaw(ctx context.Context, path string, body []byte, contentType string) error {
+	return s.post(ctx, path, body, map[string]string{"Content-Type": contentType})
+}
+
+// SendRawWithRetry retries SendRaw up to maxAttempts times with exponential backoff.
+func (s *Sender) SendRawWithRetry(ctx context.Context, path string, body []byte, contentType string, maxAttempts int, initialBackoff time.Duration) error {
+	return retry(ctx, maxAttempts, initialBackoff, func() error {
+		return s.SendRaw(ctx, path, body, contentType)
+	})
+}
+
 // post executes a single HTTP POST. extraHeaders are applied after Content-Type and Authorization.
 func (s *Sender) post(ctx context.Context, path string, body []byte, extraHeaders map[string]string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.serverURL+path, bytes.NewReader(body))
