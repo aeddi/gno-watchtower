@@ -36,5 +36,5 @@ add-validator:
 # Usage: make remove-validator name=val-01
 remove-validator:
 	@if [ -z "$(name)" ]; then echo "ERROR: name is required"; exit 1; fi
-	@python3 -c "import re; f=open('watchtower.toml','r'); c=f.read(); f.close(); u=re.sub(r'\n\[validators\.$(name)\][^\[]*','',c); f=open('watchtower.toml','w'); f.write(u); f.close(); print('Validator $(name) removed from watchtower.toml')"
+	@python3 -c "import re; f=open('watchtower.toml','r'); c=f.read(); f.close(); u=re.sub(r'\n\[validators\.$(name)\].*?(?=\n\[|\Z)','',c,flags=re.S|re.M); f=open('watchtower.toml','w'); f.write(u); f.close(); print('Validator $(name) removed from watchtower.toml')"
 	@$(COMPOSE) restart watchtower
