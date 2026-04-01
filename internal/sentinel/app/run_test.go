@@ -86,3 +86,23 @@ func TestRun_RPCDisabled(t *testing.T) {
 	// Must return without panic when RPC is disabled.
 	app.Run(ctx, cfg, logger.Noop())
 }
+
+func TestRun_LogsEnabled_DockerUnavailable(t *testing.T) {
+	// When Docker is unavailable, Run must start and exit cleanly without panicking.
+	// The log collector logs its error and stops; RPC is not affected.
+	cfg := &config.Config{
+		Server: config.ServerConfig{URL: "http://localhost", Token: "tok"},
+		Logs: config.LogsConfig{
+			Enabled:       true,
+			Source:        "docker",
+			ContainerName: "nonexistent-container",
+			BatchSize:     config.ByteSize(1024 * 1024),
+			BatchTimeout:  config.Duration{Duration: 50 * time.Millisecond},
+			MinLevel:      "info",
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	// Must return without panic when Docker is unavailable.
+	app.Run(ctx, cfg, logger.Noop())
+}
