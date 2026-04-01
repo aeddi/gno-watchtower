@@ -9,6 +9,10 @@ import (
 	"github.com/gnolang/val-companion/pkg/protocol"
 )
 
+// lineBufferSize is the capacity of the internal channel between the Source goroutine
+// and the collection loop.
+const lineBufferSize = 256
+
 // levelRank returns a numeric rank for min_level filtering.
 // Unknown levels → rank 1 (info).
 func levelRank(level string) int {
@@ -54,7 +58,7 @@ func NewCollector(source Source, minLevel string, batchSize int64, batchTimeout 
 
 // Run starts the collection loop. It blocks until ctx is cancelled.
 func (c *Collector) Run(ctx context.Context) error {
-	lineCh := make(chan LogLine, 256)
+	lineCh := make(chan LogLine, lineBufferSize)
 	go func() {
 		// collect errors are transient; log and continue.
 		if err := c.source.Tail(ctx, lineCh); err != nil && ctx.Err() == nil {
@@ -69,6 +73,8 @@ func (c *Collector) Run(ctx context.Context) error {
 	flush := func() {
 		for level, lines := range accumulated {
 			c.log.Debug("flushing batch", "level", level, "lines", len(lines))
+			// Flush is best-effort at shutdown: if out is full and ctx is cancelled,
+			// remaining levels are dropped.
 			select {
 			case c.out <- protocol.LogPayload{Level: level, Lines: lines}:
 			case <-ctx.Done():
