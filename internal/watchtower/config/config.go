@@ -25,10 +25,10 @@ type TokenEntry struct {
 
 // Config is the root watchtower configuration.
 type Config struct {
-	Server          ServerConfig          `toml:"server"`
-	Security        SecurityConfig
-	VictoriaMetrics VictoriaMetricsConfig `toml:"victoria_metrics"`
-	Loki            LokiConfig
+	Server          ServerConfig               `toml:"server"`
+	Security        SecurityConfig             `toml:"security"`
+	VictoriaMetrics VictoriaMetricsConfig      `toml:"victoria_metrics"`
+	Loki            LokiConfig                 `toml:"loki"`
 	Validators      map[string]ValidatorConfig `toml:"validators"`
 
 	// TokenIndex is built from Validators at load time; not in TOML.
