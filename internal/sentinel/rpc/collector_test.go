@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gnolang/val-companion/internal/sentinel/rpc"
+	"github.com/gnolang/val-companion/pkg/logger"
 	"github.com/gnolang/val-companion/pkg/protocol"
 )
 
@@ -62,7 +63,7 @@ func TestCollector_EmitsPayloads(t *testing.T) {
 	defer srv.Close()
 
 	out := make(chan protocol.RPCPayload, 10)
-	c := rpc.NewCollector(rpc.NewClient(srv.URL), 50*time.Millisecond, 1*time.Hour, out, func(string, ...any) {})
+	c := rpc.NewCollector(rpc.NewClient(srv.URL), 50*time.Millisecond, 1*time.Hour, out, logger.Noop())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
@@ -114,7 +115,7 @@ func TestCollector_DeltaSkipsUnchangedEndpoints(t *testing.T) {
 	defer srv.Close()
 
 	out := make(chan protocol.RPCPayload, 10)
-	c := rpc.NewCollector(rpc.NewClient(srv.URL), 50*time.Millisecond, 1*time.Hour, out, func(string, ...any) {})
+	c := rpc.NewCollector(rpc.NewClient(srv.URL), 50*time.Millisecond, 1*time.Hour, out, logger.Noop())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
