@@ -49,6 +49,7 @@ func (c *Collector) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
+			// collect errors are transient; log and continue.
 			if err := c.collect(ctx); err != nil {
 				c.log.Error("collect failed", "err", err)
 			}

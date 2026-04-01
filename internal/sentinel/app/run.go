@@ -72,6 +72,8 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 	sendTicker := time.NewTicker(cfg.RPC.PollInterval.Duration)
 	defer sendTicker.Stop()
 
+	senderLog := log.With("component", "sender")
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -80,26 +82,25 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 			logStats(appLog, st)
 		case <-sendTicker.C:
 			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
-			go flush(ctx, s, buf, appLog, st)
+			go flush(ctx, s, buf, senderLog, st)
 		}
 	}
 }
 
 func flush(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protocol.RPCPayload], log *slog.Logger, st *stats.Stats) {
-	senderLog := log.With("component", "sender")
 	items := buf.Drain()
 	for _, p := range items {
 		b, err := json.Marshal(p)
 		if err != nil {
-			senderLog.Error("marshal payload", "err", err)
+			log.Error("marshal payload", "err", err)
 			continue
 		}
-		senderLog.Debug("sending payload", "type", "rpc", "uncompressed_bytes", len(b))
+		log.Debug("sending payload", "type", "rpc", "uncompressed_bytes", len(b))
 		if err := s.SendWithRetry(ctx, "/rpc", p, maxSendAttempts, initialBackoff); err != nil {
 			if ctx.Err() != nil {
 				return
 			}
-			senderLog.Error("send rpc payload", "err", err)
+			log.Error("send rpc payload", "err", err)
 			continue
 		}
 		st.Record("rpc", len(b))
@@ -110,10 +111,10 @@ func logStats(log *slog.Logger, st *stats.Stats) {
 	snap, uptime := st.Snapshot()
 	args := []any{"uptime", uptime.Round(time.Second)}
 	for typ, s := range snap {
-		args = append(args,
-			typ+"_last_min_bytes", s.LastMinuteBytes,
-			typ+"_total_bytes", s.TotalBytes,
-		)
+		args = append(args, slog.Group(typ,
+			"last_min_bytes", s.LastMinuteBytes,
+			"total_bytes", s.TotalBytes,
+		))
 	}
 	log.Info("stats", args...)
 }

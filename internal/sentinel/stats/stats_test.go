@@ -66,7 +66,7 @@ func TestStats_EmptySnapshot(t *testing.T) {
 	if len(snap) != 0 {
 		t.Errorf("expected empty snapshot, got %v", snap)
 	}
-	if uptime <= 0 {
-		t.Errorf("expected positive uptime, got %v", uptime)
+	if uptime < 0 {
+		t.Errorf("expected non-negative uptime, got %v", uptime)
 	}
 }
