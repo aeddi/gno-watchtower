@@ -10,4 +10,12 @@ enabled                       = true
 poll_interval                 = "3s"
 rpc_url                       = "http://localhost:26657"
 dump_consensus_state_interval = "30s"
+
+[logs]
+enabled        = true
+source         = "docker"
+container_name = "gnoland"
+batch_size     = "1MB"
+batch_timeout  = "5s"
+min_level      = "info"
 `

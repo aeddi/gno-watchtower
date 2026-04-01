@@ -98,3 +98,81 @@ func TestExample_IsValidTOML(t *testing.T) {
 		t.Fatalf("Example constant is not valid TOML: %v", err)
 	}
 }
+
+func TestLoad_LogsConfig(t *testing.T) {
+	const content = `
+[server]
+url   = "https://example.com"
+token = "tok"
+
+[logs]
+enabled        = true
+source         = "docker"
+container_name = "gnoland"
+batch_size     = "1MB"
+batch_timeout  = "5s"
+min_level      = "warn"
+`
+	f, err := os.CreateTemp("", "sentinel-config-*.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	cfg, err := config.Load(f.Name())
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.Logs.Enabled {
+		t.Error("Logs.Enabled: want true")
+	}
+	if cfg.Logs.Source != "docker" {
+		t.Errorf("Logs.Source: got %q, want %q", cfg.Logs.Source, "docker")
+	}
+	if cfg.Logs.ContainerName != "gnoland" {
+		t.Errorf("Logs.ContainerName: got %q, want %q", cfg.Logs.ContainerName, "gnoland")
+	}
+	if int64(cfg.Logs.BatchSize) != 1024*1024 {
+		t.Errorf("Logs.BatchSize: got %d, want %d", int64(cfg.Logs.BatchSize), 1024*1024)
+	}
+	if cfg.Logs.BatchTimeout.Duration != 5*time.Second {
+		t.Errorf("Logs.BatchTimeout: got %v, want %v", cfg.Logs.BatchTimeout.Duration, 5*time.Second)
+	}
+	if cfg.Logs.MinLevel != "warn" {
+		t.Errorf("Logs.MinLevel: got %q, want %q", cfg.Logs.MinLevel, "warn")
+	}
+}
+
+func TestByteSize_UnmarshalText(t *testing.T) {
+	tests := []struct {
+		input string
+		want  int64
+	}{
+		{"1MB", 1024 * 1024},
+		{"512KB", 512 * 1024},
+		{"1GB", 1024 * 1024 * 1024},
+		{"1024", 1024},
+		{"1mb", 1024 * 1024}, // case-insensitive
+	}
+	for _, tt := range tests {
+		var b config.ByteSize
+		if err := b.UnmarshalText([]byte(tt.input)); err != nil {
+			t.Errorf("UnmarshalText(%q): %v", tt.input, err)
+			continue
+		}
+		if int64(b) != tt.want {
+			t.Errorf("UnmarshalText(%q): got %d, want %d", tt.input, int64(b), tt.want)
+		}
+	}
+}
+
+func TestByteSize_UnmarshalText_Invalid(t *testing.T) {
+	var b config.ByteSize
+	if err := b.UnmarshalText([]byte("notanumber")); err == nil {
+		t.Error("expected error for invalid byte size")
+	}
+}
