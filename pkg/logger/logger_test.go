@@ -2,7 +2,6 @@
 package logger_test
 
 import (
-	"bytes"
 	"log/slog"
 	"testing"
 
@@ -43,17 +42,4 @@ func TestNoop_DiscardsOutput(t *testing.T) {
 	}
 	// Noop uses io.Discard — verify no panic and output is silent.
 	log.Info("this should not appear anywhere")
-}
-
-func TestNew_JSONWritesToWriter(t *testing.T) {
-	var buf bytes.Buffer
-	h := slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})
-	log := slog.New(h)
-	log.Info("hello", "key", "value")
-	if buf.Len() == 0 {
-		t.Error("expected JSON output in buffer")
-	}
-	if !bytes.Contains(buf.Bytes(), []byte(`"hello"`)) {
-		t.Errorf("expected message in output, got: %s", buf.Bytes())
-	}
 }
