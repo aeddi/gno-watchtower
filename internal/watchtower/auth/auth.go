@@ -33,7 +33,6 @@ func WithValidator(ctx context.Context, name string, cfg config.ValidatorConfig)
 
 type ipRecord struct {
 	failures  int
-	bannedAt  time.Time
 	banExpiry time.Time
 }
 
@@ -93,7 +92,7 @@ func (a *Authenticator) isBanned(ip string) bool {
 	if !ok {
 		return false
 	}
-	if rec.bannedAt.IsZero() {
+	if rec.banExpiry.IsZero() {
 		return false
 	}
 	if time.Now().After(rec.banExpiry) {
@@ -115,7 +114,6 @@ func (a *Authenticator) recordFailure(ip string) {
 	rec.failures++
 	if rec.failures >= a.banThreshold {
 		now := time.Now()
-		rec.bannedAt = now
 		rec.banExpiry = now.Add(a.banDuration)
 	}
 }

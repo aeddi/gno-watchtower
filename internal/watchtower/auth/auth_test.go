@@ -84,7 +84,6 @@ func TestAuth_BansIPAfterThreshold(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
 		req.Header.Set("Authorization", "Bearer bad-token")
 		req.RemoteAddr = "1.2.3.4:9999"
-		httptest.NewRecorder()
 		handler.ServeHTTP(httptest.NewRecorder(), req)
 	}
 
