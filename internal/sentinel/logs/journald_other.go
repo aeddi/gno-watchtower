@@ -1,6 +1,6 @@
 //go:build !linux
 
-// internal/sentinel/logs/journald_other.go (temporary — will be expanded in Task 5)
+// internal/sentinel/logs/journald_other.go
 package logs
 
 import (
@@ -8,9 +8,17 @@ import (
 	"fmt"
 )
 
-type JournaldSource struct{ unit string }
+// JournaldSource is not supported on non-Linux platforms.
+type JournaldSource struct {
+	unit string
+}
 
-func NewJournaldSource(unit string) *JournaldSource { return &JournaldSource{unit: unit} }
+// NewJournaldSource returns a stub that fails on non-Linux platforms.
+func NewJournaldSource(unit string) *JournaldSource {
+	return &JournaldSource{unit: unit}
+}
+
+// Tail immediately returns an error on non-Linux platforms.
 func (s *JournaldSource) Tail(_ context.Context, _ chan<- LogLine) error {
-	return fmt.Errorf("journald source is not supported on this platform")
+	return fmt.Errorf("journald source is not supported on this platform (Linux only)")
 }
