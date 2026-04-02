@@ -38,7 +38,7 @@ func New(vmURL, lokiURL string) *Forwarder {
 
 // forwardVM forwards a raw JSON body to VictoriaMetrics with the specified data type.
 func (f *Forwarder) forwardVM(ctx context.Context, validator, dataType string, body []byte) error {
-	u := f.vmURL + "/api/v1/import/json?extra_labels=validator=" + url.QueryEscape(validator) + ",type=" + dataType
+	u := f.vmURL + "/api/v1/import/json?extra_labels=validator=" + url.QueryEscape(validator) + ",type=" + url.QueryEscape(dataType)
 	return f.post(ctx, u, body, "application/json")
 }
 
