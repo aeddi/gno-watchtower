@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -35,16 +36,20 @@ func New(vmURL, lokiURL string) *Forwarder {
 	}
 }
 
+// forwardVM forwards a raw JSON body to VictoriaMetrics with the specified data type.
+func (f *Forwarder) forwardVM(ctx context.Context, validator, dataType string, body []byte) error {
+	u := f.vmURL + "/api/v1/import/json?extra_labels=validator=" + url.QueryEscape(validator) + ",type=" + dataType
+	return f.post(ctx, u, body, "application/json")
+}
+
 // ForwardRPC forwards a raw MetricsPayload JSON body to VictoriaMetrics.
 func (f *Forwarder) ForwardRPC(ctx context.Context, validator string, body []byte) error {
-	url := f.vmURL + "/api/v1/import/json?extra_labels=validator=" + validator + ",type=rpc"
-	return f.post(ctx, url, body, "application/json")
+	return f.forwardVM(ctx, validator, "rpc", body)
 }
 
 // ForwardMetrics forwards a raw MetricsPayload JSON body to VictoriaMetrics.
 func (f *Forwarder) ForwardMetrics(ctx context.Context, validator string, body []byte) error {
-	url := f.vmURL + "/api/v1/import/json?extra_labels=validator=" + validator + ",type=metrics"
-	return f.post(ctx, url, body, "application/json")
+	return f.forwardVM(ctx, validator, "metrics", body)
 }
 
 // ForwardLogs decompresses the zstd-encoded LogPayload body and pushes it to Loki.
@@ -74,17 +79,16 @@ func (f *Forwarder) ForwardOTLP(ctx context.Context, validator string, body []by
 	if err := proto.Unmarshal(body, &req); err != nil {
 		return fmt.Errorf("unmarshal otlp: %w", err)
 	}
-	validatorAttr := &commonpb.KeyValue{
-		Key: "validator",
-		Value: &commonpb.AnyValue{
-			Value: &commonpb.AnyValue_StringValue{StringValue: validator},
-		},
-	}
 	for _, rm := range req.ResourceMetrics {
 		if rm.Resource == nil {
 			rm.Resource = &resourcepb.Resource{}
 		}
-		rm.Resource.Attributes = append(rm.Resource.Attributes, validatorAttr)
+		rm.Resource.Attributes = append(rm.Resource.Attributes, &commonpb.KeyValue{
+			Key: "validator",
+			Value: &commonpb.AnyValue{
+				Value: &commonpb.AnyValue_StringValue{StringValue: validator},
+			},
+		})
 	}
 	out, err := proto.Marshal(&req)
 	if err != nil {
@@ -159,11 +163,9 @@ func (f *Forwarder) post(ctx context.Context, url string, body []byte, contentTy
 	return nil
 }
 
+// zstdDecoder is a reusable stateless decoder; DecodeAll is safe for concurrent use.
+var zstdDecoder, _ = zstd.NewReader(nil)
+
 func zstdDecompress(data []byte) ([]byte, error) {
-	r, err := zstd.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	defer r.Close()
-	return io.ReadAll(r)
+	return zstdDecoder.DecodeAll(data, nil)
 }
