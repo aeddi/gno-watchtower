@@ -9,6 +9,7 @@ import (
 
 	"github.com/gnolang/val-companion/internal/sentinel/config"
 	"github.com/gnolang/val-companion/internal/sentinel/logs"
+	"github.com/gnolang/val-companion/pkg/levels"
 )
 
 // checkDuration is how long CheckLogs listens for log lines.
@@ -32,8 +33,6 @@ func CheckLogs(ctx context.Context, src logs.Source, cfg config.LogsConfig, minL
 	}()
 
 	var total, invalidJSON, atLevel int
-	timer := time.NewTimer(checkDuration)
-	defer timer.Stop()
 
 	for {
 		select {
@@ -42,33 +41,28 @@ func CheckLogs(ctx context.Context, src logs.Source, cfg config.LogsConfig, minL
 			if !json.Valid(line.Raw) {
 				invalidJSON++
 			}
-			if levelRank(line.Level) >= levelRank(minLevel) {
+			if levels.Rank(line.Level) >= levels.Rank(minLevel) {
 				atLevel++
 			}
-		case <-timer.C:
-			goto done
 		case <-ctx.Done():
-			goto done
+			if total == 0 {
+				return CheckResult{Name: name, Status: StatusRed, Detail: fmt.Sprintf("no lines received in %s", checkDuration)}
+			}
+			if invalidJSON > 0 {
+				return CheckResult{Name: name, Status: StatusRed, Detail: fmt.Sprintf("%d/%d lines are not valid JSON", invalidJSON, total)}
+			}
+			if atLevel == 0 {
+				return CheckResult{
+					Name:   name,
+					Status: StatusRed,
+					Detail: fmt.Sprintf("%d lines received but none at %s or above", total, minLevel),
+				}
+			}
+			return CheckResult{
+				Name:   name,
+				Status: StatusGreen,
+				Detail: fmt.Sprintf("%d valid JSON lines, %d at %s+ in %s", total, atLevel, minLevel, checkDuration),
+			}
 		}
-	}
-
-done:
-	if total == 0 {
-		return CheckResult{Name: name, Status: StatusRed, Detail: fmt.Sprintf("no lines received in %s", checkDuration)}
-	}
-	if invalidJSON > 0 {
-		return CheckResult{Name: name, Status: StatusRed, Detail: fmt.Sprintf("%d/%d lines are not valid JSON", invalidJSON, total)}
-	}
-	if atLevel == 0 {
-		return CheckResult{
-			Name:   name,
-			Status: StatusRed,
-			Detail: fmt.Sprintf("%d lines received but none at %s or above", total, minLevel),
-		}
-	}
-	return CheckResult{
-		Name:   name,
-		Status: StatusGreen,
-		Detail: fmt.Sprintf("%d valid JSON lines, %d at %s+ in %s", total, atLevel, minLevel, checkDuration),
 	}
 }

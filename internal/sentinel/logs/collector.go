@@ -6,29 +6,13 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/gnolang/val-companion/pkg/levels"
 	"github.com/gnolang/val-companion/pkg/protocol"
 )
 
 // lineBufferSize is the capacity of the internal channel between the Source goroutine
 // and the collection loop.
 const lineBufferSize = 256
-
-// levelRank returns a numeric rank for min_level filtering.
-// Unknown levels → rank 1 (info).
-func levelRank(level string) int {
-	switch level {
-	case "debug":
-		return 0
-	case "info":
-		return 1
-	case "warn":
-		return 2
-	case "error":
-		return 3
-	default:
-		return 1
-	}
-}
 
 // Collector reads from a Source, filters by min_level, accumulates log lines by level,
 // and flushes protocol.LogPayload values when either batchSize bytes accumulate or
@@ -48,7 +32,7 @@ type Collector struct {
 func NewCollector(source Source, minLevel string, batchSize int64, batchTimeout time.Duration, out chan<- protocol.LogPayload, log *slog.Logger) *Collector {
 	return &Collector{
 		source:       source,
-		minLevel:     levelRank(minLevel),
+		minLevel:     levels.Rank(minLevel),
 		batchSize:    batchSize,
 		batchTimeout: batchTimeout,
 		out:          out,
@@ -94,7 +78,7 @@ func (c *Collector) Run(ctx context.Context) error {
 			flush()
 			return ctx.Err()
 		case line := <-lineCh:
-			if levelRank(line.Level) < c.minLevel {
+			if levels.Rank(line.Level) < c.minLevel {
 				continue
 			}
 			accumulated[line.Level] = append(accumulated[line.Level], line.Raw)

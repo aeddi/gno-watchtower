@@ -58,9 +58,11 @@ Validator machine(s)                    Central server
    listen_addr = "127.0.0.1:8080"
 
    [security]
-   rate_limit_rps = 10
-   ban_threshold  = 5
-   ban_duration   = "15m"
+   rate_limit_rps   = 10
+   # rate_limit_burst must be >= number of concurrent sentinel data types (rpc + metrics + logs + otlp = 4)
+   rate_limit_burst = 10
+   ban_threshold    = 5
+   ban_duration     = "15m"
 
    [victoria_metrics]
    url = "http://victoria-metrics:8428"
@@ -87,7 +89,7 @@ Validator machine(s)                    Central server
    $EDITOR /etc/sentinel/config.toml
    ```
 
-3. Set `[server] url` to `https://<DOMAIN>` and `token` to the value printed by `make add-validator` (see below).
+3. Set `[server] url` to `https://<DOMAIN>/watchtower` and `token` to the value printed by `make add-validator` (see below).
 
 4. Run sentinel:
    ```sh

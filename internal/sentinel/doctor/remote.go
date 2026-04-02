@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -85,16 +86,16 @@ func unreachable(serverURL, reason string) []CheckResult {
 func checkPermissions(cfg *config.Config, ar *AuthResponse) CheckResult {
 	var missing []string
 
-	if cfg.RPC.Enabled && !hasPermission(ar, "rpc") {
+	if cfg.RPC.Enabled && !slices.Contains(ar.Permissions, "rpc") {
 		missing = append(missing, "rpc")
 	}
-	if (cfg.Resources.Enabled || cfg.Metadata.Enabled) && !hasPermission(ar, "metrics") {
+	if (cfg.Resources.Enabled || cfg.Metadata.Enabled) && !slices.Contains(ar.Permissions, "metrics") {
 		missing = append(missing, "metrics")
 	}
-	if cfg.Logs.Enabled && !hasPermission(ar, "logs") {
+	if cfg.Logs.Enabled && !slices.Contains(ar.Permissions, "logs") {
 		missing = append(missing, "logs")
 	}
-	if cfg.OTLP.Enabled && !hasPermission(ar, "otlp") {
+	if cfg.OTLP.Enabled && !slices.Contains(ar.Permissions, "otlp") {
 		missing = append(missing, "otlp")
 	}
 

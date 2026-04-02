@@ -1,6 +1,6 @@
 {$DOMAIN} {
-    # Watchtower API — must match before the catch-all below
-    handle /api/v1/* {
+    # Watchtower API
+    handle_path /watchtower/* {
         reverse_proxy watchtower:8080
     }
 

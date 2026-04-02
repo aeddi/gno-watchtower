@@ -43,3 +43,19 @@ func New(format Format, level slog.Level) (*slog.Logger, error) {
 func Noop() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
+
+// ParseLevel converts a string level name to a slog.Level.
+func ParseLevel(s string) (slog.Level, error) {
+	switch s {
+	case "debug":
+		return slog.LevelDebug, nil
+	case "info":
+		return slog.LevelInfo, nil
+	case "warn":
+		return slog.LevelWarn, nil
+	case "error":
+		return slog.LevelError, nil
+	default:
+		return slog.LevelInfo, fmt.Errorf("unknown level %q: must be debug, info, warn, or error", s)
+	}
+}

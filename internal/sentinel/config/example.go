@@ -3,7 +3,7 @@ package config
 
 // Example is the annotated example TOML config printed by `sentinel generate-config`.
 const Example = `[server]
-url   = "https://monitoring.example.com"
+url   = "https://monitoring.example.com/watchtower"
 token = "secret-validator-token"
 
 [rpc]

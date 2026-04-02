@@ -10,16 +10,20 @@ import (
 )
 
 // Limiter enforces a per-validator token-bucket rate limit.
+// The limiters map grows to at most one entry per registered validator name,
+// so no eviction is needed.
 type Limiter struct {
 	rps      rate.Limit
+	burst    int
 	mu       sync.Mutex
 	limiters map[string]*rate.Limiter
 }
 
-// New creates a Limiter with the given requests-per-second rate.
-func New(rps float64) *Limiter {
+// New creates a Limiter with the given requests-per-second rate and burst size.
+func New(rps float64, burst int) *Limiter {
 	return &Limiter{
 		rps:      rate.Limit(rps),
+		burst:    burst,
 		limiters: make(map[string]*rate.Limiter),
 	}
 }
@@ -46,7 +50,7 @@ func (l *Limiter) allow(validatorName string) bool {
 	l.mu.Lock()
 	lim, ok := l.limiters[validatorName]
 	if !ok {
-		lim = rate.NewLimiter(l.rps, 1)
+		lim = rate.NewLimiter(l.rps, l.burst)
 		l.limiters[validatorName] = lim
 	}
 	l.mu.Unlock()

@@ -8,13 +8,13 @@ import (
 
 // TypeSnapshot holds byte counts for one validator+type combination.
 type TypeSnapshot struct {
-	LastHourBytes int
-	TotalBytes    int
+	LastHourBytes int64
+	TotalBytes    int64
 }
 
 type entry struct {
-	lastHour int
-	total    int
+	lastHour int64
+	total    int64
 }
 
 // Stats tracks per-validator, per-type byte counts.
@@ -44,8 +44,8 @@ func (s *Stats) Record(validator, collectorType string, bytes int) {
 		e = &entry{}
 		s.data[validator][collectorType] = e
 	}
-	e.lastHour += bytes
-	e.total += bytes
+	e.lastHour += int64(bytes)
+	e.total += int64(bytes)
 }
 
 // Snapshot returns a copy of per-validator stats and the uptime.

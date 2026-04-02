@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-systemd/v22/sdjournal"
@@ -16,8 +17,9 @@ type JournaldSource struct {
 }
 
 // NewJournaldSource creates a JournaldSource for the named systemd unit.
+// The .service suffix is accepted but stripped: "gnoland" and "gnoland.service" are equivalent.
 func NewJournaldSource(unit string) *JournaldSource {
-	return &JournaldSource{unit: unit}
+	return &JournaldSource{unit: strings.TrimSuffix(unit, ".service")}
 }
 
 // Tail streams log entries from the journal until ctx is cancelled.

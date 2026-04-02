@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -56,7 +55,7 @@ func runCmd(args []string) {
 		log.Fatalf("load config: %v", err)
 	}
 
-	level, err := parseLevel(*logLevel)
+	level, err := pkglogger.ParseLevel(*logLevel)
 	if err != nil {
 		log.Fatalf("invalid log level: %v", err)
 	}
@@ -95,21 +94,6 @@ func doctorCmd(args []string) {
 
 	code := doctor.Run(ctx, cfg, fs.Arg(0), os.Stdout)
 	os.Exit(code)
-}
-
-func parseLevel(s string) (slog.Level, error) {
-	switch s {
-	case "debug":
-		return slog.LevelDebug, nil
-	case "info":
-		return slog.LevelInfo, nil
-	case "warn":
-		return slog.LevelWarn, nil
-	case "error":
-		return slog.LevelError, nil
-	default:
-		return slog.LevelInfo, fmt.Errorf("unknown level %q: must be debug, info, warn, or error", s)
-	}
 }
 
 func usage() {

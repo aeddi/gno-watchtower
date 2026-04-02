@@ -22,7 +22,7 @@ func injectValidator(name string) func(http.Handler) http.Handler {
 }
 
 func TestRateLimiter_AllowsUnderLimit(t *testing.T) {
-	lim := ratelimit.New(100) // 100 rps — won't be hit in a single test request
+	lim := ratelimit.New(100, 10) // 100 rps — won't be hit in a single test request
 	handler := injectValidator("val-01")(lim.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})))
@@ -37,7 +37,7 @@ func TestRateLimiter_AllowsUnderLimit(t *testing.T) {
 }
 
 func TestRateLimiter_BlocksOverLimit(t *testing.T) {
-	lim := ratelimit.New(0.001) // ~1 request per 1000s — immediately exhausted
+	lim := ratelimit.New(0.001, 1) // ~1 request per 1000s — immediately exhausted
 
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -60,7 +60,7 @@ func TestRateLimiter_BlocksOverLimit(t *testing.T) {
 }
 
 func TestRateLimiter_IndependentPerValidator(t *testing.T) {
-	lim := ratelimit.New(0.001) // immediately exhausted
+	lim := ratelimit.New(0.001, 1) // immediately exhausted
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
