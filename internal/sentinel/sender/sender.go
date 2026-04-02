@@ -33,7 +33,7 @@ func (s *Sender) Send(ctx context.Context, path string, payload any) error {
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	return s.post(ctx, path, body, map[string]string{"Content-Type": "application/json"})
+	return s.post(ctx, path, body, "application/json", "")
 }
 
 // SendCompressed makes a single POST attempt with a zstd-compressed JSON body.
@@ -44,7 +44,7 @@ func (s *Sender) SendCompressed(ctx context.Context, path string, payload any) e
 		return fmt.Errorf("marshal: %w", err)
 	}
 	compressed := ZstdCompress(body)
-	return s.post(ctx, path, compressed, map[string]string{"Content-Type": "application/json", "Content-Encoding": "zstd"})
+	return s.post(ctx, path, compressed, "application/json", "zstd")
 }
 
 // SendWithRetry retries Send up to maxAttempts times with exponential backoff.
@@ -65,7 +65,7 @@ func (s *Sender) SendCompressedWithRetry(ctx context.Context, path string, paylo
 // SendRaw makes a single POST attempt with raw bytes and a specific Content-Type.
 // Use for non-JSON payloads such as protobuf (Content-Type: application/x-protobuf).
 func (s *Sender) SendRaw(ctx context.Context, path string, body []byte, contentType string) error {
-	return s.post(ctx, path, body, map[string]string{"Content-Type": contentType})
+	return s.post(ctx, path, body, contentType, "")
 }
 
 // SendRawWithRetry retries SendRaw up to maxAttempts times with exponential backoff.
@@ -79,20 +79,21 @@ func (s *Sender) SendRawWithRetry(ctx context.Context, path string, body []byte,
 // Use when the caller already holds the compressed bytes (e.g. to measure wire size).
 func (s *Sender) SendCompressedBytesWithRetry(ctx context.Context, path string, body []byte, maxAttempts int, initialBackoff time.Duration) error {
 	return retry(ctx, maxAttempts, initialBackoff, func() error {
-		return s.post(ctx, path, body, map[string]string{"Content-Type": "application/json", "Content-Encoding": "zstd"})
+		return s.post(ctx, path, body, "application/json", "zstd")
 	})
 }
 
-// post executes a single HTTP POST. headers are set as provided by the caller.
-func (s *Sender) post(ctx context.Context, path string, body []byte, headers map[string]string) error {
+// post executes a single HTTP POST.
+// contentEncoding is set as Content-Encoding if non-empty.
+func (s *Sender) post(ctx context.Context, path string, body []byte, contentType, contentEncoding string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.serverURL+path, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
-	// Authorization is always set; callers must not pass "Authorization" in headers.
 	req.Header.Set("Authorization", "Bearer "+s.token)
-	for k, v := range headers {
-		req.Header.Set(k, v)
+	req.Header.Set("Content-Type", contentType)
+	if contentEncoding != "" {
+		req.Header.Set("Content-Encoding", contentEncoding)
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
