@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -95,7 +96,7 @@ func runCmd(args []string) {
 	}()
 
 	logger.Info("watchtower starting", "addr", cfg.Server.ListenAddr)
-	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("server: %v", err)
 	}
 }
