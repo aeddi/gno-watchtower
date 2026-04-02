@@ -156,10 +156,15 @@ func (f *Forwarder) post(ctx context.Context, url string, body []byte, contentTy
 		return fmt.Errorf("post %s: %w", url, err)
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("post %s: unexpected status %d", url, resp.StatusCode)
+		excerpt, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		_, _ = io.Copy(io.Discard, resp.Body)
+		if len(bytes.TrimSpace(excerpt)) > 0 {
+			return fmt.Errorf("post %s: status %d: %s", url, resp.StatusCode, bytes.TrimSpace(excerpt))
+		}
+		return fmt.Errorf("post %s: status %d", url, resp.StatusCode)
 	}
+	_, _ = io.Copy(io.Discard, resp.Body)
 	return nil
 }
 

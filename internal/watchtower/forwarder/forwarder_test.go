@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
@@ -148,6 +149,23 @@ func TestForwardLogs_InvalidCompression_ReturnsError(t *testing.T) {
 	err := f.ForwardLogs(context.Background(), "val-01", []byte("not zstd compressed"))
 	if err == nil {
 		t.Error("expected error for invalid zstd data")
+	}
+}
+
+func TestForwardRPC_NonOKIncludesBody(t *testing.T) {
+	vmSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("entry out of order"))
+	}))
+	defer vmSrv.Close()
+
+	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
+	err := f.ForwardRPC(context.Background(), "val-01", []byte(`{}`))
+	if err == nil {
+		t.Fatal("expected error for 400 response")
+	}
+	if !strings.Contains(err.Error(), "entry out of order") {
+		t.Errorf("error should contain upstream body, got: %v", err)
 	}
 }
 
