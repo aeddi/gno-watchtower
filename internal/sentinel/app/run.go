@@ -142,14 +142,12 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 				case <-ctx.Done():
 					return
 				case b := <-otlpOut:
-					go func(b []byte) {
-						senderLog.Debug("sending payload", "type", "otlp", "bytes", len(b))
-						if err := s.SendRawWithRetry(ctx, "/otlp", b, "application/x-protobuf", maxSendAttempts, initialBackoff); err != nil && ctx.Err() == nil {
-							senderLog.Error("send otlp payload", "err", err)
-							return
-						}
-						st.Record("otlp", len(b))
-					}(b)
+					senderLog.Debug("sending payload", "type", "otlp", "bytes", len(b))
+					if err := s.SendRawWithRetry(ctx, "/otlp", b, "application/x-protobuf", maxSendAttempts, initialBackoff); err != nil && ctx.Err() == nil {
+						senderLog.Error("send otlp payload", "err", err)
+						continue
+					}
+					st.Record("otlp", len(b))
 				}
 			}
 		}()
@@ -250,8 +248,8 @@ func flush(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protocol.RP
 			log.Error("marshal payload", "err", err)
 			continue
 		}
-		log.Debug("sending payload", "type", "rpc", "uncompressed_bytes", len(b))
-		if err := s.SendWithRetry(ctx, "/rpc", p, maxSendAttempts, initialBackoff); err != nil {
+		log.Debug("sending payload", "type", "rpc", "bytes", len(b))
+		if err := s.SendRawWithRetry(ctx, "/rpc", b, "application/json", maxSendAttempts, initialBackoff); err != nil {
 			if ctx.Err() != nil {
 				return
 			}
@@ -270,8 +268,13 @@ func flushLogs(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protoco
 			log.Error("marshal log payload", "err", err)
 			continue
 		}
-		log.Debug("sending payload", "type", "logs", "level", p.Level, "uncompressed_bytes", len(b))
-		if err := s.SendCompressedWithRetry(ctx, "/logs", p, maxSendAttempts, initialBackoff); err != nil {
+		compressed, err := sender.ZstdCompress(b)
+		if err != nil {
+			log.Error("compress log payload", "err", err)
+			continue
+		}
+		log.Debug("sending payload", "type", "logs", "level", p.Level, "uncompressed_bytes", len(b), "wire_bytes", len(compressed))
+		if err := s.SendCompressedBytesWithRetry(ctx, "/logs", compressed, maxSendAttempts, initialBackoff); err != nil {
 			if ctx.Err() != nil {
 				return
 			}
@@ -290,8 +293,8 @@ func flushMetrics(ctx context.Context, s *sender.Sender, buf *sender.Buffer[prot
 			log.Error("marshal metrics payload", "err", err)
 			continue
 		}
-		log.Debug("sending payload", "type", typ, "uncompressed_bytes", len(b))
-		if err := s.SendWithRetry(ctx, "/metrics", p, maxSendAttempts, initialBackoff); err != nil {
+		log.Debug("sending payload", "type", typ, "bytes", len(b))
+		if err := s.SendRawWithRetry(ctx, "/metrics", b, "application/json", maxSendAttempts, initialBackoff); err != nil {
 			if ctx.Err() != nil {
 				return
 			}
