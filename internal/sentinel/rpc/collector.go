@@ -51,7 +51,7 @@ func (c *Collector) Run(ctx context.Context) error {
 			return ctx.Err()
 		case <-ticker.C:
 			// collect errors are transient; log and continue.
-			if err := c.collect(ctx); err != nil {
+			if err := c.collect(ctx); err != nil && ctx.Err() == nil {
 				c.log.Error("collect failed", "err", err)
 			}
 		}
@@ -96,10 +96,10 @@ func (c *Collector) collect(ctx context.Context) error {
 				payload.Data["dump_consensus_state"] = raw
 				changed = append(changed, "dump_consensus_state")
 			}
+			c.lastDump = time.Now()
 		} else {
 			c.log.Warn("endpoint error", "endpoint", "dump_consensus_state", "err", err)
 		}
-		c.lastDump = time.Now()
 	}
 
 	if currentHeight > c.lastHeight && currentHeight > 0 {
@@ -111,19 +111,29 @@ func (c *Collector) collect(ctx context.Context) error {
 				payload.Data["validators"] = raw
 				changed = append(changed, "validators")
 			}
+		} else {
+			c.log.Warn("endpoint error", "endpoint", "validators", "err", err)
 		}
 		if raw, err := c.client.Block(currentHeight); err == nil {
 			payload.Data["block"] = raw
 			changed = append(changed, "block")
+		} else {
+			c.log.Warn("endpoint error", "endpoint", "block", "err", err)
 		}
 		if raw, err := c.client.BlockResults(currentHeight); err == nil {
 			payload.Data["block_results"] = raw
 			changed = append(changed, "block_results")
+		} else {
+			c.log.Warn("endpoint error", "endpoint", "block_results", "err", err)
 		}
 	}
 
 	if len(changed) > 0 {
 		c.log.Debug("poll", "changed", changed)
+	}
+
+	if len(payload.Data) == 0 {
+		return nil
 	}
 
 	select {
