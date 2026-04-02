@@ -33,7 +33,7 @@ func (s *Sender) Send(ctx context.Context, path string, payload any) error {
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	return s.post(ctx, path, body, nil)
+	return s.post(ctx, path, body, map[string]string{"Content-Type": "application/json"})
 }
 
 // SendCompressed makes a single POST attempt with a zstd-compressed JSON body.
@@ -43,11 +43,11 @@ func (s *Sender) SendCompressed(ctx context.Context, path string, payload any) e
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	compressed, err := zstdCompress(body)
+	compressed, err := ZstdCompress(body)
 	if err != nil {
 		return fmt.Errorf("compress: %w", err)
 	}
-	return s.post(ctx, path, compressed, map[string]string{"Content-Encoding": "zstd"})
+	return s.post(ctx, path, compressed, map[string]string{"Content-Type": "application/json", "Content-Encoding": "zstd"})
 }
 
 // SendWithRetry retries Send up to maxAttempts times with exponential backoff.
@@ -78,15 +78,22 @@ func (s *Sender) SendRawWithRetry(ctx context.Context, path string, body []byte,
 	})
 }
 
-// post executes a single HTTP POST. extraHeaders are applied after Content-Type and Authorization.
-func (s *Sender) post(ctx context.Context, path string, body []byte, extraHeaders map[string]string) error {
+// SendCompressedBytesWithRetry sends pre-compressed bytes with Content-Encoding: zstd.
+// Use when the caller already holds the compressed bytes (e.g. to measure wire size).
+func (s *Sender) SendCompressedBytesWithRetry(ctx context.Context, path string, body []byte, maxAttempts int, initialBackoff time.Duration) error {
+	return retry(ctx, maxAttempts, initialBackoff, func() error {
+		return s.post(ctx, path, body, map[string]string{"Content-Type": "application/json", "Content-Encoding": "zstd"})
+	})
+}
+
+// post executes a single HTTP POST. headers are set as provided by the caller.
+func (s *Sender) post(ctx context.Context, path string, body []byte, headers map[string]string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.serverURL+path, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+s.token)
-	for k, v := range extraHeaders {
+	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
 	resp, err := s.client.Do(req)
@@ -107,10 +114,12 @@ func retry(ctx context.Context, maxAttempts int, initialBackoff time.Duration, f
 	var lastErr error
 	for i := 0; i < maxAttempts; i++ {
 		if i > 0 {
+			timer := time.NewTimer(backoff)
 			select {
 			case <-ctx.Done():
+				timer.Stop()
 				return ctx.Err()
-			case <-time.After(backoff):
+			case <-timer.C:
 			}
 			backoff *= 2
 			if backoff > 30*time.Second {
@@ -124,19 +133,10 @@ func retry(ctx context.Context, maxAttempts int, initialBackoff time.Duration, f
 	return fmt.Errorf("all %d attempts failed: %w", maxAttempts, lastErr)
 }
 
-// zstdCompress returns the zstd-compressed form of data.
-func zstdCompress(data []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	w, err := zstd.NewWriter(&buf)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := w.Write(data); err != nil {
-		w.Close()
-		return nil, err
-	}
-	if err := w.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+// zstdEncoder is a reusable stateless encoder; EncodeAll is safe for concurrent use.
+var zstdEncoder, _ = zstd.NewWriter(nil)
+
+// ZstdCompress returns the zstd-compressed form of data.
+func ZstdCompress(data []byte) ([]byte, error) {
+	return zstdEncoder.EncodeAll(data, make([]byte, 0, len(data))), nil
 }
