@@ -128,18 +128,9 @@ func TestCollector_DeltaSkipsUnchangedEndpoints(t *testing.T) {
 		payloads = append(payloads, <-out)
 	}
 
-	// After the first payload, subsequent ones should be empty (all unchanged).
-	for i, p := range payloads[1:] {
-		if len(p.Data) > 0 {
-			t.Errorf("payload %d should have empty data (delta unchanged), got keys: %v", i+1, keys(p.Data))
-		}
+	// After the first payload, delta must filter all subsequent polls (all responses unchanged).
+	// Exactly one payload should have been emitted.
+	if len(payloads) != 1 {
+		t.Errorf("expected exactly 1 payload after delta filtering, got %d", len(payloads))
 	}
-}
-
-func keys(m map[string]json.RawMessage) []string {
-	ks := make([]string, 0, len(m))
-	for k := range m {
-		ks = append(ks, k)
-	}
-	return ks
 }
