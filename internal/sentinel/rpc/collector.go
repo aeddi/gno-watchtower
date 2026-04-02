@@ -68,9 +68,9 @@ func (c *Collector) collect(ctx context.Context) error {
 		key  string
 		call func() (json.RawMessage, error)
 	}{
-		{"status", c.client.Status},
-		{"net_info", c.client.NetInfo},
-		{"num_unconfirmed_txs", c.client.NumUnconfirmedTxs},
+		{"status", func() (json.RawMessage, error) { return c.client.Status(ctx) }},
+		{"net_info", func() (json.RawMessage, error) { return c.client.NetInfo(ctx) }},
+		{"num_unconfirmed_txs", func() (json.RawMessage, error) { return c.client.NumUnconfirmedTxs(ctx) }},
 	}
 
 	var currentHeight int64
@@ -91,7 +91,7 @@ func (c *Collector) collect(ctx context.Context) error {
 	}
 
 	if time.Since(c.lastDump) >= c.dumpInterval {
-		if raw, err := c.client.DumpConsensusState(); err == nil {
+		if raw, err := c.client.DumpConsensusState(ctx); err == nil {
 			if c.delta.Changed("dump_consensus_state", raw) {
 				payload.Data["dump_consensus_state"] = raw
 				changed = append(changed, "dump_consensus_state")
@@ -106,7 +106,7 @@ func (c *Collector) collect(ctx context.Context) error {
 		c.lastHeight = currentHeight
 		c.log.Info("new block", "height", currentHeight)
 
-		if raw, err := c.client.Validators(currentHeight); err == nil {
+		if raw, err := c.client.Validators(ctx, currentHeight); err == nil {
 			if c.delta.Changed("validators", raw) {
 				payload.Data["validators"] = raw
 				changed = append(changed, "validators")
@@ -114,13 +114,13 @@ func (c *Collector) collect(ctx context.Context) error {
 		} else {
 			c.log.Warn("endpoint error", "endpoint", "validators", "err", err)
 		}
-		if raw, err := c.client.Block(currentHeight); err == nil {
+		if raw, err := c.client.Block(ctx, currentHeight); err == nil {
 			payload.Data["block"] = raw
 			changed = append(changed, "block")
 		} else {
 			c.log.Warn("endpoint error", "endpoint", "block", "err", err)
 		}
-		if raw, err := c.client.BlockResults(currentHeight); err == nil {
+		if raw, err := c.client.BlockResults(ctx, currentHeight); err == nil {
 			payload.Data["block_results"] = raw
 			changed = append(changed, "block_results")
 		} else {

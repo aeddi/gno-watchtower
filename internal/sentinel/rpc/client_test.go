@@ -1,10 +1,12 @@
 package rpc_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gnolang/val-companion/internal/sentinel/rpc"
 )
@@ -37,7 +39,7 @@ func TestClient_Status(t *testing.T) {
 	defer srv.Close()
 
 	c := rpc.NewClient(srv.URL)
-	raw, err := c.Status()
+	raw, err := c.Status(context.Background())
 	if err != nil {
 		t.Fatalf("Status: %v", err)
 	}
@@ -66,7 +68,7 @@ func TestClient_RPCError(t *testing.T) {
 	defer srv.Close()
 
 	c := rpc.NewClient(srv.URL)
-	_, err := c.Status()
+	_, err := c.Status(context.Background())
 	if err == nil {
 		t.Fatal("expected error from RPC error response")
 	}
@@ -88,7 +90,7 @@ func TestClient_Block(t *testing.T) {
 	defer srv.Close()
 
 	c := rpc.NewClient(srv.URL)
-	raw, err := c.Block(42)
+	raw, err := c.Block(context.Background(), 42)
 	if err != nil {
 		t.Fatalf("Block: %v", err)
 	}
@@ -113,7 +115,7 @@ func TestClient_Validators(t *testing.T) {
 	defer srv.Close()
 
 	c := rpc.NewClient(srv.URL)
-	raw, err := c.Validators(10)
+	raw, err := c.Validators(context.Background(), 10)
 	if err != nil {
 		t.Fatalf("Validators: %v", err)
 	}
@@ -138,12 +140,41 @@ func TestClient_BlockResults(t *testing.T) {
 	defer srv.Close()
 
 	c := rpc.NewClient(srv.URL)
-	raw, err := c.BlockResults(7)
+	raw, err := c.BlockResults(context.Background(), 7)
 	if err != nil {
 		t.Fatalf("BlockResults: %v", err)
 	}
 	if len(raw) == 0 {
 		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestClient_ContextCancellation(t *testing.T) {
+	unblock := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-unblock
+	}))
+	defer srv.Close()
+	defer close(unblock)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	c := rpc.NewClient(srv.URL)
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := c.Status(ctx)
+		done <- err
+	}()
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected error after context cancellation")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Status did not return after context cancellation")
 	}
 }
 
@@ -154,7 +185,7 @@ func TestClient_HTTPError(t *testing.T) {
 	defer srv.Close()
 
 	c := rpc.NewClient(srv.URL)
-	_, err := c.Status()
+	_, err := c.Status(context.Background())
 	if err == nil {
 		t.Fatal("expected error for non-200 HTTP status")
 	}

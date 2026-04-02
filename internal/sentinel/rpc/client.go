@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -36,8 +37,12 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
-func (c *Client) get(path string) (json.RawMessage, error) {
-	resp, err := c.httpClient.Get(c.baseURL + path)
+func (c *Client) get(ctx context.Context, path string) (json.RawMessage, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request %s: %w", path, err)
+	}
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("get %s: %w", path, err)
 	}
@@ -57,18 +62,24 @@ func (c *Client) get(path string) (json.RawMessage, error) {
 	return env.Result, nil
 }
 
-func (c *Client) Status() (json.RawMessage, error)            { return c.get("/status") }
-func (c *Client) NetInfo() (json.RawMessage, error)           { return c.get("/net_info") }
-func (c *Client) NumUnconfirmedTxs() (json.RawMessage, error) { return c.get("/num_unconfirmed_txs") }
-func (c *Client) DumpConsensusState() (json.RawMessage, error) {
-	return c.get("/dump_consensus_state")
+func (c *Client) Status(ctx context.Context) (json.RawMessage, error) {
+	return c.get(ctx, "/status")
 }
-func (c *Client) Validators(height int64) (json.RawMessage, error) {
-	return c.get(fmt.Sprintf("/validators?height=%d", height))
+func (c *Client) NetInfo(ctx context.Context) (json.RawMessage, error) {
+	return c.get(ctx, "/net_info")
 }
-func (c *Client) Block(height int64) (json.RawMessage, error) {
-	return c.get(fmt.Sprintf("/block?height=%d", height))
+func (c *Client) NumUnconfirmedTxs(ctx context.Context) (json.RawMessage, error) {
+	return c.get(ctx, "/num_unconfirmed_txs")
 }
-func (c *Client) BlockResults(height int64) (json.RawMessage, error) {
-	return c.get(fmt.Sprintf("/block_results?height=%d", height))
+func (c *Client) DumpConsensusState(ctx context.Context) (json.RawMessage, error) {
+	return c.get(ctx, "/dump_consensus_state")
+}
+func (c *Client) Validators(ctx context.Context, height int64) (json.RawMessage, error) {
+	return c.get(ctx, fmt.Sprintf("/validators?height=%d", height))
+}
+func (c *Client) Block(ctx context.Context, height int64) (json.RawMessage, error) {
+	return c.get(ctx, fmt.Sprintf("/block?height=%d", height))
+}
+func (c *Client) BlockResults(ctx context.Context, height int64) (json.RawMessage, error) {
+	return c.get(ctx, fmt.Sprintf("/block_results?height=%d", height))
 }
