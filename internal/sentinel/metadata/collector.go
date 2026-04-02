@@ -131,60 +131,43 @@ func (c *Collector) collectAndSend(ctx context.Context) {
 }
 
 func (c *Collector) collectBinary(data map[string]json.RawMessage) {
-	if c.cfg.BinaryPath != "" && c.cfg.BinaryChecksumCmd != "" {
-		c.log.Error("metadata conflict: binary_path and binary_checksum_cmd both set — skipping binary checksum")
-		return
-	}
-	var checksum string
-	var err error
-	switch {
-	case c.cfg.BinaryPath != "":
-		checksum, err = SHA256File(c.cfg.BinaryPath)
-	case c.cfg.BinaryChecksumCmd != "":
-		checksum, err = RunCmd(c.cfg.BinaryChecksumCmd)
-	default:
-		return
-	}
-	if err != nil {
-		c.log.Warn("binary checksum error", "err", err)
-		return
-	}
-	b, err := json.Marshal(checksum)
-	if err != nil {
-		c.log.Warn("binary checksum marshal error", "err", err)
-		return
-	}
-	if c.delta.Changed("binary_checksum", b) {
-		data["binary_checksum"] = b
-	}
+	c.collectChecksum(data, "binary_checksum", "binary",
+		c.cfg.BinaryPath, c.cfg.BinaryChecksumCmd,
+		"metadata conflict: binary_path and binary_checksum_cmd both set — skipping binary checksum")
 }
 
 func (c *Collector) collectGenesis(data map[string]json.RawMessage) {
-	if c.cfg.GenesisPath != "" && c.cfg.GenesisChecksumCmd != "" {
-		c.log.Error("metadata conflict: genesis_path and genesis_checksum_cmd both set — skipping genesis checksum")
+	c.collectChecksum(data, "genesis_checksum", "genesis",
+		c.cfg.GenesisPath, c.cfg.GenesisChecksumCmd,
+		"metadata conflict: genesis_path and genesis_checksum_cmd both set — skipping genesis checksum")
+}
+
+func (c *Collector) collectChecksum(data map[string]json.RawMessage, dataKey, name, path, cmd, conflictMsg string) {
+	if path != "" && cmd != "" {
+		c.log.Error(conflictMsg)
 		return
 	}
 	var checksum string
 	var err error
 	switch {
-	case c.cfg.GenesisPath != "":
-		checksum, err = SHA256File(c.cfg.GenesisPath)
-	case c.cfg.GenesisChecksumCmd != "":
-		checksum, err = RunCmd(c.cfg.GenesisChecksumCmd)
+	case path != "":
+		checksum, err = SHA256File(path)
+	case cmd != "":
+		checksum, err = RunCmd(cmd)
 	default:
 		return
 	}
 	if err != nil {
-		c.log.Warn("genesis checksum error", "err", err)
+		c.log.Warn(name+" checksum error", "err", err)
 		return
 	}
 	b, err := json.Marshal(checksum)
 	if err != nil {
-		c.log.Warn("genesis checksum marshal error", "err", err)
+		c.log.Warn(name+" checksum marshal error", "err", err)
 		return
 	}
-	if c.delta.Changed("genesis_checksum", b) {
-		data["genesis_checksum"] = b
+	if c.delta.Changed(dataKey, b) {
+		data[dataKey] = b
 	}
 }
 
