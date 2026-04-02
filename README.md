@@ -1,4 +1,4 @@
-# val-companion
+# Gno Watchtower
 
 A two-binary monitoring system for gnoland validator nodes.
 
@@ -9,12 +9,12 @@ Validator machine(s)                    Central server
 ────────────────────                    ──────────────────────────────────────────────
 ┌──────────────────┐                    ┌────────┐  ┌─────────────┐
 │    sentinel      │                    │        │  │ watchtower  │
-│ ─────────────── │   HTTPS POST       │        │─▶│ auth        │──▶ VictoriaMetrics
-│ RPC collector   │───────────────────▶│ Caddy  │  │ rate limit  │──▶ Loki
-│ Log collector   │                    │ (TLS)  │  │ IP ban      │
-│ OTLP relay      │                    │        │  └─────────────┘
-│ Resource monitor│                    └────────┘
-│ Metadata        │                    Grafana ◀── VictoriaMetrics + Loki
+│ ──────────────── │   HTTPS POST       │        │─▶│ auth        │──▶ VictoriaMetrics
+│ RPC collector    │───────────────────▶│ Caddy  │  │ rate limit  │──▶ Loki
+│ Log collector    │                    │ (TLS)  │  │ IP ban      │
+│ OTLP relay       │                    │        │  └─────────────┘
+│ Resource monitor │                    └────────┘
+│ Metadata         │                    Grafana ◀── VictoriaMetrics + Loki
 └──────────────────┘
 ```
 
@@ -28,54 +28,61 @@ Validator machine(s)                    Central server
 ## Prerequisites
 
 **Server:**
+
 - Docker Engine 24+ and Docker Compose v2
 - A public domain with DNS pointing to the server (for Caddy TLS)
 - Ports 80 and 443 open in the firewall
 
 **Validator machine:**
-- Linux (Docker or systemd deployment of gnoland)
+
+- Linux (not tested on macOS)
+- gnoland Docker image or standalone binary
 - `sentinel` binary
 - Network access to the central server on port 443
 
 ## Server stack setup
 
 1. Clone the repository:
-   ```sh
-   git clone https://github.com/gnolang/val-companion.git
-   cd val-companion/deploy
-   ```
+
+    ```sh
+    git clone https://github.com/aeddi/gno-watchtower.git
+    cd gno-watchtower/deploy
+    ```
 
 2. Copy and edit the environment file:
-   ```sh
-   cp config.env.example config.env
-   $EDITOR config.env   # set DOMAIN, GRAFANA_ADMIN_PASSWORD
-   ```
+
+    ```sh
+    cp config.env.example config.env
+    $EDITOR config.env   # set DOMAIN, GRAFANA_ADMIN_PASSWORD
+    ```
 
 3. Create the initial (empty) watchtower config:
-   ```sh
-   cat > watchtower.toml <<'EOF'
-   [server]
-   listen_addr = "127.0.0.1:8080"
 
-   [security]
-   rate_limit_rps   = 10
-   # rate_limit_burst must be >= number of concurrent sentinel data types (rpc + metrics + logs + otlp = 4)
-   rate_limit_burst = 10
-   ban_threshold    = 5
-   ban_duration     = "15m"
+    ```sh
+    cat > watchtower.toml <<'EOF'
+    [server]
+    listen_addr = "127.0.0.1:8080"
 
-   [victoria_metrics]
-   url = "http://victoria-metrics:8428"
+    [security]
+    rate_limit_rps   = 10
+    # rate_limit_burst must be >= number of concurrent sentinel data types (rpc + metrics + logs + otlp = 4)
+    rate_limit_burst = 10
+    ban_threshold    = 5
+    ban_duration     = "15m"
 
-   [loki]
-   url = "http://loki:3100"
-   EOF
-   ```
+    [victoria_metrics]
+    url = "http://victoria-metrics:8428"
+
+    [loki]
+    url = "http://loki:3100"
+    EOF
+    ```
 
 4. Start the stack:
-   ```sh
-   make up
-   ```
+
+    ```sh
+    make up
+    ```
 
 5. Grafana is available at `https://<DOMAIN>`. Log in with the admin credentials set in `config.env`.
 
@@ -84,37 +91,41 @@ Validator machine(s)                    Central server
 1. Copy the `sentinel` binary to the validator machine.
 
 2. Generate an example config:
-   ```sh
-   sentinel generate-config > /etc/sentinel/config.toml
-   $EDITOR /etc/sentinel/config.toml
-   ```
+
+    ```sh
+    sentinel generate-config > /etc/sentinel/config.toml
+    $EDITOR /etc/sentinel/config.toml
+    ```
 
 3. Set `[server] url` to `https://<DOMAIN>/watchtower` and `token` to the value printed by `make add-validator` (see below).
 
 4. Run sentinel:
-   ```sh
-   sentinel run /etc/sentinel/config.toml
-   ```
 
-   For production, run as a systemd service:
-   ```ini
-   [Unit]
-   Description=val-companion sentinel
-   After=network.target
+    ```sh
+    sentinel run /etc/sentinel/config.toml
+    ```
 
-   [Service]
-   ExecStart=/usr/local/bin/sentinel run --log-format=journal /etc/sentinel/config.toml
-   Restart=on-failure
+    For production, run as a systemd service:
 
-   [Install]
-   WantedBy=multi-user.target
-   ```
+    ```ini
+    [Unit]
+    Description=Gnoland sentinel
+    After=network.target
+
+    [Service]
+    ExecStart=/usr/local/bin/sentinel run --log-format=journal /etc/sentinel/config.toml
+    Restart=on-failure
+
+    [Install]
+    WantedBy=multi-user.target
+    ```
 
 ## Adding and removing validators
 
 Run these commands from the `deploy/` directory.
 
 **Add a validator:**
+
 ```sh
 make add-validator name=val-01 permissions=rpc,metrics,logs,otlp logs_min_level=info
 ```
@@ -122,6 +133,7 @@ make add-validator name=val-01 permissions=rpc,metrics,logs,otlp logs_min_level=
 This generates a cryptographically secure bearer token, appends the `[validators.val-01]` block to `watchtower.toml`, restarts watchtower, and prints the token. Paste the token into the sentinel's `config.toml` `[server] token` field.
 
 **Remove a validator:**
+
 ```sh
 make remove-validator name=val-01
 ```
@@ -132,44 +144,44 @@ This removes the `[validators.val-01]` block from `watchtower.toml` and restarts
 
 ### `deploy/config.env`
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DOMAIN` | Public domain for Caddy TLS and Grafana | `monitoring.example.com` |
-| `GRAFANA_ADMIN_USER` | Grafana admin username | `admin` |
-| `GRAFANA_ADMIN_PASSWORD` | Grafana admin password | `changeme` |
-| `METRICS_RETENTION` | VictoriaMetrics retention in months | `6` |
-| `LOGS_RETENTION` | Loki log retention period (e.g. `2160h` = 90 days) | `2160h` |
+| Variable                 | Description                                        | Default                  |
+| ------------------------ | -------------------------------------------------- | ------------------------ |
+| `DOMAIN`                 | Public domain for Caddy TLS and Grafana            | `monitoring.example.com` |
+| `GRAFANA_ADMIN_USER`     | Grafana admin username                             | `admin`                  |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana admin password                             | `changeme`               |
+| `METRICS_RETENTION`      | VictoriaMetrics retention in months                | `6`                      |
+| `LOGS_RETENTION`         | Loki log retention period (e.g. `2160h` = 90 days) | `2160h`                  |
 
 ### `watchtower.toml` (validator block)
 
-| Field | Description |
-|-------|-------------|
-| `token` | Bearer token for this validator (hex string) |
-| `permissions` | Allowed data types: any subset of `["rpc", "metrics", "logs", "otlp"]` |
-| `logs_min_level` | Minimum log level forwarded to Loki: `debug`, `info`, `warn`, `error` |
+| Field            | Description                                                            |
+| ---------------- | ---------------------------------------------------------------------- |
+| `token`          | Bearer token for this validator (hex string)                           |
+| `permissions`    | Allowed data types: any subset of `["rpc", "metrics", "logs", "otlp"]` |
+| `logs_min_level` | Minimum log level forwarded to Loki: `debug`, `info`, `warn`, `error`  |
 
 ### `sentinel` config (`config.toml`)
 
 Run `sentinel generate-config` for a fully annotated example. Key fields:
 
-| Section | Field | Description |
-|---------|-------|-------------|
-| `[server]` | `url` | Watchtower base URL |
-| `[server]` | `token` | Bearer token from `make add-validator` |
-| `[logs]` | `source` | `docker` or `journald` |
-| `[logs]` | `min_level` | Minimum log level to ship |
-| `[otlp]` | `listen_addr` | Local OTLP listener (point gnoland here) |
-| `[resources]` | `source` | `host`, `docker`, or `both` |
+| Section       | Field         | Description                              |
+| ------------- | ------------- | ---------------------------------------- |
+| `[server]`    | `url`         | Watchtower base URL                      |
+| `[server]`    | `token`       | Bearer token from `make add-validator`   |
+| `[logs]`      | `source`      | `docker` or `journald`                   |
+| `[logs]`      | `min_level`   | Minimum log level to ship                |
+| `[otlp]`      | `listen_addr` | Local OTLP listener (point gnoland here) |
+| `[resources]` | `source`      | `host`, `docker`, or `both`              |
 
 ## Doctor usage
 
 `sentinel doctor` checks your sentinel configuration and actual runtime environment, then prints a colour-coded report:
 
-| Symbol | Meaning |
-|--------|---------|
-| GREEN  | Working correctly |
-| RED    | Enabled but failing |
-| ORANGE | Disabled in config |
+| Symbol | Meaning                       |
+| ------ | ----------------------------- |
+| GREEN  | Working correctly             |
+| RED    | Enabled but failing           |
+| ORANGE | Disabled in config            |
 | GREY   | Not permitted by server token |
 
 Run it before deploying or after any configuration change:
