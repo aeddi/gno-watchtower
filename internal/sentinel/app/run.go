@@ -60,6 +60,7 @@ func wireBuffered[T any](ctx context.Context, outCh <-chan T, buf *sender.Buffer
 // It blocks until ctx is cancelled.
 func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 	appLog := log.With("component", "app")
+	go runHealthServer(ctx, cfg.Health.ListenAddr, log.With("component", "health"))
 	senderLog := log.With("component", "sender")
 	st := stats.New()
 	s := sender.New(cfg.Server.URL, cfg.Server.Token)

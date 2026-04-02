@@ -50,6 +50,7 @@ type Config struct {
 	OTLP      OTLPConfig      `toml:"otlp"`
 	Resources ResourcesConfig `toml:"resources"`
 	Metadata  MetadataConfig  `toml:"metadata"`
+	Health    HealthConfig    `toml:"health"`
 }
 
 type ServerConfig struct {
@@ -103,6 +104,12 @@ type MetadataConfig struct {
 
 	GenesisPath        string `toml:"genesis_path"`
 	GenesisChecksumCmd string `toml:"genesis_checksum_cmd"`
+}
+
+// HealthConfig holds the sentinel health endpoint settings.
+// If ListenAddr is empty, no health endpoint is started.
+type HealthConfig struct {
+	ListenAddr string `toml:"listen_addr"`
 }
 
 func Load(path string) (*Config, error) {
