@@ -63,5 +63,35 @@ func Load(path string) (*Config, error) {
 	if cfg.Security.RateLimitBurst == 0 {
 		cfg.Security.RateLimitBurst = 10
 	}
+	if err := cfg.validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
 	return &cfg, nil
+}
+
+func (c *Config) validate() error {
+	if c.Server.ListenAddr == "" {
+		return fmt.Errorf("server.listen_addr is required")
+	}
+	if c.VictoriaMetrics.URL == "" {
+		return fmt.Errorf("victoria_metrics.url is required")
+	}
+	if c.Loki.URL == "" {
+		return fmt.Errorf("loki.url is required")
+	}
+	if c.Security.RateLimitRPS <= 0 {
+		return fmt.Errorf("security.rate_limit_rps must be > 0")
+	}
+	if c.Security.BanThreshold <= 0 {
+		return fmt.Errorf("security.ban_threshold must be > 0")
+	}
+	if c.Security.BanDuration.Duration <= 0 {
+		return fmt.Errorf("security.ban_duration must be > 0")
+	}
+	for name, v := range c.Validators {
+		if v.Token == "" {
+			return fmt.Errorf("validators.%s.token is required", name)
+		}
+	}
+	return nil
 }

@@ -130,3 +130,93 @@ url = "http://loki:3100"
 		t.Errorf("RateLimitBurst default: got %d, want 10", cfg.Security.RateLimitBurst)
 	}
 }
+
+func TestLoad_MissingListenAddr_ReturnsError(t *testing.T) {
+	const content = `
+[security]
+rate_limit_rps = 5
+ban_threshold  = 3
+ban_duration   = "5m"
+[victoria_metrics]
+url = "http://vm:8428"
+[loki]
+url = "http://loki:3100"
+`
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := config.Load(path)
+	if err == nil {
+		t.Error("expected error for missing listen_addr")
+	}
+}
+
+func TestLoad_ZeroRateLimitRPS_ReturnsError(t *testing.T) {
+	const content = `
+[server]
+listen_addr = "127.0.0.1:8080"
+[security]
+ban_threshold = 3
+ban_duration  = "5m"
+[victoria_metrics]
+url = "http://vm:8428"
+[loki]
+url = "http://loki:3100"
+`
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := config.Load(path)
+	if err == nil {
+		t.Error("expected error for zero rate_limit_rps")
+	}
+}
+
+func TestLoad_MissingVMURL_ReturnsError(t *testing.T) {
+	const content = `
+[server]
+listen_addr = "127.0.0.1:8080"
+[security]
+rate_limit_rps = 5
+ban_threshold  = 3
+ban_duration   = "5m"
+[loki]
+url = "http://loki:3100"
+`
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := config.Load(path)
+	if err == nil {
+		t.Error("expected error for missing victoria_metrics.url")
+	}
+}
+
+func TestLoad_EmptyValidatorToken_ReturnsError(t *testing.T) {
+	const content = `
+[server]
+listen_addr = "127.0.0.1:8080"
+[security]
+rate_limit_rps = 5
+ban_threshold  = 3
+ban_duration   = "5m"
+[victoria_metrics]
+url = "http://vm:8428"
+[loki]
+url = "http://loki:3100"
+[validators.val-01]
+token = ""
+permissions = ["rpc"]
+`
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := config.Load(path)
+	if err == nil {
+		t.Error("expected error for empty validator token")
+	}
+}
