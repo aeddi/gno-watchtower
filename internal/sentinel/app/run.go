@@ -31,6 +31,31 @@ const (
 	metricsSendInterval = time.Second
 )
 
+// runCollector starts a collector goroutine. Transient errors are logged; ctx cancellation exits cleanly.
+func runCollector(ctx context.Context, name string, log *slog.Logger, run func(context.Context) error) {
+	go func() {
+		if err := run(ctx); err != nil && ctx.Err() == nil {
+			log.Error(name+" collector stopped", "err", err)
+		}
+	}()
+}
+
+// wireBuffered launches a goroutine that drains outCh into buf until ctx is done.
+func wireBuffered[T any](ctx context.Context, outCh <-chan T, buf *sender.Buffer[T], log *slog.Logger, name string) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case p := <-outCh:
+				if dropped := buf.Push(p); dropped {
+					log.Warn(name + " buffer full: oldest payload dropped")
+				}
+			}
+		}
+	}()
+}
+
 // Run starts all enabled collectors and drains their output to the sender.
 // It blocks until ctx is cancelled.
 func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
@@ -59,24 +84,8 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 			rpcOut,
 			log,
 		)
-		go func() {
-			// collect errors are transient; log and continue.
-			if err := collector.Run(ctx); err != nil && ctx.Err() == nil {
-				appLog.Error("rpc collector stopped", "err", err)
-			}
-		}()
-		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case p := <-rpcOut:
-					if dropped := rpcBuf.Push(p); dropped {
-						appLog.Warn("rpc buffer full: oldest payload dropped")
-					}
-				}
-			}
-		}()
+		runCollector(ctx, "rpc", appLog, collector.Run)
+		wireBuffered(ctx, rpcOut, rpcBuf, appLog, "rpc")
 
 		t := time.NewTicker(cfg.RPC.PollInterval.Duration)
 		defer t.Stop()
@@ -102,23 +111,8 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 				logsOut,
 				log,
 			)
-			go func() {
-				if err := lc.Run(ctx); err != nil && ctx.Err() == nil {
-					appLog.Error("log collector stopped", "err", err)
-				}
-			}()
-			go func() {
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case p := <-logsOut:
-						if dropped := logBuf.Push(p); dropped {
-							appLog.Warn("log buffer full: oldest payload dropped")
-						}
-					}
-				}
-			}()
+			runCollector(ctx, "log", appLog, lc.Run)
+			wireBuffered(ctx, logsOut, logBuf, appLog, "log")
 
 			t := time.NewTicker(logSendInterval)
 			defer t.Stop()
@@ -161,23 +155,8 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 		resourcesOut := make(chan protocol.MetricsPayload, resourcesBufferSize)
 
 		rc := resources.NewCollector(cfg.Resources, resourcesOut, log)
-		go func() {
-			if err := rc.Run(ctx); err != nil && ctx.Err() == nil {
-				appLog.Error("resource collector stopped", "err", err)
-			}
-		}()
-		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case p := <-resourcesOut:
-					if dropped := resourcesBuf.Push(p); dropped {
-						appLog.Warn("resources buffer full: oldest payload dropped")
-					}
-				}
-			}
-		}()
+		runCollector(ctx, "resources", appLog, rc.Run)
+		wireBuffered(ctx, resourcesOut, resourcesBuf, appLog, "resources")
 
 		t := time.NewTicker(metricsSendInterval)
 		defer t.Stop()
@@ -192,23 +171,8 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 		metadataOut := make(chan protocol.MetricsPayload, metadataBufferSize)
 
 		mc := metadata.NewCollector(cfg.Metadata, metadataOut, log)
-		go func() {
-			if err := mc.Run(ctx); err != nil && ctx.Err() == nil {
-				appLog.Error("metadata collector stopped", "err", err)
-			}
-		}()
-		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case p := <-metadataOut:
-					if dropped := metadataBuf.Push(p); dropped {
-						appLog.Warn("metadata buffer full: oldest payload dropped")
-					}
-				}
-			}
-		}()
+		runCollector(ctx, "metadata", appLog, mc.Run)
+		wireBuffered(ctx, metadataOut, metadataBuf, appLog, "metadata")
 
 		t := time.NewTicker(metricsSendInterval)
 		defer t.Stop()
