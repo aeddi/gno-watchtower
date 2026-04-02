@@ -70,3 +70,30 @@ func TestStats_EmptySnapshot(t *testing.T) {
 		t.Errorf("expected non-negative uptime, got %v", uptime)
 	}
 }
+
+func TestStats_RecordDropAndRetry(t *testing.T) {
+	s := stats.New()
+	s.RecordDrop("rpc")
+	s.RecordDrop("rpc")
+	s.RecordRetry("logs")
+
+	snap, _ := s.Snapshot()
+
+	if snap["rpc"].Drops != 2 {
+		t.Errorf("rpc Drops: got %d, want 2", snap["rpc"].Drops)
+	}
+	if snap["logs"].Retries != 1 {
+		t.Errorf("logs Retries: got %d, want 1", snap["logs"].Retries)
+	}
+}
+
+func TestStats_DropRetryResetOnSnapshot(t *testing.T) {
+	s := stats.New()
+	s.RecordDrop("rpc")
+	s.Snapshot() // resets
+	s.RecordDrop("rpc")
+	snap, _ := s.Snapshot()
+	if snap["rpc"].Drops != 1 {
+		t.Errorf("expected 1 drop after reset, got %d", snap["rpc"].Drops)
+	}
+}

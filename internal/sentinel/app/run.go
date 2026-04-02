@@ -41,7 +41,7 @@ func runCollector(ctx context.Context, name string, log *slog.Logger, run func(c
 }
 
 // wireBuffered launches a goroutine that drains outCh into buf until ctx is done.
-func wireBuffered[T any](ctx context.Context, outCh <-chan T, buf *sender.Buffer[T], log *slog.Logger, name string) {
+func wireBuffered[T any](ctx context.Context, outCh <-chan T, buf *sender.Buffer[T], log *slog.Logger, name string, st *stats.Stats) {
 	go func() {
 		for {
 			select {
@@ -50,6 +50,7 @@ func wireBuffered[T any](ctx context.Context, outCh <-chan T, buf *sender.Buffer
 			case p := <-outCh:
 				if dropped := buf.Push(p); dropped {
 					log.Warn(name + " buffer full: oldest payload dropped")
+					st.RecordDrop(name)
 				}
 			}
 		}
@@ -86,7 +87,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 			log,
 		)
 		runCollector(ctx, "rpc", appLog, collector.Run)
-		wireBuffered(ctx, rpcOut, rpcBuf, appLog, "rpc")
+		wireBuffered(ctx, rpcOut, rpcBuf, appLog, "rpc", st)
 
 		t := time.NewTicker(cfg.RPC.PollInterval.Duration)
 		defer t.Stop()
@@ -113,7 +114,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 				log,
 			)
 			runCollector(ctx, "log", appLog, lc.Run)
-			wireBuffered(ctx, logsOut, logBuf, appLog, "log")
+			wireBuffered(ctx, logsOut, logBuf, appLog, "log", st)
 
 			t := time.NewTicker(logSendInterval)
 			defer t.Stop()
@@ -157,7 +158,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 
 		rc := resources.NewCollector(cfg.Resources, resourcesOut, log)
 		runCollector(ctx, "resources", appLog, rc.Run)
-		wireBuffered(ctx, resourcesOut, resourcesBuf, appLog, "resources")
+		wireBuffered(ctx, resourcesOut, resourcesBuf, appLog, "resources", st)
 
 		t := time.NewTicker(metricsSendInterval)
 		defer t.Stop()
@@ -173,7 +174,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 
 		mc := metadata.NewCollector(cfg.Metadata, metadataOut, log)
 		runCollector(ctx, "metadata", appLog, mc.Run)
-		wireBuffered(ctx, metadataOut, metadataBuf, appLog, "metadata")
+		wireBuffered(ctx, metadataOut, metadataBuf, appLog, "metadata", st)
 
 		t := time.NewTicker(metricsSendInterval)
 		defer t.Stop()
@@ -242,6 +243,7 @@ func flush(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protocol.RP
 				return
 			}
 			log.Error("send rpc payload", "err", err)
+			st.RecordRetry("rpc")
 			continue
 		}
 		st.Record("rpc", len(b))
@@ -263,6 +265,7 @@ func flushLogs(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protoco
 				return
 			}
 			log.Error("send log payload", "err", err)
+			st.RecordRetry("logs")
 			continue
 		}
 		st.Record("logs", len(b))
@@ -283,6 +286,7 @@ func flushMetrics(ctx context.Context, s *sender.Sender, buf *sender.Buffer[prot
 				return
 			}
 			log.Error("send metrics payload", "err", err, "type", typ)
+			st.RecordRetry(typ)
 			continue
 		}
 		st.Record(typ, len(b))
@@ -296,6 +300,8 @@ func logStats(log *slog.Logger, st *stats.Stats) {
 		args = append(args, slog.Group(typ,
 			"last_min_bytes", s.LastMinuteBytes,
 			"total_bytes", s.TotalBytes,
+			"drops", s.Drops,
+			"retries", s.Retries,
 		))
 	}
 	log.Info("stats", args...)
