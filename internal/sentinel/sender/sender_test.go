@@ -224,6 +224,37 @@ func TestSender_SendCompressedBytesWithRetry_SetsHeaderAndBody(t *testing.T) {
 	}
 }
 
+func TestSender_SendWithRetry_RespectsRetryAfter(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := calls.Add(1)
+		if n < 2 {
+			w.Header().Set("Retry-After", "0") // 0 seconds: skip the normal backoff
+			http.Error(w, "rate limited", http.StatusTooManyRequests)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	// Use a large initialBackoff so that normal backoff would take ~500ms.
+	// With Retry-After: 0, the retry must happen without waiting.
+	s := sender.New(srv.URL, "tok")
+	start := time.Now()
+	err := s.SendRawWithRetry(context.Background(), "/rpc", []byte("{}"), "application/json", 3, 500*time.Millisecond)
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("SendRawWithRetry: %v", err)
+	}
+	if calls.Load() != 2 {
+		t.Errorf("expected 2 calls, got %d", calls.Load())
+	}
+	// Without Retry-After support, the retry would wait 500ms. With it, near-instant.
+	if elapsed > 200*time.Millisecond {
+		t.Errorf("expected Retry-After: 0 to skip backoff, elapsed %v", elapsed)
+	}
+}
+
 func TestSender_SendRawWithRetry_RetriesOnFailure(t *testing.T) {
 	var attempts atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

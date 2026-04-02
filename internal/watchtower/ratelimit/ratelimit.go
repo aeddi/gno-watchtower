@@ -39,6 +39,7 @@ func (l *Limiter) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		if !l.allow(name) {
+			w.Header().Set("Retry-After", "1")
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}

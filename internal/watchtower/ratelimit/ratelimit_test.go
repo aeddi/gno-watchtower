@@ -1,6 +1,7 @@
 package ratelimit_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -56,6 +57,30 @@ func TestRateLimiter_BlocksOverLimit(t *testing.T) {
 
 	if rr2.Code != http.StatusTooManyRequests {
 		t.Errorf("want 429, got %d", rr2.Code)
+	}
+}
+
+func TestLimiter_RateLimitedResponse_HasRetryAfterHeader(t *testing.T) {
+	rl := ratelimit.New(0.001, 1) // effectively zero RPS to trigger rate limit
+
+	// Set validator in context.
+	ctx := auth.WithValidator(context.Background(), "val-01", config.ValidatorConfig{})
+	req := httptest.NewRequest("POST", "/rpc", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	// First request should succeed (burst=1).
+	rl.Middleware(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})).ServeHTTP(w, req)
+
+	// Second should be rate-limited.
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest("POST", "/rpc", nil).WithContext(ctx)
+	rl.Middleware(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})).ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429, got %d", w2.Code)
+	}
+	if w2.Header().Get("Retry-After") == "" {
+		t.Error("expected Retry-After header on 429 response")
 	}
 }
 
