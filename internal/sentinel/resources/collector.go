@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	dockerclient "github.com/docker/docker/client"
 	gopsutilcpu "github.com/shirou/gopsutil/v3/cpu"
 	gopsutildisk "github.com/shirou/gopsutil/v3/disk"
 	gopsutilmem "github.com/shirou/gopsutil/v3/mem"
@@ -20,10 +21,11 @@ import (
 // Collector polls host and/or container resource metrics on a configurable interval.
 // Only changed values (by hash) are included in each MetricsPayload (delta-filtered).
 type Collector struct {
-	cfg   config.ResourcesConfig
-	delta *delta.Delta
-	out   chan<- protocol.MetricsPayload
-	log   *slog.Logger
+	cfg       config.ResourcesConfig
+	delta     *delta.Delta
+	out       chan<- protocol.MetricsPayload
+	log       *slog.Logger
+	dockerCli *dockerclient.Client // lazily initialized on first docker poll
 }
 
 // NewCollector creates a resource Collector.
@@ -40,6 +42,11 @@ func NewCollector(cfg config.ResourcesConfig, out chan<- protocol.MetricsPayload
 func (c *Collector) Run(ctx context.Context) error {
 	ticker := time.NewTicker(c.cfg.PollInterval.Duration)
 	defer ticker.Stop()
+	defer func() {
+		if c.dockerCli != nil {
+			c.dockerCli.Close()
+		}
+	}()
 	for {
 		select {
 		case <-ctx.Done():
@@ -120,9 +127,18 @@ func (c *Collector) collectHost(ctx context.Context, data map[string]json.RawMes
 }
 
 func (c *Collector) collectDocker(ctx context.Context, data map[string]json.RawMessage) {
-	// Docker container stats are collected via the Docker SDK.
-	// On error, log and continue — Docker may not be running.
-	b, err := dockerContainerStats(ctx, c.cfg.ContainerName)
+	if c.dockerCli == nil {
+		cli, err := dockerclient.NewClientWithOpts(
+			dockerclient.FromEnv,
+			dockerclient.WithAPIVersionNegotiation(),
+		)
+		if err != nil {
+			c.log.Warn("docker client error", "container", c.cfg.ContainerName, "err", err)
+			return
+		}
+		c.dockerCli = cli
+	}
+	b, err := containerStatsFromClient(ctx, c.dockerCli, c.cfg.ContainerName)
 	if err != nil {
 		c.log.Warn("docker stats error", "container", c.cfg.ContainerName, "err", err)
 		return

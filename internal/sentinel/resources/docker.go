@@ -11,13 +11,7 @@ import (
 )
 
 // ContainerStats returns the one-shot Docker stats snapshot for the named container as raw JSON bytes.
-// It wraps dockerContainerStats for use by external packages.
 func ContainerStats(ctx context.Context, name string) ([]byte, error) {
-	return dockerContainerStats(ctx, name)
-}
-
-// dockerContainerStats returns the one-shot Docker stats snapshot for the named container as raw JSON bytes.
-func dockerContainerStats(ctx context.Context, containerName string) ([]byte, error) {
 	cli, err := dockerclient.NewClientWithOpts(
 		dockerclient.FromEnv,
 		dockerclient.WithAPIVersionNegotiation(),
@@ -26,7 +20,11 @@ func dockerContainerStats(ctx context.Context, containerName string) ([]byte, er
 		return nil, fmt.Errorf("docker client: %w", err)
 	}
 	defer cli.Close()
+	return containerStatsFromClient(ctx, cli, name)
+}
 
+// containerStatsFromClient fetches a one-shot stats snapshot using an existing client.
+func containerStatsFromClient(ctx context.Context, cli *dockerclient.Client, containerName string) ([]byte, error) {
 	resp, err := cli.ContainerStatsOneShot(ctx, containerName)
 	if err != nil {
 		return nil, fmt.Errorf("container stats %q: %w", containerName, err)
@@ -37,8 +35,6 @@ func dockerContainerStats(ctx context.Context, containerName string) ([]byte, er
 	if err != nil {
 		return nil, fmt.Errorf("read stats body: %w", err)
 	}
-
-	// Validate it's JSON before returning.
 	if !json.Valid(b) {
 		return nil, fmt.Errorf("container stats: invalid JSON response")
 	}
