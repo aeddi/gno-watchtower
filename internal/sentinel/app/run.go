@@ -268,11 +268,7 @@ func flushLogs(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protoco
 			log.Error("marshal log payload", "err", err)
 			continue
 		}
-		compressed, err := sender.ZstdCompress(b)
-		if err != nil {
-			log.Error("compress log payload", "err", err)
-			continue
-		}
+		compressed := sender.ZstdCompress(b)
 		log.Debug("sending payload", "type", "logs", "level", p.Level, "uncompressed_bytes", len(b), "wire_bytes", len(compressed))
 		if err := s.SendCompressedBytesWithRetry(ctx, "/logs", compressed, maxSendAttempts, initialBackoff); err != nil {
 			if ctx.Err() != nil {

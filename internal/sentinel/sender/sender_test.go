@@ -195,6 +195,35 @@ func TestSender_SendRaw_SetsContentType(t *testing.T) {
 	}
 }
 
+func TestSender_SendCompressedBytesWithRetry_SetsHeaderAndBody(t *testing.T) {
+	var gotEncoding string
+	var gotBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotEncoding = r.Header.Get("Content-Encoding")
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	payload := map[string]string{"key": "value"}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	compressed := sender.ZstdCompress(b)
+
+	s := sender.New(srv.URL, "tok")
+	if err := s.SendCompressedBytesWithRetry(context.Background(), "/logs", compressed, 1, 0); err != nil {
+		t.Fatalf("SendCompressedBytesWithRetry: %v", err)
+	}
+	if gotEncoding != "zstd" {
+		t.Errorf("Content-Encoding: got %q, want %q", gotEncoding, "zstd")
+	}
+	if !bytes.Equal(gotBody, compressed) {
+		t.Errorf("body mismatch: got %x, want %x", gotBody, compressed)
+	}
+}
+
 func TestSender_SendRawWithRetry_RetriesOnFailure(t *testing.T) {
 	var attempts atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

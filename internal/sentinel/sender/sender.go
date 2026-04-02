@@ -43,10 +43,7 @@ func (s *Sender) SendCompressed(ctx context.Context, path string, payload any) e
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	compressed, err := ZstdCompress(body)
-	if err != nil {
-		return fmt.Errorf("compress: %w", err)
-	}
+	compressed := ZstdCompress(body)
 	return s.post(ctx, path, compressed, map[string]string{"Content-Type": "application/json", "Content-Encoding": "zstd"})
 }
 
@@ -92,6 +89,7 @@ func (s *Sender) post(ctx context.Context, path string, body []byte, headers map
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
+	// Authorization is always set; callers must not pass "Authorization" in headers.
 	req.Header.Set("Authorization", "Bearer "+s.token)
 	for k, v := range headers {
 		req.Header.Set(k, v)
@@ -112,7 +110,7 @@ func (s *Sender) post(ctx context.Context, path string, body []byte, headers map
 func retry(ctx context.Context, maxAttempts int, initialBackoff time.Duration, fn func() error) error {
 	backoff := initialBackoff
 	var lastErr error
-	for i := 0; i < maxAttempts; i++ {
+	for i := range maxAttempts {
 		if i > 0 {
 			timer := time.NewTimer(backoff)
 			select {
@@ -137,6 +135,6 @@ func retry(ctx context.Context, maxAttempts int, initialBackoff time.Duration, f
 var zstdEncoder, _ = zstd.NewWriter(nil)
 
 // ZstdCompress returns the zstd-compressed form of data.
-func ZstdCompress(data []byte) ([]byte, error) {
-	return zstdEncoder.EncodeAll(data, make([]byte, 0, len(data))), nil
+func ZstdCompress(data []byte) []byte {
+	return zstdEncoder.EncodeAll(data, make([]byte, 0, len(data)))
 }
