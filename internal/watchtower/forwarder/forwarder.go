@@ -164,7 +164,13 @@ func (f *Forwarder) post(ctx context.Context, url string, body []byte, contentTy
 }
 
 // zstdDecoder is a reusable stateless decoder; DecodeAll is safe for concurrent use.
-var zstdDecoder, _ = zstd.NewReader(nil)
+var zstdDecoder = func() *zstd.Decoder {
+	dec, err := zstd.NewReader(nil)
+	if err != nil {
+		panic("init zstd decoder: " + err.Error())
+	}
+	return dec
+}()
 
 func zstdDecompress(data []byte) ([]byte, error) {
 	return zstdDecoder.DecodeAll(data, nil)

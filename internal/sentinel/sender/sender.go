@@ -132,7 +132,13 @@ func retry(ctx context.Context, maxAttempts int, initialBackoff time.Duration, f
 }
 
 // zstdEncoder is a reusable stateless encoder; EncodeAll is safe for concurrent use.
-var zstdEncoder, _ = zstd.NewWriter(nil)
+var zstdEncoder = func() *zstd.Encoder {
+	enc, err := zstd.NewWriter(nil)
+	if err != nil {
+		panic("init zstd encoder: " + err.Error())
+	}
+	return enc
+}()
 
 // ZstdCompress returns the zstd-compressed form of data.
 func ZstdCompress(data []byte) []byte {
