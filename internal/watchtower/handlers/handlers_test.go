@@ -38,12 +38,8 @@ func makeServer(t *testing.T, vmURL, lokiURL string) *handlers.Server {
 		},
 		Validators: validators,
 	}
-	cfg.TokenIndex = make(map[string]config.TokenEntry)
-	for name, v := range validators {
-		cfg.TokenIndex[v.Token] = config.TokenEntry{ValidatorName: name, Config: v}
-	}
 	a := auth.New(validators, cfg.Security.BanThreshold, cfg.Security.BanDuration.Duration)
-	rl := ratelimit.New(cfg.Security.RateLimitRPS)
+	rl := ratelimit.New(cfg.Security.RateLimitRPS, 10)
 	fwd := forwarder.New(vmURL, lokiURL)
 	st := stats.New()
 	return handlers.NewServer(cfg, a, rl, fwd, st, logger.Noop())
@@ -152,12 +148,8 @@ func TestHandler_PermissionDenied_Returns403(t *testing.T) {
 		},
 		Validators: validators,
 	}
-	cfg.TokenIndex = make(map[string]config.TokenEntry)
-	for name, v := range validators {
-		cfg.TokenIndex[v.Token] = config.TokenEntry{ValidatorName: name, Config: v}
-	}
 	a := auth.New(validators, 10, time.Minute)
-	rl := ratelimit.New(100)
+	rl := ratelimit.New(100, 10)
 	fwd := forwarder.New("http://vm:8428", "http://loki:3100")
 	srv := handlers.NewServer(cfg, a, rl, fwd, stats.New(), logger.Noop())
 
@@ -191,5 +183,16 @@ func TestRunStatsLogger_LogsAndStops(t *testing.T) {
 	case <-done:
 	case <-time.After(500 * time.Millisecond):
 		t.Error("RunStatsLogger did not stop after context cancel")
+	}
+}
+
+func TestHandler_Health_Returns200WithoutAuth(t *testing.T) {
+	srv := makeServer(t, "http://vm:8428", "http://loki:3100")
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.RemoteAddr = "127.0.0.1:9999"
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Errorf("want 200, got %d", rr.Code)
 	}
 }

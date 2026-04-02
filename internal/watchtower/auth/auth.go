@@ -43,6 +43,7 @@ type Authenticator struct {
 	banDuration  time.Duration
 	mu           sync.Mutex
 	ips          map[string]*ipRecord
+	lastCleanup  time.Time
 }
 
 // New creates an Authenticator from the token index in cfg.Validators.
@@ -88,6 +89,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 func (a *Authenticator) isBanned(ip string) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.maybeSweep()
 	rec, ok := a.ips[ip]
 	if !ok {
 		return false
@@ -101,6 +103,21 @@ func (a *Authenticator) isBanned(ip string) bool {
 		return false
 	}
 	return true
+}
+
+// maybeSweep removes expired ban records if a full ban duration has elapsed since
+// the last cleanup. Must be called with a.mu held.
+func (a *Authenticator) maybeSweep() {
+	if time.Since(a.lastCleanup) < a.banDuration {
+		return
+	}
+	now := time.Now()
+	for ip, rec := range a.ips {
+		if !rec.banExpiry.IsZero() && now.After(rec.banExpiry) {
+			delete(a.ips, ip)
+		}
+	}
+	a.lastCleanup = now
 }
 
 func (a *Authenticator) recordFailure(ip string) {
@@ -120,11 +137,11 @@ func (a *Authenticator) recordFailure(ip string) {
 
 // bearerToken extracts the token from the Authorization: Bearer <token> header.
 func bearerToken(r *http.Request) string {
-	h := r.Header.Get("Authorization")
-	if !strings.HasPrefix(h, "Bearer ") {
+	token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !ok {
 		return ""
 	}
-	return strings.TrimPrefix(h, "Bearer ")
+	return token
 }
 
 // remoteIP extracts the IP from r.RemoteAddr (host:port).

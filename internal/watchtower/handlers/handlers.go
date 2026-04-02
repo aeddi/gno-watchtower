@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/gnolang/val-companion/internal/watchtower/auth"
@@ -47,18 +49,25 @@ func NewServer(
 }
 
 // Handler returns the http.Handler with the full middleware chain.
+// GET /health is unauthenticated (used by Docker healthcheck).
 func (s *Server) Handler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /rpc", s.handleRPC)
-	mux.HandleFunc("POST /metrics", s.handleMetrics)
-	mux.HandleFunc("POST /logs", s.handleLogs)
-	mux.HandleFunc("POST /otlp", s.handleOTLP)
-	mux.HandleFunc("GET /auth/check", s.handleAuthCheck)
-	return s.auth.Middleware(s.rl.Middleware(mux))
+	inner := http.NewServeMux()
+	inner.HandleFunc("POST /rpc", s.handleRPC)
+	inner.HandleFunc("POST /metrics", s.handleMetrics)
+	inner.HandleFunc("POST /logs", s.handleLogs)
+	inner.HandleFunc("POST /otlp", s.handleOTLP)
+	inner.HandleFunc("GET /auth/check", s.handleAuthCheck)
+
+	outer := http.NewServeMux()
+	outer.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	outer.Handle("/", s.auth.Middleware(s.rl.Middleware(inner)))
+	return outer
 }
 
 // RunStatsLogger logs per-validator hourly stats on the given ticker until ctx is done.
-func (s *Server) RunStatsLogger(ctx interface{ Done() <-chan struct{} }, ticker *time.Ticker) {
+func (s *Server) RunStatsLogger(ctx context.Context, ticker *time.Ticker) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -79,9 +88,14 @@ func (s *Server) RunStatsLogger(ctx interface{ Done() <-chan struct{} }, ticker 
 	}
 }
 
-func (s *Server) handleRPC(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handlePayload(
+	w http.ResponseWriter,
+	r *http.Request,
+	perm string,
+	forward func(context.Context, string, []byte) error,
+) {
 	validator, vcfg, _ := auth.ValidatorFromContext(r.Context())
-	if !hasPermission(vcfg.Permissions, "rpc") {
+	if !slices.Contains(vcfg.Permissions, perm) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -91,80 +105,30 @@ func (s *Server) handleRPC(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "read body", http.StatusBadRequest)
 		return
 	}
-	s.log.Info("received", "validator", validator, "type", "rpc", "bytes", len(body))
-	if err := s.fwd.ForwardRPC(r.Context(), validator, body); err != nil {
-		s.log.Error("forward rpc", "err", err)
+	s.log.Info("received", "validator", validator, "type", perm, "bytes", len(body))
+	if err := forward(r.Context(), validator, body); err != nil {
+		s.log.Error("forward "+perm, "err", err)
 		http.Error(w, "forward failed", http.StatusBadGateway)
 		return
 	}
-	s.stats.Record(validator, "rpc", len(body))
+	s.stats.Record(validator, perm, len(body))
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleRPC(w http.ResponseWriter, r *http.Request) {
+	s.handlePayload(w, r, "rpc", s.fwd.ForwardRPC)
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
-	validator, vcfg, _ := auth.ValidatorFromContext(r.Context())
-	if !hasPermission(vcfg.Permissions, "metrics") {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "read body", http.StatusBadRequest)
-		return
-	}
-	s.log.Info("received", "validator", validator, "type", "metrics", "bytes", len(body))
-	if err := s.fwd.ForwardMetrics(r.Context(), validator, body); err != nil {
-		s.log.Error("forward metrics", "err", err)
-		http.Error(w, "forward failed", http.StatusBadGateway)
-		return
-	}
-	s.stats.Record(validator, "metrics", len(body))
-	w.WriteHeader(http.StatusOK)
+	s.handlePayload(w, r, "metrics", s.fwd.ForwardMetrics)
 }
 
 func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
-	validator, vcfg, _ := auth.ValidatorFromContext(r.Context())
-	if !hasPermission(vcfg.Permissions, "logs") {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "read body", http.StatusBadRequest)
-		return
-	}
-	s.log.Info("received", "validator", validator, "type", "logs", "bytes", len(body))
-	if err := s.fwd.ForwardLogs(r.Context(), validator, body); err != nil {
-		s.log.Error("forward logs", "err", err)
-		http.Error(w, "forward failed", http.StatusBadGateway)
-		return
-	}
-	s.stats.Record(validator, "logs", len(body))
-	w.WriteHeader(http.StatusOK)
+	s.handlePayload(w, r, "logs", s.fwd.ForwardLogs)
 }
 
 func (s *Server) handleOTLP(w http.ResponseWriter, r *http.Request) {
-	validator, vcfg, _ := auth.ValidatorFromContext(r.Context())
-	if !hasPermission(vcfg.Permissions, "otlp") {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "read body", http.StatusBadRequest)
-		return
-	}
-	s.log.Info("received", "validator", validator, "type", "otlp", "bytes", len(body))
-	if err := s.fwd.ForwardOTLP(r.Context(), validator, body); err != nil {
-		s.log.Error("forward otlp", "err", err)
-		http.Error(w, "forward failed", http.StatusBadGateway)
-		return
-	}
-	s.stats.Record(validator, "otlp", len(body))
-	w.WriteHeader(http.StatusOK)
+	s.handlePayload(w, r, "otlp", s.fwd.ForwardOTLP)
 }
 
 func (s *Server) handleAuthCheck(w http.ResponseWriter, r *http.Request) {
@@ -176,13 +140,4 @@ func (s *Server) handleAuthCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp) //nolint:errcheck
-}
-
-func hasPermission(permissions []string, perm string) bool {
-	for _, p := range permissions {
-		if p == perm {
-			return true
-		}
-	}
-	return false
 }
