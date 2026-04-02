@@ -81,3 +81,54 @@ func TestCollector_ConflictDetection_SkipsItem(t *testing.T) {
 		t.Fatal("expected payload within 200ms")
 	}
 }
+
+func TestReadConfigKey(t *testing.T) {
+	const content = `
+moniker = "my-node"
+db_backend = "goleveldb"
+
+[p2p]
+laddr = "tcp://0.0.0.0:26656"
+persistent_peers = ""
+
+[telemetry]
+enabled = true
+exporter_endpoint = "http://localhost:4317"
+`
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		key  string
+		want string
+	}{
+		{"moniker", "my-node"},
+		{"db_backend", "goleveldb"},
+		{"p2p.laddr", "tcp://0.0.0.0:26656"},
+		{"p2p.persistent_peers", ""},
+		{"telemetry.enabled", "true"},
+		{"telemetry.exporter_endpoint", "http://localhost:4317"},
+	}
+	for _, tt := range tests {
+		got, err := metadata.ReadConfigKey(path, tt.key)
+		if err != nil {
+			t.Errorf("ReadConfigKey(%q): unexpected error: %v", tt.key, err)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("ReadConfigKey(%q) = %q, want %q", tt.key, got, tt.want)
+		}
+	}
+
+	if _, err := metadata.ReadConfigKey(path, "nonexistent"); err == nil {
+		t.Error("ReadConfigKey(nonexistent): expected error, got nil")
+	}
+	if _, err := metadata.ReadConfigKey(path, "p2p.nonexistent"); err == nil {
+		t.Error("ReadConfigKey(p2p.nonexistent): expected error, got nil")
+	}
+	if _, err := metadata.ReadConfigKey("/nonexistent/file.toml", "moniker"); err == nil {
+		t.Error("ReadConfigKey(missing file): expected error, got nil")
+	}
+}

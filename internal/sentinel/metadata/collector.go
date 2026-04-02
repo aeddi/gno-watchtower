@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/fsnotify/fsnotify"
 
 	"github.com/gnolang/val-companion/internal/sentinel/config"
@@ -231,54 +232,38 @@ func RunCmd(cmd string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// ReadConfigKey reads a key from a TOML config file by scanning for section headers and key lines.
-// Key is a dot-separated path like "p2p.laddr": it looks for the [p2p] section, then matches "laddr = value".
-// Single-segment keys (e.g. "moniker") are matched at the top level (before any section header).
+// ReadConfigKey reads a dot-separated key from a TOML config file.
+// For example "p2p.laddr" navigates to the [p2p] section and returns the laddr value.
+// Single-segment keys (e.g. "moniker") are read from the top-level table.
 func ReadConfigKey(configPath, key string) (string, error) {
 	b, err := os.ReadFile(configPath)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", configPath, err)
 	}
-
-	var section, leaf string
-	if idx := strings.LastIndex(key, "."); idx >= 0 {
-		section = key[:idx]
-		leaf = key[idx+1:]
-	} else {
-		section = ""
-		leaf = key
+	var root map[string]any
+	if _, err := toml.Decode(string(b), &root); err != nil {
+		return "", fmt.Errorf("parse %s: %w", configPath, err)
 	}
-
-	// inSection tracks whether we are currently inside the target section.
-	// For top-level keys (section == ""), we are always "in section" until the first header.
-	inSection := section == ""
-	for _, line := range strings.Split(string(b), "\n") {
-		trimmed := strings.TrimSpace(line)
-
-		// Detect section headers like [p2p] or [telemetry].
-		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
-			currentSection := trimmed[1 : len(trimmed)-1]
-			inSection = currentSection == section
-			if section == "" {
-				// top-level key: stop searching once we hit any section header
-				inSection = false
-			}
-			continue
+	parts := strings.Split(key, ".")
+	node := any(root)
+	for _, part := range parts[:len(parts)-1] {
+		m, ok := node.(map[string]any)
+		if !ok {
+			return "", fmt.Errorf("key %q not found in %s", key, configPath)
 		}
-
-		if !inSection {
-			continue
+		v, ok := m[part]
+		if !ok {
+			return "", fmt.Errorf("key %q not found in %s", key, configPath)
 		}
-
-		parts := strings.SplitN(trimmed, "=", 2)
-		if len(parts) != 2 || strings.TrimSpace(parts[0]) != leaf {
-			continue
-		}
-		val := strings.TrimSpace(parts[1])
-		if len(val) >= 2 && val[0] == '"' && val[len(val)-1] == '"' {
-			val = val[1 : len(val)-1]
-		}
-		return val, nil
+		node = v
 	}
-	return "", fmt.Errorf("key %q not found in %s", key, configPath)
+	m, ok := node.(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("key %q not found in %s", key, configPath)
+	}
+	v, ok := m[parts[len(parts)-1]]
+	if !ok {
+		return "", fmt.Errorf("key %q not found in %s", key, configPath)
+	}
+	return fmt.Sprintf("%v", v), nil
 }
