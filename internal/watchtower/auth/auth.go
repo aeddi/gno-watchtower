@@ -38,6 +38,7 @@ type ipRecord struct {
 
 // Authenticator validates Bearer tokens and manages per-IP failure tracking.
 type Authenticator struct {
+	tokensMu     sync.RWMutex
 	tokens       map[string]config.TokenEntry
 	banThreshold int
 	banDuration  time.Duration
@@ -60,6 +61,18 @@ func New(validators map[string]config.ValidatorConfig, banThreshold int, banDura
 	}
 }
 
+// Reload atomically replaces the validator token map.
+// Existing IP ban records are preserved.
+func (a *Authenticator) Reload(validators map[string]config.ValidatorConfig) {
+	tokens := make(map[string]config.TokenEntry, len(validators))
+	for name, v := range validators {
+		tokens[v.Token] = config.TokenEntry{ValidatorName: name, Config: v}
+	}
+	a.tokensMu.Lock()
+	a.tokens = tokens
+	a.tokensMu.Unlock()
+}
+
 // Middleware returns an http.Handler that enforces IP ban check and Bearer token auth.
 // On success it sets the validator name and config in the request context.
 func (a *Authenticator) Middleware(next http.Handler) http.Handler {
@@ -74,7 +87,9 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 
 		// Validate Bearer token.
 		token := bearerToken(r)
+		a.tokensMu.RLock()
 		entry, ok := a.tokens[token]
+		a.tokensMu.RUnlock()
 		if !ok {
 			a.recordFailure(ip)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)

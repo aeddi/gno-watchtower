@@ -72,6 +72,27 @@ func runCmd(args []string) {
 	defer stop()
 
 	a := auth.New(cfg.Validators, cfg.Security.BanThreshold, cfg.Security.BanDuration.Duration)
+
+	// SIGHUP: reload config and update auth tokens.
+	sighupCh := make(chan os.Signal, 1)
+	signal.Notify(sighupCh, syscall.SIGHUP)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-sighupCh:
+				newCfg, err := config.Load(fs.Arg(0))
+				if err != nil {
+					logger.Error("reload config", "err", err)
+					continue
+				}
+				a.Reload(newCfg.Validators)
+				logger.Info("config reloaded", "validators", len(newCfg.Validators))
+			}
+		}
+	}()
+
 	rl := ratelimit.New(cfg.Security.RateLimitRPS, cfg.Security.RateLimitBurst)
 	fwd := forwarder.New(cfg.VictoriaMetrics.URL, cfg.Loki.URL)
 	st := stats.New()

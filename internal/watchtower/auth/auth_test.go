@@ -129,6 +129,53 @@ func TestAuth_BanExpires(t *testing.T) {
 	}
 }
 
+func TestAuthenticator_Reload_UpdatesTokens(t *testing.T) {
+	validators := map[string]config.ValidatorConfig{
+		"val-01": {Token: "token-1", Permissions: []string{"rpc"}},
+	}
+	a := auth.New(validators, 5, time.Minute)
+
+	// val-01 token works before reload.
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer token-1")
+	w := httptest.NewRecorder()
+	called := false
+	a.Middleware(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	})).ServeHTTP(w, req)
+	if !called {
+		t.Fatal("expected handler to be called for token-1 before reload")
+	}
+
+	// Reload with new validators — token-1 removed, token-2 added.
+	a.Reload(map[string]config.ValidatorConfig{
+		"val-02": {Token: "token-2", Permissions: []string{"metrics"}},
+	})
+
+	// token-1 must now be rejected.
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest("GET", "/", nil)
+	req2.Header.Set("Authorization", "Bearer token-1")
+	a.Middleware(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		t.Error("old token should be rejected after reload")
+	})).ServeHTTP(w2, req2)
+	if w2.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for old token, got %d", w2.Code)
+	}
+
+	// token-2 must now be accepted.
+	w3 := httptest.NewRecorder()
+	req3 := httptest.NewRequest("GET", "/", nil)
+	req3.Header.Set("Authorization", "Bearer token-2")
+	called3 := false
+	a.Middleware(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called3 = true
+	})).ServeHTTP(w3, req3)
+	if !called3 {
+		t.Error("new token should be accepted after reload")
+	}
+}
+
 func TestAuth_MissingAuthHeader_Returns401(t *testing.T) {
 	a := makeAuth(t)
 	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
