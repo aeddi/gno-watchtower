@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gnolang/val-companion/pkg/levels"
+	pkglogger "github.com/gnolang/val-companion/pkg/logger"
 	"github.com/gnolang/val-companion/pkg/protocol"
 )
 
@@ -32,7 +32,7 @@ type Collector struct {
 func NewCollector(source Source, minLevel string, batchSize int64, batchTimeout time.Duration, out chan<- protocol.LogPayload, log *slog.Logger) *Collector {
 	return &Collector{
 		source:       source,
-		minLevel:     levels.Rank(minLevel),
+		minLevel:     pkglogger.LevelRank(minLevel),
 		batchSize:    batchSize,
 		batchTimeout: batchTimeout,
 		out:          out,
@@ -78,7 +78,7 @@ func (c *Collector) Run(ctx context.Context) error {
 			flush()
 			return ctx.Err()
 		case line := <-lineCh:
-			if levels.Rank(line.Level) < c.minLevel {
+			if pkglogger.LevelRank(line.Level) < c.minLevel {
 				continue
 			}
 			accumulated[line.Level] = append(accumulated[line.Level], line.Raw)

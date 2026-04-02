@@ -9,7 +9,7 @@ import (
 
 	"github.com/gnolang/val-companion/internal/sentinel/config"
 	"github.com/gnolang/val-companion/internal/sentinel/logs"
-	"github.com/gnolang/val-companion/pkg/levels"
+	pkglogger "github.com/gnolang/val-companion/pkg/logger"
 )
 
 // checkDuration is how long CheckLogs listens for log lines.
@@ -41,7 +41,7 @@ func CheckLogs(ctx context.Context, src logs.Source, cfg config.LogsConfig, minL
 			if !json.Valid(line.Raw) {
 				invalidJSON++
 			}
-			if levels.Rank(line.Level) >= levels.Rank(minLevel) {
+			if pkglogger.LevelRank(line.Level) >= pkglogger.LevelRank(minLevel) {
 				atLevel++
 			}
 		case <-ctx.Done():

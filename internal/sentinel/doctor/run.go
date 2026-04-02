@@ -9,7 +9,7 @@ import (
 
 	"github.com/gnolang/val-companion/internal/sentinel/config"
 	"github.com/gnolang/val-companion/internal/sentinel/logs"
-	"github.com/gnolang/val-companion/pkg/levels"
+	pkglogger "github.com/gnolang/val-companion/pkg/logger"
 )
 
 // Run executes all doctor checks, writes a formatted report to w, and returns an exit code.
@@ -83,7 +83,7 @@ func logsCheck(ctx context.Context, cfg *config.Config, ar *AuthResponse) CheckR
 		return CheckResult{Name: "Logs", Status: StatusRed, Detail: fmt.Sprintf("invalid source config: %v", err)}
 	}
 	minLevel := cfg.Logs.MinLevel
-	if ar != nil && levels.Rank(ar.LogsMinLevel) > levels.Rank(minLevel) {
+	if ar != nil && pkglogger.LevelRank(ar.LogsMinLevel) > pkglogger.LevelRank(minLevel) {
 		minLevel = ar.LogsMinLevel
 	}
 	return CheckLogs(ctx, src, cfg.Logs, minLevel)

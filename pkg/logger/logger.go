@@ -44,6 +44,23 @@ func Noop() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
+// LevelRank returns a numeric rank for log level comparisons.
+// Unknown levels return 1 (info rank).
+func LevelRank(level string) int {
+	switch level {
+	case "debug":
+		return 0
+	case "info":
+		return 1
+	case "warn":
+		return 2
+	case "error":
+		return 3
+	default:
+		return 1
+	}
+}
+
 // ParseLevel converts a string level name to a slog.Level.
 func ParseLevel(s string) (slog.Level, error) {
 	switch s {

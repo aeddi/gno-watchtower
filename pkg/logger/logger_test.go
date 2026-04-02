@@ -43,3 +43,21 @@ func TestNoop_DiscardsOutput(t *testing.T) {
 	// Noop uses io.Discard — verify no panic and output is silent.
 	log.Info("this should not appear anywhere")
 }
+
+func TestLevelRank(t *testing.T) {
+	tests := []struct {
+		level string
+		want  int
+	}{
+		{"debug", 0},
+		{"info", 1},
+		{"warn", 2},
+		{"error", 3},
+		{"unknown", 1},
+	}
+	for _, tt := range tests {
+		if got := logger.LevelRank(tt.level); got != tt.want {
+			t.Errorf("LevelRank(%q) = %d, want %d", tt.level, got, tt.want)
+		}
+	}
+}
