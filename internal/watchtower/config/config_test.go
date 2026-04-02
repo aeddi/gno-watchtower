@@ -14,9 +14,10 @@ const exampleTOML = `
 listen_addr = "127.0.0.1:8080"
 
 [security]
-rate_limit_rps = 10
-ban_threshold  = 5
-ban_duration   = "15m"
+rate_limit_rps  = 10
+rate_limit_burst = 20
+ban_threshold    = 5
+ban_duration     = "15m"
 
 [victoria_metrics]
 url = "http://victoria-metrics:8428"
@@ -52,6 +53,9 @@ func TestLoad_ParsesAllFields(t *testing.T) {
 	if cfg.Security.RateLimitRPS != 10 {
 		t.Errorf("rate_limit_rps: got %v", cfg.Security.RateLimitRPS)
 	}
+	if cfg.Security.RateLimitBurst != 20 {
+		t.Errorf("rate_limit_burst: got %v", cfg.Security.RateLimitBurst)
+	}
 	if cfg.Security.BanThreshold != 5 {
 		t.Errorf("ban_threshold: got %v", cfg.Security.BanThreshold)
 	}
@@ -86,7 +90,6 @@ func TestLoad_ParsesAllFields(t *testing.T) {
 		t.Errorf("val-01 logs_min_level: got %q", v01.LogsMinLevel)
 	}
 }
-
 
 func TestLoad_MissingFile_ReturnsError(t *testing.T) {
 	_, err := config.Load("/nonexistent/config.toml")
