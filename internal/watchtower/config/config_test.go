@@ -87,31 +87,6 @@ func TestLoad_ParsesAllFields(t *testing.T) {
 	}
 }
 
-func TestLoad_BuildsTokenIndex(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte(exampleTOML), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := config.Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	entry, ok := cfg.TokenIndex["secret-token-1"]
-	if !ok {
-		t.Fatal("token not found in index")
-	}
-	if entry.ValidatorName != "val-01" {
-		t.Errorf("validator name: got %q", entry.ValidatorName)
-	}
-	if entry.Config.LogsMinLevel != "info" {
-		t.Errorf("logs_min_level: got %q", entry.Config.LogsMinLevel)
-	}
-	if _, ok := cfg.TokenIndex["secret-token-2"]; !ok {
-		t.Error("secret-token-2 not found in token index")
-	}
-}
 
 func TestLoad_MissingFile_ReturnsError(t *testing.T) {
 	_, err := config.Load("/nonexistent/config.toml")
@@ -120,5 +95,35 @@ func TestLoad_MissingFile_ReturnsError(t *testing.T) {
 	}
 	if err != nil && err.Error() == "" {
 		t.Error("error message must be non-empty")
+	}
+}
+
+func TestLoad_RateLimitBurstDefault(t *testing.T) {
+	// TOML with no rate_limit_burst — Load must default it to 10.
+	const content = `
+[server]
+listen_addr = "127.0.0.1:8080"
+
+[security]
+rate_limit_rps = 5
+ban_threshold   = 3
+ban_duration    = "5m"
+
+[victoria_metrics]
+url = "http://vm:8428"
+
+[loki]
+url = "http://loki:3100"
+`
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Security.RateLimitBurst != 10 {
+		t.Errorf("RateLimitBurst default: got %d, want 10", cfg.Security.RateLimitBurst)
 	}
 }

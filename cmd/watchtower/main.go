@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -59,7 +58,7 @@ func runCmd(args []string) {
 		log.Fatalf("load config: %v", err)
 	}
 
-	level, err := parseLevel(*logLevel)
+	level, err := pkglogger.ParseLevel(*logLevel)
 	if err != nil {
 		log.Fatalf("invalid log level: %v", err)
 	}
@@ -72,7 +71,7 @@ func runCmd(args []string) {
 	defer stop()
 
 	a := auth.New(cfg.Validators, cfg.Security.BanThreshold, cfg.Security.BanDuration.Duration)
-	rl := ratelimit.New(cfg.Security.RateLimitRPS)
+	rl := ratelimit.New(cfg.Security.RateLimitRPS, cfg.Security.RateLimitBurst)
 	fwd := forwarder.New(cfg.VictoriaMetrics.URL, cfg.Loki.URL)
 	st := stats.New()
 	srv := handlers.NewServer(cfg, a, rl, fwd, st, logger)
@@ -98,21 +97,6 @@ func runCmd(args []string) {
 	logger.Info("watchtower starting", "addr", cfg.Server.ListenAddr)
 	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server: %v", err)
-	}
-}
-
-func parseLevel(s string) (slog.Level, error) {
-	switch s {
-	case "debug":
-		return slog.LevelDebug, nil
-	case "info":
-		return slog.LevelInfo, nil
-	case "warn":
-		return slog.LevelWarn, nil
-	case "error":
-		return slog.LevelError, nil
-	default:
-		return slog.LevelInfo, fmt.Errorf("unknown level %q: must be debug, info, warn, or error", s)
 	}
 }
 

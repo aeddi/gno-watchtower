@@ -30,9 +30,6 @@ type Config struct {
 	VictoriaMetrics VictoriaMetricsConfig      `toml:"victoria_metrics"`
 	Loki            LokiConfig                 `toml:"loki"`
 	Validators      map[string]ValidatorConfig `toml:"validators"`
-
-	// TokenIndex is built from Validators at load time; not in TOML.
-	TokenIndex map[string]TokenEntry `toml:"-"`
 }
 
 type ServerConfig struct {
@@ -40,9 +37,13 @@ type ServerConfig struct {
 }
 
 type SecurityConfig struct {
-	RateLimitRPS float64  `toml:"rate_limit_rps"`
-	BanThreshold int      `toml:"ban_threshold"`
-	BanDuration  Duration `toml:"ban_duration"`
+	RateLimitRPS   float64  `toml:"rate_limit_rps"`
+	// RateLimitBurst is the maximum number of requests allowed in a burst.
+	// Must be at least the number of data types sentinel sends concurrently
+	// (rpc + metrics + logs + otlp = 4). Default 10.
+	RateLimitBurst int      `toml:"rate_limit_burst"`
+	BanThreshold   int      `toml:"ban_threshold"`
+	BanDuration    Duration `toml:"ban_duration"`
 }
 
 type VictoriaMetricsConfig struct {
@@ -59,9 +60,8 @@ func Load(path string) (*Config, error) {
 	if _, err := toml.DecodeFile(path, &cfg); err != nil {
 		return nil, fmt.Errorf("load config %s: %w", path, err)
 	}
-	cfg.TokenIndex = make(map[string]TokenEntry, len(cfg.Validators))
-	for name, v := range cfg.Validators {
-		cfg.TokenIndex[v.Token] = TokenEntry{ValidatorName: name, Config: v}
+	if cfg.Security.RateLimitBurst == 0 {
+		cfg.Security.RateLimitBurst = 10
 	}
 	return &cfg, nil
 }
