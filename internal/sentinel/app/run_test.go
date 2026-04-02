@@ -148,3 +148,72 @@ func TestRun_MetadataEnabled(t *testing.T) {
 	defer cancel()
 	app.Run(ctx, cfg, logger.Noop())
 }
+
+func TestRun_GracefulDrain(t *testing.T) {
+	var receivedCount atomic.Int32
+
+	watchtower := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/rpc" {
+			receivedCount.Add(1)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer watchtower.Close()
+
+	var height atomic.Int64
+	node := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		type env struct {
+			JSONRPC string `json:"jsonrpc"`
+			Result  any    `json:"result"`
+		}
+		respond := func(result any) {
+			b, _ := json.Marshal(env{JSONRPC: "2.0", Result: result})
+			w.Write(b)
+		}
+		switch r.URL.Path {
+		case "/status":
+			h := height.Add(1)
+			respond(map[string]any{
+				"sync_info": map[string]any{"latest_block_height": fmt.Sprintf("%d", h)},
+			})
+		default:
+			respond(map[string]any{})
+		}
+	}))
+	defer node.Close()
+
+	cfg := &config.Config{
+		Server: config.ServerConfig{URL: watchtower.URL, Token: "tok"},
+		RPC: config.RPCConfig{
+			Enabled:                    true,
+			PollInterval:               config.Duration{Duration: 20 * time.Millisecond},
+			RPCURL:                     node.URL,
+			DumpConsensusStateInterval: config.Duration{Duration: 1 * time.Hour},
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		app.Run(ctx, cfg, logger.Noop())
+		close(done)
+	}()
+
+	// Let it collect a few payloads.
+	time.Sleep(100 * time.Millisecond)
+	cancel() // trigger shutdown
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return after cancellation")
+	}
+
+	// After shutdown, all buffered items must have been sent.
+	if receivedCount.Load() == 0 {
+		t.Error("expected buffered payloads to be drained on shutdown")
+	}
+}

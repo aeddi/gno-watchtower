@@ -185,22 +185,45 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			// fall through to drain
 		case <-statsTicker.C:
 			logStats(appLog, st)
+			continue
 		case <-rpcSendCh:
 			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
 			go flush(ctx, s, rpcBuf, senderLog, st)
+			continue
 		case <-logSendCh:
 			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
 			go flushLogs(ctx, s, logBuf, senderLog, st)
+			continue
 		case <-resourcesSendCh:
 			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
 			go flushMetrics(ctx, s, resourcesBuf, "resources", senderLog, st)
+			continue
 		case <-metadataSendCh:
 			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
 			go flushMetrics(ctx, s, metadataBuf, "metadata", senderLog, st)
+			continue
 		}
+		break
+	}
+
+	// Gracefully flush remaining buffered payloads.
+	// Use a fresh context so flushing isn't blocked by the cancelled ctx.
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer drainCancel()
+	if rpcBuf != nil {
+		flush(drainCtx, s, rpcBuf, senderLog, st)
+	}
+	if logBuf != nil {
+		flushLogs(drainCtx, s, logBuf, senderLog, st)
+	}
+	if resourcesBuf != nil {
+		flushMetrics(drainCtx, s, resourcesBuf, "resources", senderLog, st)
+	}
+	if metadataBuf != nil {
+		flushMetrics(drainCtx, s, metadataBuf, "metadata", senderLog, st)
 	}
 }
 
