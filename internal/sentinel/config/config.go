@@ -110,5 +110,24 @@ func Load(path string) (*Config, error) {
 	if _, err := toml.DecodeFile(path, &cfg); err != nil {
 		return nil, fmt.Errorf("load config %s: %w", path, err)
 	}
+	if err := cfg.validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
 	return &cfg, nil
+}
+
+func (c *Config) anyCollectorEnabled() bool {
+	return c.RPC.Enabled || c.Logs.Enabled || c.OTLP.Enabled || c.Resources.Enabled || c.Metadata.Enabled
+}
+
+func (c *Config) validate() error {
+	if c.anyCollectorEnabled() {
+		if c.Server.URL == "" {
+			return fmt.Errorf("server.url is required when a collector is enabled")
+		}
+		if c.Server.Token == "" {
+			return fmt.Errorf("server.token is required when a collector is enabled")
+		}
+	}
+	return nil
 }

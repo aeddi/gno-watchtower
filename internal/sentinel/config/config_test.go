@@ -251,6 +251,56 @@ genesis_path   = "/etc/gnoland/genesis.json"
 	}
 }
 
+func TestLoad_EnabledCollectorRequiresServerURL(t *testing.T) {
+	const content = `
+[server]
+url   = ""
+token = ""
+
+[rpc]
+enabled       = true
+poll_interval = "1s"
+rpc_url       = "http://localhost:26657"
+dump_consensus_state_interval = "1m"
+`
+	f, err := os.CreateTemp("", "sentinel-config-*.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	_, err = config.Load(f.Name())
+	if err == nil {
+		t.Error("expected error: server.url required when a collector is enabled")
+	}
+}
+
+func TestLoad_AllDisabled_NoValidationError(t *testing.T) {
+	const content = `
+[server]
+url   = ""
+token = ""
+`
+	f, err := os.CreateTemp("", "sentinel-config-*.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	_, err = config.Load(f.Name())
+	if err != nil {
+		t.Errorf("unexpected error when all collectors disabled: %v", err)
+	}
+}
+
 // mustLoadTOML is a test helper that writes content to a temp file and loads it.
 func mustLoadTOML(t *testing.T, content string) *config.Config {
 	t.Helper()
