@@ -14,18 +14,11 @@ import (
 	"github.com/gnolang/val-companion/pkg/protocol"
 )
 
-func TestCollector_BinaryPath_EmitsChecksum(t *testing.T) {
-	// Write a temp file to use as the "binary".
-	tmpDir := t.TempDir()
-	binPath := filepath.Join(tmpDir, "gnoland")
-	if err := os.WriteFile(binPath, []byte("fake binary content"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
+func TestCollector_BinaryVersionCmd_EmitsVersion(t *testing.T) {
 	cfg := config.MetadataConfig{
-		Enabled:       true,
-		CheckInterval: config.Duration{Duration: 10 * time.Millisecond},
-		BinaryPath:    binPath,
+		Enabled:          true,
+		CheckInterval:    config.Duration{Duration: 10 * time.Millisecond},
+		BinaryVersionCmd: "echo v1.2.3",
 	}
 	out := make(chan protocol.MetricsPayload, 5)
 	c := metadata.NewCollector(cfg, out, logger.Noop())
@@ -39,8 +32,12 @@ func TestCollector_BinaryPath_EmitsChecksum(t *testing.T) {
 		if p.CollectedAt.IsZero() {
 			t.Error("CollectedAt must not be zero")
 		}
-		if _, ok := p.Data["binary_checksum"]; !ok {
-			t.Error("expected data[binary_checksum]")
+		raw, ok := p.Data["binary_version"]
+		if !ok {
+			t.Fatal("expected data[binary_version]")
+		}
+		if string(raw) != `"v1.2.3"` {
+			t.Errorf("binary_version: got %s, want %q", raw, "v1.2.3")
 		}
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("expected payload within 200ms")
@@ -48,7 +45,6 @@ func TestCollector_BinaryPath_EmitsChecksum(t *testing.T) {
 }
 
 func TestCollector_ConflictDetection_SkipsItem(t *testing.T) {
-	// When both path and cmd are set for the same item, neither should be collected.
 	tmpDir := t.TempDir()
 	genPath := filepath.Join(tmpDir, "genesis.json")
 	if err := os.WriteFile(genPath, []byte(`{"chain_id":"test"}`), 0644); err != nil {
@@ -56,11 +52,11 @@ func TestCollector_ConflictDetection_SkipsItem(t *testing.T) {
 	}
 
 	cfg := config.MetadataConfig{
-		Enabled:           true,
-		CheckInterval:     config.Duration{Duration: 10 * time.Millisecond},
-		BinaryPath:        "/usr/local/bin/gnoland",
+		Enabled:          true,
+		CheckInterval:    config.Duration{Duration: 10 * time.Millisecond},
+		BinaryPath:       "/usr/local/bin/gnoland",
 		BinaryVersionCmd: "echo fakehash", // CONFLICT: both set
-		GenesisPath:       genPath,         // only path set — valid
+		GenesisPath:      genPath,
 	}
 	out := make(chan protocol.MetricsPayload, 5)
 	c := metadata.NewCollector(cfg, out, logger.Noop())
@@ -71,8 +67,8 @@ func TestCollector_ConflictDetection_SkipsItem(t *testing.T) {
 
 	select {
 	case p := <-out:
-		if _, ok := p.Data["binary_checksum"]; ok {
-			t.Error("binary_checksum must not be collected when path and cmd both set")
+		if _, ok := p.Data["binary_version"]; ok {
+			t.Error("binary_version must not be collected when path and cmd both set")
 		}
 		if _, ok := p.Data["genesis_checksum"]; !ok {
 			t.Error("genesis_checksum must be collected (only path set)")

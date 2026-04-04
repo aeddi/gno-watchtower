@@ -33,10 +33,11 @@ var ConfigKeys = []string{
 	"telemetry.exporter_endpoint",
 }
 
-// Collector gathers binary/genesis checksums and gnoland config key values.
-// Each item uses either a file path (direct sha256 + fsnotify change watch) or
-// a shell command (polled on check_interval). Setting both for the same item is
-// an error — the item is skipped and an error is logged.
+// Collector gathers binary version, genesis checksum, and gnoland config key values.
+// Binary version is obtained by running a command (polled on check_interval).
+// Genesis uses a file path (direct sha256 + fsnotify change watch).
+// Config uses either a file path or a shell command. Setting both for the same
+// item is an error — the item is skipped and an error is logged.
 type Collector struct {
 	cfg   config.MetadataConfig
 	delta *delta.Delta
@@ -102,9 +103,6 @@ func (c *Collector) Run(ctx context.Context) error {
 // watchedPaths returns the file paths being watched (path-mode items only, conflict-free).
 func (c *Collector) watchedPaths() []string {
 	var paths []string
-	if c.cfg.BinaryPath != "" && c.cfg.BinaryVersionCmd == "" {
-		paths = append(paths, c.cfg.BinaryPath)
-	}
 	if c.cfg.GenesisPath != "" {
 		paths = append(paths, c.cfg.GenesisPath)
 	}
@@ -132,43 +130,54 @@ func (c *Collector) collectAndSend(ctx context.Context) {
 }
 
 func (c *Collector) collectBinary(data map[string]json.RawMessage) {
-	c.collectChecksum(data, "binary_checksum", "binary",
-		c.cfg.BinaryPath, c.cfg.BinaryVersionCmd,
-		"metadata conflict: binary_path and binary_version_cmd both set — skipping binary")
-}
-
-func (c *Collector) collectGenesis(data map[string]json.RawMessage) {
-	c.collectChecksum(data, "genesis_checksum", "genesis",
-		c.cfg.GenesisPath, "",
-		"")
-}
-
-func (c *Collector) collectChecksum(data map[string]json.RawMessage, dataKey, name, path, cmd, conflictMsg string) {
-	if path != "" && cmd != "" {
-		c.log.Error(conflictMsg)
+	if c.cfg.BinaryPath != "" && c.cfg.BinaryVersionCmd != "" {
+		c.log.Error("metadata conflict: binary_path and binary_version_cmd both set — skipping binary version")
 		return
 	}
-	var checksum string
+
+	var version string
 	var err error
 	switch {
-	case path != "":
-		checksum, err = SHA256File(path)
-	case cmd != "":
-		checksum, err = RunCmd(cmd)
+	case c.cfg.BinaryPath != "":
+		version, err = RunBinaryVersion(c.cfg.BinaryPath)
+	case c.cfg.BinaryVersionCmd != "":
+		version, err = RunCmd(c.cfg.BinaryVersionCmd)
 	default:
 		return
 	}
+
+	// TODO: Remove this fallback once gnoland implements the version subcommand.
 	if err != nil {
-		c.log.Warn(name+" checksum error", "err", err)
+		c.log.Warn("binary version error, using placeholder", "err", err)
+		version = "version not implemented yet"
+	}
+
+	b, err := json.Marshal(version)
+	if err != nil {
+		c.log.Warn("binary version marshal error", "err", err)
+		return
+	}
+	if c.delta.Changed("binary_version", b) {
+		data["binary_version"] = b
+	}
+}
+
+func (c *Collector) collectGenesis(data map[string]json.RawMessage) {
+	if c.cfg.GenesisPath == "" {
+		return
+	}
+	checksum, err := SHA256File(c.cfg.GenesisPath)
+	if err != nil {
+		c.log.Warn("genesis checksum error", "err", err)
 		return
 	}
 	b, err := json.Marshal(checksum)
 	if err != nil {
-		c.log.Warn(name+" checksum marshal error", "err", err)
+		c.log.Warn("genesis checksum marshal error", "err", err)
 		return
 	}
-	if c.delta.Changed(dataKey, b) {
-		data[dataKey] = b
+	if c.delta.Changed("genesis_checksum", b) {
+		data["genesis_checksum"] = b
 	}
 }
 
@@ -221,6 +230,15 @@ func SHA256File(path string) (string, error) {
 		return "", fmt.Errorf("hash %s: %w", path, err)
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// RunBinaryVersion runs "<binaryPath> version" and returns the trimmed stdout.
+func RunBinaryVersion(binaryPath string) (string, error) {
+	out, err := exec.Command(binaryPath, "version").Output()
+	if err != nil {
+		return "", fmt.Errorf("run %s version: %w", binaryPath, err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // RunCmd runs cmd via sh -c and returns the trimmed stdout.
