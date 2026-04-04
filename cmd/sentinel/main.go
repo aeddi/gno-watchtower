@@ -25,7 +25,10 @@ func main() {
 	case "run":
 		runCmd(os.Args[2:])
 	case "generate-config":
-		os.Stdout.WriteString(config.Example) //nolint:errcheck
+		ctx := context.Background()
+		if err := config.Generate(ctx, os.Stderr, os.Stdout); err != nil {
+			log.Fatalf("generate config: %v", err)
+		}
 	case "doctor":
 		doctorCmd(os.Args[2:])
 	default:

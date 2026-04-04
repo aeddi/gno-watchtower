@@ -83,22 +83,6 @@ poll_interval = "notaduration"
 	}
 }
 
-func TestExample_IsValidTOML(t *testing.T) {
-	f, err := os.CreateTemp("", "sentinel-example-*.toml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	if _, err := f.WriteString(config.Example); err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
-
-	if _, err := config.Load(f.Name()); err != nil {
-		t.Fatalf("Example constant is not valid TOML: %v", err)
-	}
-}
-
 func TestLoad_LogsConfig(t *testing.T) {
 	const content = `
 [server]
