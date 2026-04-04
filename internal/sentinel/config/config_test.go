@@ -345,6 +345,80 @@ func TestByteSize_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestDefaultConfig(t *testing.T) {
+	cfg := config.DefaultConfig()
+
+	if cfg.Server.URL != "<watchtower-server-url>" {
+		t.Errorf("Server.URL: got %q", cfg.Server.URL)
+	}
+	if cfg.Server.Token != "<watchtower-auth-token>" {
+		t.Errorf("Server.Token: got %q", cfg.Server.Token)
+	}
+	if !cfg.RPC.Enabled {
+		t.Error("RPC.Enabled: want true")
+	}
+	if cfg.RPC.PollInterval.Duration != 3*time.Second {
+		t.Errorf("RPC.PollInterval: got %v", cfg.RPC.PollInterval.Duration)
+	}
+	if cfg.RPC.RPCURL != "http://localhost:26657" {
+		t.Errorf("RPC.RPCURL: got %q", cfg.RPC.RPCURL)
+	}
+	if cfg.RPC.DumpConsensusStateInterval.Duration != 30*time.Second {
+		t.Errorf("RPC.DumpConsensusStateInterval: got %v", cfg.RPC.DumpConsensusStateInterval.Duration)
+	}
+	if !cfg.Logs.Enabled {
+		t.Error("Logs.Enabled: want true")
+	}
+	if cfg.Logs.Source != "docker" {
+		t.Errorf("Logs.Source: got %q", cfg.Logs.Source)
+	}
+	if cfg.Logs.ContainerName != "<gnoland-container-name>" {
+		t.Errorf("Logs.ContainerName: got %q", cfg.Logs.ContainerName)
+	}
+	if int64(cfg.Logs.BatchSize) != 1024*1024 {
+		t.Errorf("Logs.BatchSize: got %d", int64(cfg.Logs.BatchSize))
+	}
+	if cfg.Logs.BatchTimeout.Duration != 5*time.Second {
+		t.Errorf("Logs.BatchTimeout: got %v", cfg.Logs.BatchTimeout.Duration)
+	}
+	if cfg.Logs.MinLevel != "info" {
+		t.Errorf("Logs.MinLevel: got %q", cfg.Logs.MinLevel)
+	}
+	if !cfg.OTLP.Enabled {
+		t.Error("OTLP.Enabled: want true")
+	}
+	if cfg.OTLP.ListenAddr != "localhost:4317" {
+		t.Errorf("OTLP.ListenAddr: got %q", cfg.OTLP.ListenAddr)
+	}
+	if !cfg.Resources.Enabled {
+		t.Error("Resources.Enabled: want true")
+	}
+	if cfg.Resources.PollInterval.Duration != 10*time.Second {
+		t.Errorf("Resources.PollInterval: got %v", cfg.Resources.PollInterval.Duration)
+	}
+	if cfg.Resources.Source != "host" {
+		t.Errorf("Resources.Source: got %q", cfg.Resources.Source)
+	}
+	if cfg.Resources.ContainerName != "<gnoland-container-name>" {
+		t.Errorf("Resources.ContainerName: got %q", cfg.Resources.ContainerName)
+	}
+	if !cfg.Metadata.Enabled {
+		t.Error("Metadata.Enabled: want true")
+	}
+	if cfg.Metadata.CheckInterval.Duration != 10*time.Minute {
+		t.Errorf("Metadata.CheckInterval: got %v", cfg.Metadata.CheckInterval.Duration)
+	}
+	if cfg.Metadata.BinaryPath != "<path-to-gnoland>" {
+		t.Errorf("Metadata.BinaryPath: got %q", cfg.Metadata.BinaryPath)
+	}
+	if cfg.Metadata.ConfigPath != "<path-to-gnoland-config>" {
+		t.Errorf("Metadata.ConfigPath: got %q", cfg.Metadata.ConfigPath)
+	}
+	if cfg.Metadata.GenesisPath != "<path-to-genesis-json>" {
+		t.Errorf("Metadata.GenesisPath: got %q", cfg.Metadata.GenesisPath)
+	}
+}
+
 // mustLoadTOML is a test helper that writes content to a temp file and loads it.
 func mustLoadTOML(t *testing.T, content string) *config.Config {
 	t.Helper()

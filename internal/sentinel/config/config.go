@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	toml "github.com/pelletier/go-toml/v2"
 
@@ -140,6 +141,48 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 	return &cfg, nil
+}
+
+// DefaultConfig returns a Config with sensible defaults.
+// Unknown values use angle-bracket placeholders.
+func DefaultConfig() *Config {
+	return &Config{
+		Server: ServerConfig{
+			URL:   "<watchtower-server-url>",
+			Token: "<watchtower-auth-token>",
+		},
+		RPC: RPCConfig{
+			Enabled:                    true,
+			PollInterval:               Duration{Duration: 3 * time.Second},
+			RPCURL:                     "http://localhost:26657",
+			DumpConsensusStateInterval: Duration{Duration: 30 * time.Second},
+		},
+		Logs: LogsConfig{
+			Enabled:       true,
+			Source:        "docker",
+			ContainerName: "<gnoland-container-name>",
+			BatchSize:     ByteSize(1024 * 1024),
+			BatchTimeout:  Duration{Duration: 5 * time.Second},
+			MinLevel:      "info",
+		},
+		OTLP: OTLPConfig{
+			Enabled:    true,
+			ListenAddr: "localhost:4317",
+		},
+		Resources: ResourcesConfig{
+			Enabled:       true,
+			PollInterval:  Duration{Duration: 10 * time.Second},
+			Source:        "host",
+			ContainerName: "<gnoland-container-name>",
+		},
+		Metadata: MetadataConfig{
+			Enabled:       true,
+			CheckInterval: Duration{Duration: 10 * time.Minute},
+			BinaryPath:    "<path-to-gnoland>",
+			ConfigPath:    "<path-to-gnoland-config>",
+			GenesisPath:   "<path-to-genesis-json>",
+		},
+	}
 }
 
 func (c *Config) anyCollectorEnabled() bool {
