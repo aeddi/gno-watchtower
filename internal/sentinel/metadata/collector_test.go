@@ -59,7 +59,7 @@ func TestCollector_ConflictDetection_SkipsItem(t *testing.T) {
 		Enabled:           true,
 		CheckInterval:     config.Duration{Duration: 10 * time.Millisecond},
 		BinaryPath:        "/usr/local/bin/gnoland",
-		BinaryChecksumCmd: "echo fakehash", // CONFLICT: both set
+		BinaryVersionCmd: "echo fakehash", // CONFLICT: both set
 		GenesisPath:       genPath,         // only path set — valid
 	}
 	out := make(chan protocol.MetricsPayload, 5)

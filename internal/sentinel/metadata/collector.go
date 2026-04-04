@@ -102,10 +102,10 @@ func (c *Collector) Run(ctx context.Context) error {
 // watchedPaths returns the file paths being watched (path-mode items only, conflict-free).
 func (c *Collector) watchedPaths() []string {
 	var paths []string
-	if c.cfg.BinaryPath != "" && c.cfg.BinaryChecksumCmd == "" {
+	if c.cfg.BinaryPath != "" && c.cfg.BinaryVersionCmd == "" {
 		paths = append(paths, c.cfg.BinaryPath)
 	}
-	if c.cfg.GenesisPath != "" && c.cfg.GenesisChecksumCmd == "" {
+	if c.cfg.GenesisPath != "" {
 		paths = append(paths, c.cfg.GenesisPath)
 	}
 	if c.cfg.ConfigPath != "" && c.cfg.ConfigGetCmd == "" {
@@ -133,14 +133,14 @@ func (c *Collector) collectAndSend(ctx context.Context) {
 
 func (c *Collector) collectBinary(data map[string]json.RawMessage) {
 	c.collectChecksum(data, "binary_checksum", "binary",
-		c.cfg.BinaryPath, c.cfg.BinaryChecksumCmd,
-		"metadata conflict: binary_path and binary_checksum_cmd both set — skipping binary checksum")
+		c.cfg.BinaryPath, c.cfg.BinaryVersionCmd,
+		"metadata conflict: binary_path and binary_version_cmd both set — skipping binary")
 }
 
 func (c *Collector) collectGenesis(data map[string]json.RawMessage) {
 	c.collectChecksum(data, "genesis_checksum", "genesis",
-		c.cfg.GenesisPath, c.cfg.GenesisChecksumCmd,
-		"metadata conflict: genesis_path and genesis_checksum_cmd both set — skipping genesis checksum")
+		c.cfg.GenesisPath, "",
+		"")
 }
 
 func (c *Collector) collectChecksum(data map[string]json.RawMessage, dataKey, name, path, cmd, conflictMsg string) {

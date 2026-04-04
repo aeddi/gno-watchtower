@@ -60,72 +60,71 @@ func (b ByteSize) MarshalText() ([]byte, error) {
 }
 
 type Config struct {
-	Server    ServerConfig    `toml:"server"`
-	RPC       RPCConfig       `toml:"rpc"`
-	Logs      LogsConfig      `toml:"logs"`
-	OTLP      OTLPConfig      `toml:"otlp"`
-	Resources ResourcesConfig `toml:"resources"`
-	Metadata  MetadataConfig  `toml:"metadata"`
-	Health    HealthConfig    `toml:"health"`
+	Server    ServerConfig    `toml:"server" comment:"Connection to the watchtower server"`
+	RPC       RPCConfig       `toml:"rpc" comment:"RPC status collector"`
+	Logs      LogsConfig      `toml:"logs" comment:"Log collector"`
+	OTLP      OTLPConfig      `toml:"otlp" comment:"OpenTelemetry relay"`
+	Resources ResourcesConfig `toml:"resources" comment:"System resource monitor"`
+	Metadata  MetadataConfig  `toml:"metadata" comment:"Binary, genesis, and config metadata collector"`
+	Health    HealthConfig    `toml:"health" comment:"Sentinel health endpoint"`
 }
 
 type ServerConfig struct {
-	URL   string `toml:"url"`
-	Token string `toml:"token"`
+	URL   string `toml:"url" comment:"Watchtower server URL"`
+	Token string `toml:"token" comment:"Authentication token for this validator"`
 }
 
 type RPCConfig struct {
-	Enabled                    bool     `toml:"enabled"`
-	PollInterval               Duration `toml:"poll_interval"`
-	RPCURL                     string   `toml:"rpc_url"`
-	DumpConsensusStateInterval Duration `toml:"dump_consensus_state_interval"`
+	Enabled                    bool     `toml:"enabled" comment:"Enable the RPC collector"`
+	PollInterval               Duration `toml:"poll_interval" comment:"Polling interval for RPC status"`
+	RPCURL                     string   `toml:"rpc_url" comment:"Gnoland RPC endpoint URL"`
+	DumpConsensusStateInterval Duration `toml:"dump_consensus_state_interval" comment:"Interval for dump_consensus_state polling"`
 }
 
 // LogsConfig holds log collector settings.
 type LogsConfig struct {
-	Enabled       bool     `toml:"enabled"`
-	Source        string   `toml:"source"`         // "docker" | "journald"
-	ContainerName string   `toml:"container_name"` // docker only
-	JournaldUnit  string   `toml:"journald_unit"`  // journald only
-	BatchSize     ByteSize `toml:"batch_size"`
-	BatchTimeout  Duration `toml:"batch_timeout"`
-	MinLevel      string   `toml:"min_level"` // "debug" | "info" | "warn" | "error"
+	Enabled       bool     `toml:"enabled" comment:"Enable the log collector"`
+	Source        string   `toml:"source" comment:"Log source: docker or journald"`
+	ContainerName string   `toml:"container_name,omitempty" comment:"Docker container name (docker source only)"`
+	JournaldUnit  string   `toml:"journald_unit,omitempty" comment:"Systemd unit name (journald source only)"`
+	BatchSize     ByteSize `toml:"batch_size" comment:"Maximum batch size before sending"`
+	BatchTimeout  Duration `toml:"batch_timeout" comment:"Maximum time to wait before sending a batch"`
+	MinLevel      string   `toml:"min_level" comment:"Minimum log level: debug, info, warn, or error"`
 }
 
 // OTLPConfig holds OTLP relay settings.
 type OTLPConfig struct {
-	Enabled    bool   `toml:"enabled"`
-	ListenAddr string `toml:"listen_addr"` // default: "localhost:4317"
+	Enabled    bool   `toml:"enabled" comment:"Enable the OTLP relay"`
+	ListenAddr string `toml:"listen_addr" comment:"gRPC listen address for OTLP receiver"`
 }
 
 // ResourcesConfig holds resource monitor settings.
 type ResourcesConfig struct {
-	Enabled       bool     `toml:"enabled"`
-	PollInterval  Duration `toml:"poll_interval"`
-	Source        string   `toml:"source"`         // "host" | "docker" | "both"
-	ContainerName string   `toml:"container_name"` // docker only
+	Enabled       bool     `toml:"enabled" comment:"Enable the resource monitor"`
+	PollInterval  Duration `toml:"poll_interval" comment:"Polling interval for resource metrics"`
+	Source        string   `toml:"source" comment:"Resource source: host, docker, or both"`
+	ContainerName string   `toml:"container_name,omitempty" comment:"Docker container name (docker/both source only)"`
 }
 
 // MetadataConfig holds metadata collector settings.
-// For each item, set exactly one of _path or _cmd — setting both is an error detected at runtime.
+// For binary and config: set exactly one of _path or _cmd — setting both is an error.
 type MetadataConfig struct {
-	Enabled       bool     `toml:"enabled"`
-	CheckInterval Duration `toml:"check_interval"`
+	Enabled       bool     `toml:"enabled" comment:"Enable the metadata collector"`
+	CheckInterval Duration `toml:"check_interval" comment:"Check interval for polling-based items"`
 
-	BinaryPath        string `toml:"binary_path"`
-	BinaryChecksumCmd string `toml:"binary_checksum_cmd"`
+	BinaryPath       string `toml:"binary_path,omitempty" comment:"Path to the gnoland binary (runs <path> version)"`
+	BinaryVersionCmd string `toml:"binary_version_cmd,omitempty" comment:"Command to get gnoland binary version"`
 
-	ConfigPath   string `toml:"config_path"`
-	ConfigGetCmd string `toml:"config_get_cmd"` // use %s as placeholder for key name
+	ConfigPath   string `toml:"config_path,omitempty" comment:"Path to the gnoland config file"`
+	ConfigGetCmd string `toml:"config_get_cmd,omitempty" comment:"Command to get gnoland config values (%s = key name)"`
 
-	GenesisPath        string `toml:"genesis_path"`
-	GenesisChecksumCmd string `toml:"genesis_checksum_cmd"`
+	GenesisPath string `toml:"genesis_path" comment:"Path to the genesis.json file"`
 }
 
 // HealthConfig holds the sentinel health endpoint settings.
 // If ListenAddr is empty, no health endpoint is started.
 type HealthConfig struct {
-	ListenAddr string `toml:"listen_addr"`
+	ListenAddr string `toml:"listen_addr,omitempty" comment:"HTTP listen address (empty = disabled)"`
 }
 
 func Load(path string) (*Config, error) {

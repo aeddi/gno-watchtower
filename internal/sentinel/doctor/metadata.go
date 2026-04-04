@@ -14,9 +14,9 @@ import (
 func CheckMetadataBinary(cfg config.MetadataConfig) CheckResult {
 	const name = "Metadata binary"
 	switch {
-	case cfg.BinaryPath == "" && cfg.BinaryChecksumCmd == "":
+	case cfg.BinaryPath == "" && cfg.BinaryVersionCmd == "":
 		return CheckResult{Name: name, Status: StatusOrange, Detail: "not configured"}
-	case cfg.BinaryPath != "" && cfg.BinaryChecksumCmd != "":
+	case cfg.BinaryPath != "" && cfg.BinaryVersionCmd != "":
 		return CheckResult{Name: name, Status: StatusOrange, Detail: "skipped: see Metadata conflicts"}
 	case cfg.BinaryPath != "":
 		sum, err := metadata.SHA256File(cfg.BinaryPath)
@@ -25,7 +25,7 @@ func CheckMetadataBinary(cfg config.MetadataConfig) CheckResult {
 		}
 		return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("sha256: %s", sum[:16]+"...")}
 	default: // cmd
-		out, err := metadata.RunCmd(cfg.BinaryChecksumCmd)
+		out, err := metadata.RunCmd(cfg.BinaryVersionCmd)
 		if err != nil {
 			return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}
 		}
@@ -36,24 +36,14 @@ func CheckMetadataBinary(cfg config.MetadataConfig) CheckResult {
 // CheckMetadataGenesis checks whether the genesis checksum can be computed.
 func CheckMetadataGenesis(cfg config.MetadataConfig) CheckResult {
 	const name = "Metadata genesis"
-	switch {
-	case cfg.GenesisPath == "" && cfg.GenesisChecksumCmd == "":
+	if cfg.GenesisPath == "" {
 		return CheckResult{Name: name, Status: StatusOrange, Detail: "not configured"}
-	case cfg.GenesisPath != "" && cfg.GenesisChecksumCmd != "":
-		return CheckResult{Name: name, Status: StatusOrange, Detail: "skipped: see Metadata conflicts"}
-	case cfg.GenesisPath != "":
-		sum, err := metadata.SHA256File(cfg.GenesisPath)
-		if err != nil {
-			return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}
-		}
-		return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("sha256: %s", sum[:16]+"...")}
-	default: // cmd
-		out, err := metadata.RunCmd(cfg.GenesisChecksumCmd)
-		if err != nil {
-			return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}
-		}
-		return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("cmd output: %s", truncate(out, 40))}
 	}
+	sum, err := metadata.SHA256File(cfg.GenesisPath)
+	if err != nil {
+		return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}
+	}
+	return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("sha256: %s", sum[:16]+"...")}
 }
 
 // CheckMetadataConfig checks whether the config file is accessible (path mode)
@@ -96,11 +86,8 @@ func CheckMetadataConfig(cfg config.MetadataConfig) CheckResult {
 func CheckMetadataConflicts(cfg config.MetadataConfig) CheckResult {
 	const name = "Metadata conflicts"
 	var conflicts []string
-	if cfg.BinaryPath != "" && cfg.BinaryChecksumCmd != "" {
-		conflicts = append(conflicts, "binary (binary_path + binary_checksum_cmd)")
-	}
-	if cfg.GenesisPath != "" && cfg.GenesisChecksumCmd != "" {
-		conflicts = append(conflicts, "genesis (genesis_path + genesis_checksum_cmd)")
+	if cfg.BinaryPath != "" && cfg.BinaryVersionCmd != "" {
+		conflicts = append(conflicts, "binary (binary_path + binary_version_cmd)")
 	}
 	if cfg.ConfigPath != "" && cfg.ConfigGetCmd != "" {
 		conflicts = append(conflicts, "config (config_path + config_get_cmd)")

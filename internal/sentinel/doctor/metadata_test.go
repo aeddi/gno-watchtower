@@ -76,7 +76,7 @@ func TestCheckMetadataConfig_Path_Green(t *testing.T) {
 func TestCheckMetadataConflicts_PathAndCmd_Red(t *testing.T) {
 	cfg := config.MetadataConfig{
 		BinaryPath:        "/usr/local/bin/gnoland",
-		BinaryChecksumCmd: "sha256sum /usr/local/bin/gnoland",
+		BinaryVersionCmd: "sha256sum /usr/local/bin/gnoland",
 	}
 	r := doctor.CheckMetadataConflicts(cfg)
 	if r.Status != doctor.StatusRed {
