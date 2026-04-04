@@ -45,6 +45,20 @@ func (b *ByteSize) UnmarshalText(text []byte) error {
 	return nil
 }
 
+func (b ByteSize) MarshalText() ([]byte, error) {
+	v := int64(b)
+	switch {
+	case v > 0 && v%(1024*1024*1024) == 0:
+		return []byte(fmt.Sprintf("%dGB", v/(1024*1024*1024))), nil
+	case v > 0 && v%(1024*1024) == 0:
+		return []byte(fmt.Sprintf("%dMB", v/(1024*1024))), nil
+	case v > 0 && v%1024 == 0:
+		return []byte(fmt.Sprintf("%dKB", v/1024)), nil
+	default:
+		return []byte(strconv.FormatInt(v, 10)), nil
+	}
+}
+
 type Config struct {
 	Server    ServerConfig    `toml:"server"`
 	RPC       RPCConfig       `toml:"rpc"`

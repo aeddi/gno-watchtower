@@ -301,6 +301,50 @@ token = ""
 	}
 }
 
+func TestByteSize_MarshalText(t *testing.T) {
+	tests := []struct {
+		input config.ByteSize
+		want  string
+	}{
+		{config.ByteSize(1024 * 1024), "1MB"},
+		{config.ByteSize(512 * 1024), "512KB"},
+		{config.ByteSize(1024 * 1024 * 1024), "1GB"},
+		{config.ByteSize(1024), "1KB"},
+		{config.ByteSize(500), "500"},
+	}
+	for _, tt := range tests {
+		got, err := tt.input.MarshalText()
+		if err != nil {
+			t.Errorf("MarshalText(%d): %v", int64(tt.input), err)
+			continue
+		}
+		if string(got) != tt.want {
+			t.Errorf("MarshalText(%d): got %q, want %q", int64(tt.input), string(got), tt.want)
+		}
+	}
+}
+
+func TestByteSize_RoundTrip(t *testing.T) {
+	sizes := []string{"1MB", "512KB", "1GB", "1024"}
+	for _, s := range sizes {
+		var b config.ByteSize
+		if err := b.UnmarshalText([]byte(s)); err != nil {
+			t.Fatalf("UnmarshalText(%q): %v", s, err)
+		}
+		got, err := b.MarshalText()
+		if err != nil {
+			t.Fatalf("MarshalText: %v", err)
+		}
+		var b2 config.ByteSize
+		if err := b2.UnmarshalText(got); err != nil {
+			t.Fatalf("re-UnmarshalText(%q): %v", string(got), err)
+		}
+		if b != b2 {
+			t.Errorf("round-trip %q: got %d, want %d", s, int64(b2), int64(b))
+		}
+	}
+}
+
 // mustLoadTOML is a test helper that writes content to a temp file and loads it.
 func mustLoadTOML(t *testing.T, content string) *config.Config {
 	t.Helper()
