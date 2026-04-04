@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BurntSushi/toml"
+	toml "github.com/pelletier/go-toml/v2"
 	"github.com/fsnotify/fsnotify"
 
 	"github.com/gnolang/val-companion/internal/sentinel/config"
@@ -241,7 +241,7 @@ func ReadConfigKey(configPath, key string) (string, error) {
 		return "", fmt.Errorf("read %s: %w", configPath, err)
 	}
 	var root map[string]any
-	if _, err := toml.Decode(string(b), &root); err != nil {
+	if err := toml.Unmarshal(b, &root); err != nil {
 		return "", fmt.Errorf("parse %s: %w", configPath, err)
 	}
 	parts := strings.Split(key, ".")

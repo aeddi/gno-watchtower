@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"os"
 
-	"github.com/BurntSushi/toml"
+	toml "github.com/pelletier/go-toml/v2"
+
 	"github.com/gnolang/val-companion/pkg/tomlutil"
 )
 
@@ -56,8 +58,12 @@ type LokiConfig struct {
 
 // Load parses the TOML config file at path and returns the populated Config.
 func Load(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("load config %s: %w", path, err)
+	}
 	var cfg Config
-	if _, err := toml.DecodeFile(path, &cfg); err != nil {
+	if err := toml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("load config %s: %w", path, err)
 	}
 	if cfg.Security.RateLimitBurst == 0 {

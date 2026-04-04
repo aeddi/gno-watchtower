@@ -2,10 +2,12 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
-	"github.com/BurntSushi/toml"
+	toml "github.com/pelletier/go-toml/v2"
+
 	"github.com/gnolang/val-companion/pkg/tomlutil"
 )
 
@@ -113,8 +115,12 @@ type HealthConfig struct {
 }
 
 func Load(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("load config %s: %w", path, err)
+	}
 	var cfg Config
-	if _, err := toml.DecodeFile(path, &cfg); err != nil {
+	if err := toml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("load config %s: %w", path, err)
 	}
 	if err := cfg.validate(); err != nil {

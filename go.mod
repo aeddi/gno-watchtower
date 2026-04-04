@@ -3,14 +3,15 @@ module github.com/gnolang/val-companion
 go 1.25.0
 
 require (
-	github.com/BurntSushi/toml v1.6.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/klauspost/compress v1.18.5
+	github.com/pelletier/go-toml/v2 v2.3.0
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/systemd/slog-journal v0.1.2
 	go.opentelemetry.io/proto/otlp v1.10.0
+	golang.org/x/time v0.15.0
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 )
@@ -51,7 +52,6 @@ require (
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
-	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
