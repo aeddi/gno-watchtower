@@ -3,6 +3,7 @@ package doctor_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gnolang/val-companion/internal/sentinel/config"
@@ -10,20 +11,20 @@ import (
 )
 
 func TestCheckMetadataBinary_Path_Green(t *testing.T) {
-	f, err := os.CreateTemp(t.TempDir(), "gnoland")
-	if err != nil {
+	// Create a fake script that outputs a version string.
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, "gnoland")
+	if err := os.WriteFile(binPath, []byte("#!/bin/sh\necho v0.0.0-test"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	f.WriteString("fake binary")
-	f.Close()
 
-	cfg := config.MetadataConfig{BinaryPath: f.Name()}
+	cfg := config.MetadataConfig{BinaryPath: binPath}
 	r := doctor.CheckMetadataBinary(cfg)
 	if r.Status != doctor.StatusGreen {
 		t.Errorf("want GREEN, got %s: %s", r.Status, r.Detail)
 	}
-	if r.Detail == "" {
-		t.Error("detail must be non-empty")
+	if !strings.Contains(r.Detail, "v0.0.0-test") {
+		t.Errorf("detail should contain version, got: %s", r.Detail)
 	}
 }
 

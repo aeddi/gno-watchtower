@@ -10,7 +10,7 @@ import (
 	"github.com/gnolang/val-companion/internal/sentinel/metadata"
 )
 
-// CheckMetadataBinary checks whether the binary checksum can be computed.
+// CheckMetadataBinary checks whether the binary version can be retrieved.
 func CheckMetadataBinary(cfg config.MetadataConfig) CheckResult {
 	const name = "Metadata binary"
 	switch {
@@ -19,17 +19,17 @@ func CheckMetadataBinary(cfg config.MetadataConfig) CheckResult {
 	case cfg.BinaryPath != "" && cfg.BinaryVersionCmd != "":
 		return CheckResult{Name: name, Status: StatusOrange, Detail: "skipped: see Metadata conflicts"}
 	case cfg.BinaryPath != "":
-		sum, err := metadata.SHA256File(cfg.BinaryPath)
+		version, err := metadata.RunBinaryVersion(cfg.BinaryPath)
 		if err != nil {
 			return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}
 		}
-		return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("sha256: %s", sum[:16]+"...")}
+		return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("version: %s", truncate(version, 40))}
 	default: // cmd
 		out, err := metadata.RunCmd(cfg.BinaryVersionCmd)
 		if err != nil {
 			return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}
 		}
-		return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("cmd output: %s", truncate(out, 40))}
+		return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("version: %s", truncate(out, 40))}
 	}
 }
 
