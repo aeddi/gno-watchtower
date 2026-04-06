@@ -10,7 +10,7 @@ import (
 
 func TestPrintReport_ContainsAllResults(t *testing.T) {
 	results := []doctor.CheckResult{
-		{Name: "Remote reachable", Status: doctor.StatusGreen, Detail: "https://example.com"},
+		{Name: "Watchtower", Status: doctor.StatusGreen, Detail: "https://example.com"},
 		{Name: "Token valid", Status: doctor.StatusRed, Detail: "auth failed: 401"},
 		{Name: "Metadata binary", Status: doctor.StatusOrange, Detail: "disabled in config"},
 		{Name: "Resources", Status: doctor.StatusGrey, Detail: "metrics permission not granted"},
@@ -23,7 +23,7 @@ func TestPrintReport_ContainsAllResults(t *testing.T) {
 	checks := []string{
 		"Validating sentinel config:",
 		"/etc/sentinel.toml",
-		"Remote reachable",
+		"Watchtower",
 		termstyle.SymOK,
 		"Token valid",
 		termstyle.SymFail,
