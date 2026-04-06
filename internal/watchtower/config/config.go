@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"time"
 
 	toml "github.com/pelletier/go-toml/v2"
 
@@ -15,8 +17,8 @@ type Duration = tomlutil.Duration
 // ValidatorConfig holds per-validator settings.
 type ValidatorConfig struct {
 	Token        string   `toml:"token"`
-	Permissions  []string `toml:"permissions"`
-	LogsMinLevel string   `toml:"logs_min_level"`
+	Permissions  []string `toml:"permissions" comment:"rpc, metrics, logs, otlp"`
+	LogsMinLevel string   `toml:"logs_min_level" comment:"debug, info, warn, or error"`
 }
 
 // TokenEntry is a pre-built lookup entry mapping a token to its validator.
@@ -28,10 +30,10 @@ type TokenEntry struct {
 // Config is the root watchtower configuration.
 type Config struct {
 	Server          ServerConfig               `toml:"server"`
-	Security        SecurityConfig             `toml:"security"`
-	VictoriaMetrics VictoriaMetricsConfig      `toml:"victoria_metrics"`
-	Loki            LokiConfig                 `toml:"loki"`
-	Validators      map[string]ValidatorConfig `toml:"validators"`
+	Security        SecurityConfig             `toml:"security" comment:"Rate limiting and ban settings"`
+	VictoriaMetrics VictoriaMetricsConfig      `toml:"victoria_metrics" comment:"Metrics backend"`
+	Loki            LokiConfig                 `toml:"loki" comment:"Log backend"`
+	Validators      map[string]ValidatorConfig `toml:"validators" comment:"Each [validators.<name>] section defines a sentinel identity"`
 }
 
 type ServerConfig struct {
@@ -40,11 +42,8 @@ type ServerConfig struct {
 
 type SecurityConfig struct {
 	RateLimitRPS   float64  `toml:"rate_limit_rps"`
-	// RateLimitBurst is the maximum number of requests allowed in a burst.
-	// Must be at least the number of data types sentinel sends concurrently
-	// (rpc + metrics + logs + otlp = 4). Default 10.
-	RateLimitBurst int      `toml:"rate_limit_burst"`
-	BanThreshold   int      `toml:"ban_threshold"`
+	RateLimitBurst int      `toml:"rate_limit_burst" comment:"must be >= 4 (sentinel sends rpc + metrics + logs + otlp concurrently), default 10"`
+	BanThreshold   int      `toml:"ban_threshold" comment:"failed auth attempts before banning"`
 	BanDuration    Duration `toml:"ban_duration"`
 }
 
@@ -73,6 +72,45 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 	return &cfg, nil
+}
+
+// DefaultConfig returns a Config with sensible defaults and placeholders.
+func DefaultConfig() *Config {
+	return &Config{
+		Server: ServerConfig{
+			ListenAddr: "0.0.0.0:8080",
+		},
+		Security: SecurityConfig{
+			RateLimitRPS:   10,
+			RateLimitBurst: 10,
+			BanThreshold:   5,
+			BanDuration:    Duration{Duration: 15 * time.Minute},
+		},
+		VictoriaMetrics: VictoriaMetricsConfig{
+			URL: "<victoria-metrics-url>",
+		},
+		Loki: LokiConfig{
+			URL: "<loki-url>",
+		},
+		Validators: map[string]ValidatorConfig{
+			"my-validator": {
+				Token:        "<secret-token>",
+				Permissions:  []string{"rpc", "metrics", "logs", "otlp"},
+				LogsMinLevel: "info",
+			},
+		},
+	}
+}
+
+// Generate writes an annotated example TOML config to w.
+func Generate(w io.Writer) error {
+	cfg := DefaultConfig()
+	data, err := toml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+	_, err = w.Write(data)
+	return err
 }
 
 func (c *Config) validate() error {

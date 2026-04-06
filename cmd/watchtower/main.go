@@ -32,6 +32,10 @@ func main() {
 	switch os.Args[1] {
 	case "run":
 		runCmd(os.Args[2:])
+	case "generate-config":
+		if err := config.Generate(os.Stdout); err != nil {
+			log.Fatalf("generate config: %v", err)
+		}
 	default:
 		usage()
 		os.Exit(1)
@@ -123,5 +127,5 @@ func runCmd(args []string) {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "Usage: watchtower <command> [args]\n\nCommands:\n  run [--log-format=...] [--log-level=...] <config>  Start the watchtower\n")
+	fmt.Fprintf(os.Stderr, "Usage: watchtower <command> [args]\n\nCommands:\n  run [--log-format=...] [--log-level=...] <config>  Start the watchtower\n  generate-config                                    Print example config to stdout\n")
 }
