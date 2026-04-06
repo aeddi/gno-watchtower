@@ -18,14 +18,14 @@ import (
 // checks using a single GET /auth/check call. Returns the three CheckResults and the parsed
 // AuthResponse (nil if the server is unreachable or the token is invalid).
 func CheckRemoteTokenAndPermissions(ctx context.Context, cfg *config.Config) ([]CheckResult, *AuthResponse) {
-	if strings.HasPrefix(cfg.Server.URL, "<") {
+	if config.IsPlaceholder(cfg.Server.URL) {
 		return []CheckResult{
 			{Name: "Watchtower", Status: StatusOrange, Detail: "server.url not configured"},
 			{Name: "Token valid", Status: StatusOrange, Detail: "server.url not configured"},
 			{Name: "Token permissions", Status: StatusOrange, Detail: "server.url not configured"},
 		}, nil
 	}
-	if strings.HasPrefix(cfg.Server.Token, "<") {
+	if config.IsPlaceholder(cfg.Server.Token) {
 		return []CheckResult{
 			{Name: "Watchtower", Status: StatusOrange, Detail: "server.token not configured"},
 			{Name: "Token valid", Status: StatusOrange, Detail: "server.token not configured"},

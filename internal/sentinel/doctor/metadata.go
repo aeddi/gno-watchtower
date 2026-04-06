@@ -19,6 +19,9 @@ func CheckMetadataBinary(cfg config.MetadataConfig) CheckResult {
 	case cfg.BinaryPath != "" && cfg.BinaryVersionCmd != "":
 		return CheckResult{Name: name, Status: StatusOrange, Detail: "skipped: see Metadata conflicts"}
 	case cfg.BinaryPath != "":
+		if config.IsPlaceholder(cfg.BinaryPath) {
+			return CheckResult{Name: name, Status: StatusOrange, Detail: "binary_path not configured"}
+		}
 		if _, err := os.Stat(cfg.BinaryPath); err != nil {
 			return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}
 		}
@@ -44,6 +47,9 @@ func CheckMetadataGenesis(cfg config.MetadataConfig) CheckResult {
 	if cfg.GenesisPath == "" {
 		return CheckResult{Name: name, Status: StatusOrange, Detail: "not configured"}
 	}
+	if config.IsPlaceholder(cfg.GenesisPath) {
+		return CheckResult{Name: name, Status: StatusOrange, Detail: "genesis_path not configured"}
+	}
 	sum, err := metadata.SHA256File(cfg.GenesisPath)
 	if err != nil {
 		return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}
@@ -61,6 +67,9 @@ func CheckMetadataConfig(cfg config.MetadataConfig) CheckResult {
 	case cfg.ConfigPath != "" && cfg.ConfigGetCmd != "":
 		return CheckResult{Name: name, Status: StatusOrange, Detail: "skipped: see Metadata conflicts"}
 	case cfg.ConfigPath != "":
+		if config.IsPlaceholder(cfg.ConfigPath) {
+			return CheckResult{Name: name, Status: StatusOrange, Detail: "config_path not configured"}
+		}
 		f, err := os.Open(cfg.ConfigPath)
 		if err != nil {
 			return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}

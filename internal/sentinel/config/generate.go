@@ -48,7 +48,7 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 			afterKey: "container_name",
 			comment:  "Alternative: use journald as log source",
 			key:      "journald_unit",
-			value:    "<gnoland-systemd-unit>",
+			value:    PlaceholderJournaldUnit,
 		})
 	} else if cfg.Logs.Source == "journald" {
 		alts = append(alts, alternative{
@@ -56,7 +56,7 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 			afterKey: "journald_unit",
 			comment:  "Alternative: use docker as log source",
 			key:      "container_name",
-			value:    "<gnoland-container-name>",
+			value:    PlaceholderContainerName,
 		})
 	}
 
@@ -66,13 +66,13 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 			afterKey: "binary_version_cmd",
 			comment:  "Alternative: use binary path directly (runs <path> version)",
 			key:      "binary_path",
-			value:    "<path-to-gnoland>",
+			value:    PlaceholderBinaryPath,
 		})
 		alts = append(alts, alternative{
 			afterKey: "config_get_cmd",
 			comment:  "Alternative: read config file directly",
 			key:      "config_path",
-			value:    "<path-to-gnoland-config>",
+			value:    PlaceholderConfigPath,
 		})
 	} else {
 		alts = append(alts, alternative{

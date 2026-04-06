@@ -60,6 +60,22 @@ func (b ByteSize) MarshalText() ([]byte, error) {
 	}
 }
 
+// Placeholder values used in generated configs for fields that need user input.
+const (
+	PlaceholderServerURL     = "<watchtower-server-url>"
+	PlaceholderServerToken   = "<watchtower-auth-token>"
+	PlaceholderContainerName = "<gnoland-container-name>"
+	PlaceholderBinaryPath    = "<path-to-gnoland>"
+	PlaceholderConfigPath    = "<path-to-gnoland-config>"
+	PlaceholderGenesisPath   = "<path-to-genesis-json>"
+	PlaceholderJournaldUnit  = "<gnoland-systemd-unit>"
+)
+
+// IsPlaceholder reports whether s is an unresolved placeholder value.
+func IsPlaceholder(s string) bool {
+	return len(s) > 2 && s[0] == '<' && s[len(s)-1] == '>'
+}
+
 type Config struct {
 	Server    ServerConfig    `toml:"server" comment:"Connection to the watchtower server"`
 	RPC       RPCConfig       `toml:"rpc" comment:"RPC status collector"`
@@ -148,8 +164,8 @@ func Load(path string) (*Config, error) {
 func DefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			URL:   "<watchtower-server-url>",
-			Token: "<watchtower-auth-token>",
+			URL:   PlaceholderServerURL,
+			Token: PlaceholderServerToken,
 		},
 		RPC: RPCConfig{
 			Enabled:                    true,
@@ -160,7 +176,7 @@ func DefaultConfig() *Config {
 		Logs: LogsConfig{
 			Enabled:       true,
 			Source:        "docker",
-			ContainerName: "<gnoland-container-name>",
+			ContainerName: PlaceholderContainerName,
 			BatchSize:     ByteSize(1024 * 1024),
 			BatchTimeout:  Duration{Duration: 5 * time.Second},
 			MinLevel:      "info",
@@ -173,14 +189,14 @@ func DefaultConfig() *Config {
 			Enabled:       true,
 			PollInterval:  Duration{Duration: 10 * time.Second},
 			Source:        "host",
-			ContainerName: "<gnoland-container-name>",
+			ContainerName: PlaceholderContainerName,
 		},
 		Metadata: MetadataConfig{
 			Enabled:       true,
 			CheckInterval: Duration{Duration: 10 * time.Minute},
-			BinaryPath:    "<path-to-gnoland>",
-			ConfigPath:    "<path-to-gnoland-config>",
-			GenesisPath:   "<path-to-genesis-json>",
+			BinaryPath:    PlaceholderBinaryPath,
+			ConfigPath:    PlaceholderConfigPath,
+			GenesisPath:   PlaceholderGenesisPath,
 		},
 		Health: HealthConfig{
 			ListenAddr: "127.0.0.1:8081",
