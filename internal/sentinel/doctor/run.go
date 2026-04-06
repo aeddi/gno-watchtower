@@ -12,39 +12,46 @@ import (
 	pkglogger "github.com/gnolang/val-companion/pkg/logger"
 )
 
-// Run executes all doctor checks, writes a formatted report to w, and returns an exit code.
+// Run executes all doctor checks, printing each result as it completes.
 // Exit code 0 = no Red results. Exit code 1 = at least one Red result.
 func Run(ctx context.Context, cfg *config.Config, configPath string, w io.Writer) int {
-	var results []CheckResult
+	fmt.Fprintf(w, "Validating sentinel config: %s\n", configPath)
+	hasRed := false
+
+	emit := func(results ...CheckResult) {
+		for _, r := range results {
+			fmt.Fprintln(w, formatResult(r))
+			if r.Status == StatusRed {
+				hasRed = true
+			}
+		}
+	}
 
 	// ---- Remote + token + permissions (always run; drives Grey status below)
 	remoteResults, authResp := CheckRemoteTokenAndPermissions(ctx, cfg)
-	results = append(results, remoteResults...)
+	emit(remoteResults...)
 
 	// ---- Metadata checks
-	results = append(results, metadataChecks(cfg, authResp)...)
+	emit(metadataChecks(cfg, authResp)...)
 
 	// ---- Logs check
-	results = append(results, logsCheck(ctx, cfg, authResp))
+	emit(logsCheck(ctx, cfg, authResp))
 
 	// ---- OTLP check
-	results = append(results, otlpCheck(ctx, cfg, authResp))
+	emit(otlpCheck(ctx, cfg, authResp))
 
 	// ---- Resources check
-	results = append(results, resourcesCheck(ctx, cfg, authResp))
+	emit(resourcesCheck(ctx, cfg, authResp))
 
 	// ---- RPC check (config validity only — no live RPC poll in doctor)
-	results = append(results, rpcCheck(cfg, authResp))
+	emit(rpcCheck(cfg, authResp))
 
 	// ---- Health check (config validity only)
-	results = append(results, healthCheck(cfg))
+	emit(healthCheck(cfg))
 
-	PrintReport(w, configPath, results)
-
-	for _, r := range results {
-		if r.Status == StatusRed {
-			return 1
-		}
+	fmt.Fprintln(w)
+	if hasRed {
+		return 1
 	}
 	return 0
 }
