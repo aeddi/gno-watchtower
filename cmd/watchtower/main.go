@@ -127,5 +127,9 @@ func runCmd(args []string) {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "Usage: watchtower <command> [args]\n\nCommands:\n  run [--log-format=...] [--log-level=...] <config>  Start the watchtower\n  generate-config                                    Print example config to stdout\n")
+	fmt.Fprintln(os.Stderr, "Usage: watchtower <command> [args]")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Commands:")
+	fmt.Fprintln(os.Stderr, "  run [--log-format=...] [--log-level=...] <config>  Start the watchtower")
+	fmt.Fprintln(os.Stderr, "  generate-config                                    Print example config to stdout")
 }

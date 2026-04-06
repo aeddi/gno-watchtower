@@ -100,5 +100,10 @@ func doctorCmd(args []string) {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "Usage: sentinel <command> [args]\n\nCommands:\n  run [--log-format=...] [--log-level=...] <config>  Start the sentinel\n  generate-config                                    Print example config to stdout\n  doctor <config>                                    Check config and setup\n")
+	fmt.Fprintln(os.Stderr, "Usage: sentinel <command> [args]")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Commands:")
+	fmt.Fprintln(os.Stderr, "  run [--log-format=...] [--log-level=...] <config>  Start the sentinel")
+	fmt.Fprintln(os.Stderr, "  generate-config                                    Print example config to stdout")
+	fmt.Fprintln(os.Stderr, "  doctor <config>                                    Check config and setup")
 }
