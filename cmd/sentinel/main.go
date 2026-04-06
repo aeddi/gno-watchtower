@@ -25,16 +25,38 @@ func main() {
 	case "run":
 		runCmd(os.Args[2:])
 	case "generate-config":
-		ctx := context.Background()
-		if err := config.Generate(ctx, os.Stderr, os.Stdout); err != nil {
-			log.Fatalf("generate config: %v", err)
-		}
+		generateConfigCmd(os.Args[2:])
 	case "doctor":
 		doctorCmd(os.Args[2:])
 	default:
 		usage()
 		os.Exit(1)
 	}
+}
+
+func generateConfigCmd(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "Usage: sentinel generate-config <output-file>")
+		os.Exit(1)
+	}
+	path := args[0]
+
+	f, err := os.Create(path)
+	if err != nil {
+		log.Fatalf("create %s: %v", path, err)
+	}
+
+	ctx := context.Background()
+	if err := config.Generate(ctx, os.Stdout, f); err != nil {
+		f.Close()
+		os.Remove(path)
+		log.Fatalf("generate config: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		log.Fatalf("close %s: %v", path, err)
+	}
+
+	fmt.Printf("\nConfig written to %s — open it to finish configuring your sentinel.\n", path)
 }
 
 func runCmd(args []string) {
@@ -104,6 +126,6 @@ func usage() {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Commands:")
 	fmt.Fprintln(os.Stderr, "  run [--log-format=...] [--log-level=...] <config>  Start the sentinel")
-	fmt.Fprintln(os.Stderr, "  generate-config                                    Print example config to stdout")
+	fmt.Fprintln(os.Stderr, "  generate-config <output-file>                      Generate example config file")
 	fmt.Fprintln(os.Stderr, "  doctor <config>                                    Check config and setup")
 }
