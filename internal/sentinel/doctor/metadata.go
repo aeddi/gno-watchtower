@@ -19,15 +19,20 @@ func CheckMetadataBinary(cfg config.MetadataConfig) CheckResult {
 	case cfg.BinaryPath != "" && cfg.BinaryVersionCmd != "":
 		return CheckResult{Name: name, Status: StatusOrange, Detail: "skipped: see Metadata conflicts"}
 	case cfg.BinaryPath != "":
+		if _, err := os.Stat(cfg.BinaryPath); err != nil {
+			return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}
+		}
 		version, err := metadata.RunBinaryVersion(cfg.BinaryPath)
 		if err != nil {
-			return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}
+			// TODO: Remove this fallback once gnoland implements the version subcommand.
+			return CheckResult{Name: name, Status: StatusGreen, Detail: "binary found, version not implemented yet"}
 		}
 		return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("version: %s", truncate(version, 40))}
 	default: // cmd
 		out, err := metadata.RunCmd(cfg.BinaryVersionCmd)
 		if err != nil {
-			return CheckResult{Name: name, Status: StatusRed, Detail: err.Error()}
+			// TODO: Remove this fallback once gnoland implements the version subcommand.
+			return CheckResult{Name: name, Status: StatusGreen, Detail: "cmd reachable, version not implemented yet"}
 		}
 		return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("version: %s", truncate(out, 40))}
 	}

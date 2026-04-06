@@ -10,7 +10,7 @@ import (
 
 // PrintReport writes a human-readable doctor report to w.
 func PrintReport(w io.Writer, configPath string, results []CheckResult) {
-	fmt.Fprintf(w, "sentinel doctor — %s\n\n", configPath)
+	fmt.Fprintf(w, "Validating sentinel config: %s\n\n", configPath)
 	for _, r := range results {
 		fmt.Fprintln(w, formatResult(r))
 	}

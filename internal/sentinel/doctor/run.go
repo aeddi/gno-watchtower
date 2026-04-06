@@ -36,6 +36,9 @@ func Run(ctx context.Context, cfg *config.Config, configPath string, w io.Writer
 	// ---- RPC check (config validity only — no live RPC poll in doctor)
 	results = append(results, rpcCheck(cfg, authResp))
 
+	// ---- Health check (config validity only)
+	results = append(results, healthCheck(cfg))
+
 	PrintReport(w, configPath, results)
 
 	for _, r := range results {
@@ -120,4 +123,14 @@ func rpcCheck(cfg *config.Config, ar *AuthResponse) CheckResult {
 		return CheckResult{Name: "RPC", Status: StatusRed, Detail: "rpc_url not set"}
 	}
 	return CheckResult{Name: "RPC", Status: StatusGreen, Detail: fmt.Sprintf("configured: %s", cfg.RPC.RPCURL)}
+}
+
+func healthCheck(cfg *config.Config) CheckResult {
+	if !cfg.Health.Enabled {
+		return CheckResult{Name: "Health", Status: StatusOrange, Detail: "disabled in config"}
+	}
+	if cfg.Health.ListenAddr == "" {
+		return CheckResult{Name: "Health", Status: StatusRed, Detail: "listen_addr not set"}
+	}
+	return CheckResult{Name: "Health", Status: StatusGreen, Detail: fmt.Sprintf("configured: %s", cfg.Health.ListenAddr)}
 }

@@ -21,7 +21,7 @@ func TestPrintReport_ContainsAllResults(t *testing.T) {
 	out := buf.String()
 
 	checks := []string{
-		"sentinel doctor",
+		"Validating sentinel config:",
 		"/etc/sentinel.toml",
 		"Remote reachable",
 		termstyle.SymOK,

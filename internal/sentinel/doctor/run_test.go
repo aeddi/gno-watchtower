@@ -20,7 +20,7 @@ func TestRun_AllDisabled_ExitsZero(t *testing.T) {
 	code := doctor.Run(context.Background(), cfg, "/etc/sentinel.toml", &buf)
 
 	out := buf.String()
-	if !strings.Contains(out, "sentinel doctor") {
+	if !strings.Contains(out, "Validating sentinel config:") {
 		t.Errorf("report header missing\n%s", out)
 	}
 	// Remote will be Red (unreachable), so exit 1.
