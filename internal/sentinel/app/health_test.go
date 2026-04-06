@@ -13,7 +13,7 @@ import (
 
 func TestRun_HealthEndpoint_Responds(t *testing.T) {
 	cfg := &config.Config{
-		Health: config.HealthConfig{ListenAddr: "127.0.0.1:19876"},
+		Health: config.HealthConfig{Enabled: true, ListenAddr: "127.0.0.1:19876"},
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

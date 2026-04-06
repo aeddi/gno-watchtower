@@ -11,6 +11,7 @@ import (
 
 // alternative describes a commented-out config key to inject after an active key.
 type alternative struct {
+	section  string // only match within this TOML section (empty = any)
 	afterKey string // insert after the line containing this key
 	comment  string // comment line above the commented-out key
 	key      string // the commented-out key name
@@ -22,6 +23,7 @@ type alternative struct {
 func Generate(ctx context.Context, stderr, stdout io.Writer) error {
 	cfg := DefaultConfig()
 	env := Detect(ctx, stderr)
+	fmt.Fprintln(stderr)
 	applyDetection(cfg, env)
 
 	data, err := toml.Marshal(cfg)
@@ -39,8 +41,27 @@ func Generate(ctx context.Context, stderr, stdout io.Writer) error {
 func buildAlternatives(cfg *Config, env *Environment) []alternative {
 	var alts []alternative
 
+	// ---- Logs source alternatives
+	if cfg.Logs.Source == "docker" {
+		alts = append(alts, alternative{
+			section:  "logs",
+			afterKey: "container_name",
+			comment:  "Alternative: use journald as log source",
+			key:      "journald_unit",
+			value:    "<gnoland-systemd-unit>",
+		})
+	} else if cfg.Logs.Source == "journald" {
+		alts = append(alts, alternative{
+			section:  "logs",
+			afterKey: "journald_unit",
+			comment:  "Alternative: use docker as log source",
+			key:      "container_name",
+			value:    "<gnoland-container-name>",
+		})
+	}
+
+	// ---- Metadata path/cmd alternatives
 	if env.Docker != nil {
-		// Docker mode: cmd fields are active. Show path alternatives.
 		alts = append(alts, alternative{
 			afterKey: "binary_version_cmd",
 			comment:  "Alternative: use binary path directly (runs <path> version)",
@@ -54,7 +75,6 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 			value:    "<path-to-gnoland-config>",
 		})
 	} else {
-		// Native mode: path fields are active. Show cmd alternatives.
 		alts = append(alts, alternative{
 			afterKey: "binary_path",
 			comment:  "Alternative: run a command to get the version (e.g. via docker exec)",
@@ -73,15 +93,26 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 }
 
 // injectAlternatives inserts commented-out key=value lines after their corresponding
-// active keys in the TOML string.
+// active keys in the TOML string. If an alternative has a section constraint, it only
+// matches within that section.
 func injectAlternatives(tomlStr string, alts []alternative) string {
 	lines := strings.Split(tomlStr, "\n")
 	var result []string
+	var currentSection string
 
 	for _, line := range lines {
 		result = append(result, line)
 		trimmed := strings.TrimSpace(line)
+
+		// Track current TOML section.
+		if strings.HasPrefix(trimmed, "[") && !strings.HasPrefix(trimmed, "[[") {
+			currentSection = strings.Trim(trimmed, "[] ")
+		}
+
 		for _, alt := range alts {
+			if alt.section != "" && alt.section != currentSection {
+				continue
+			}
 			prefix := alt.afterKey + " ="
 			prefixNoSpace := alt.afterKey + "="
 			if strings.HasPrefix(trimmed, prefix) || strings.HasPrefix(trimmed, prefixNoSpace) {

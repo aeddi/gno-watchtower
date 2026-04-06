@@ -68,14 +68,20 @@ func TestBuildAlternatives_DockerMode(t *testing.T) {
 	applyDetection(cfg, env)
 	alts := buildAlternatives(cfg, env)
 
-	if len(alts) != 2 {
-		t.Fatalf("expected 2 alternatives, got %d", len(alts))
+	if len(alts) != 3 {
+		t.Fatalf("expected 3 alternatives, got %d", len(alts))
 	}
-	if alts[0].afterKey != "binary_version_cmd" || alts[0].key != "binary_path" {
-		t.Errorf("alt[0]: afterKey=%q key=%q", alts[0].afterKey, alts[0].key)
+	// Logs: journald_unit as alternative to container_name
+	if alts[0].section != "logs" || alts[0].key != "journald_unit" {
+		t.Errorf("alt[0]: section=%q key=%q", alts[0].section, alts[0].key)
 	}
-	if alts[1].afterKey != "config_get_cmd" || alts[1].key != "config_path" {
+	// Metadata: binary_path as alternative to binary_version_cmd
+	if alts[1].afterKey != "binary_version_cmd" || alts[1].key != "binary_path" {
 		t.Errorf("alt[1]: afterKey=%q key=%q", alts[1].afterKey, alts[1].key)
+	}
+	// Metadata: config_path as alternative to config_get_cmd
+	if alts[2].afterKey != "config_get_cmd" || alts[2].key != "config_path" {
+		t.Errorf("alt[2]: afterKey=%q key=%q", alts[2].afterKey, alts[2].key)
 	}
 }
 
@@ -85,14 +91,20 @@ func TestBuildAlternatives_NativeMode(t *testing.T) {
 	applyDetection(cfg, env)
 	alts := buildAlternatives(cfg, env)
 
-	if len(alts) != 2 {
-		t.Fatalf("expected 2 alternatives, got %d", len(alts))
+	if len(alts) != 3 {
+		t.Fatalf("expected 3 alternatives, got %d", len(alts))
 	}
-	if alts[0].afterKey != "binary_path" || alts[0].key != "binary_version_cmd" {
-		t.Errorf("alt[0]: afterKey=%q key=%q", alts[0].afterKey, alts[0].key)
+	// Logs: journald_unit as alternative (default source is docker)
+	if alts[0].section != "logs" || alts[0].key != "journald_unit" {
+		t.Errorf("alt[0]: section=%q key=%q", alts[0].section, alts[0].key)
 	}
-	if alts[1].afterKey != "config_path" || alts[1].key != "config_get_cmd" {
+	// Metadata: binary_version_cmd as alternative to binary_path
+	if alts[1].afterKey != "binary_path" || alts[1].key != "binary_version_cmd" {
 		t.Errorf("alt[1]: afterKey=%q key=%q", alts[1].afterKey, alts[1].key)
+	}
+	// Metadata: config_get_cmd as alternative to config_path
+	if alts[2].afterKey != "config_path" || alts[2].key != "config_get_cmd" {
+		t.Errorf("alt[2]: afterKey=%q key=%q", alts[2].afterKey, alts[2].key)
 	}
 }
 
@@ -110,12 +122,12 @@ func TestMarshalDefaultConfig_ValidTOML(t *testing.T) {
 	if roundTrip.Server.URL != "<watchtower-server-url>" {
 		t.Errorf("round-trip Server.URL: got %q", roundTrip.Server.URL)
 	}
-	// Verify comment tags are present in output.
+	// Verify section and field comment tags are present in output.
 	output := string(data)
-	if !strings.Contains(output, "# Watchtower server URL") {
-		t.Error("missing comment for server.url")
+	if !strings.Contains(output, "# Connection to the watchtower server") {
+		t.Error("missing section comment for [server]")
 	}
-	if !strings.Contains(output, "# Enable the RPC collector") {
-		t.Error("missing comment for rpc.enabled")
+	if !strings.Contains(output, "# docker or journald") {
+		t.Error("missing comment for logs.source")
 	}
 }

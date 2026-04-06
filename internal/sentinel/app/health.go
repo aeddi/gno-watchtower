@@ -10,9 +10,8 @@ import (
 
 // runHealthServer starts a minimal HTTP server that responds 200 to GET /health.
 // It blocks until ctx is done, then shuts down gracefully.
-// If listenAddr is empty, it returns immediately.
-func runHealthServer(ctx context.Context, listenAddr string, log *slog.Logger) {
-	if listenAddr == "" {
+func runHealthServer(ctx context.Context, enabled bool, listenAddr string, log *slog.Logger) {
+	if !enabled {
 		return
 	}
 	mux := http.NewServeMux()
