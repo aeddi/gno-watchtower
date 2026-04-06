@@ -56,22 +56,22 @@ func Run(ctx context.Context, cfg *config.Config, configPath string, w io.Writer
 	return 0
 }
 
+var metadataCheckNames = []string{"Metadata binary", "Metadata genesis", "Metadata config", "Metadata conflicts"}
+
+func metadataAllSame(status Status, detail string) []CheckResult {
+	results := make([]CheckResult, len(metadataCheckNames))
+	for i, name := range metadataCheckNames {
+		results[i] = CheckResult{Name: name, Status: status, Detail: detail}
+	}
+	return results
+}
+
 func metadataChecks(cfg *config.Config, ar *AuthResponse) []CheckResult {
 	if !cfg.Metadata.Enabled {
-		return []CheckResult{
-			{Name: "Metadata binary", Status: StatusOrange, Detail: "disabled in config"},
-			{Name: "Metadata genesis", Status: StatusOrange, Detail: "disabled in config"},
-			{Name: "Metadata config", Status: StatusOrange, Detail: "disabled in config"},
-			{Name: "Metadata conflicts", Status: StatusOrange, Detail: "disabled in config"},
-		}
+		return metadataAllSame(StatusOrange, "disabled in config")
 	}
 	if ar != nil && !slices.Contains(ar.Permissions, "metrics") {
-		return []CheckResult{
-			{Name: "Metadata binary", Status: StatusGrey, Detail: "metrics permission not granted"},
-			{Name: "Metadata genesis", Status: StatusGrey, Detail: "metrics permission not granted"},
-			{Name: "Metadata config", Status: StatusGrey, Detail: "metrics permission not granted"},
-			{Name: "Metadata conflicts", Status: StatusGrey, Detail: "metrics permission not granted"},
-		}
+		return metadataAllSame(StatusGrey, "metrics permission not granted")
 	}
 	return []CheckResult{
 		CheckMetadataBinary(cfg.Metadata),

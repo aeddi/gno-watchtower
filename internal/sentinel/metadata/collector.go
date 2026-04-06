@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	toml "github.com/pelletier/go-toml/v2"
 	"github.com/fsnotify/fsnotify"
+	toml "github.com/pelletier/go-toml/v2"
 
 	"github.com/gnolang/val-companion/internal/sentinel/config"
 	"github.com/gnolang/val-companion/internal/sentinel/delta"

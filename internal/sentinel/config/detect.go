@@ -22,10 +22,12 @@ type Environment struct {
 	Binary   *BinaryResult
 }
 
+const gnolandRPCPort = 26657
+
 // DockerResult holds information about a detected gnoland Docker container.
 type DockerResult struct {
 	ContainerName string
-	RPCPort       uint16 // 0 if port 26657 is not exposed
+	RPCPort       uint16 // 0 if the RPC port is not exposed
 }
 
 // JournaldResult holds information about a detected gnoland systemd service.
@@ -74,7 +76,7 @@ func probeDocker(ctx context.Context, w io.Writer) *DockerResult {
 			}
 			result := &DockerResult{ContainerName: trimmed}
 			for _, p := range c.Ports {
-				if p.PrivatePort == 26657 && p.PublicPort != 0 {
+				if p.PrivatePort == gnolandRPCPort && p.PublicPort != 0 {
 					result.RPCPort = p.PublicPort
 					break
 				}
@@ -146,10 +148,10 @@ func probeBinary(w io.Writer) *BinaryResult {
 // applyDetection overrides default config values with detection results.
 func applyDetection(cfg *Config, env *Environment) {
 	if env.Docker != nil {
-		cfg.Logs.Source = "docker"
+		cfg.Logs.Source = LogSourceDocker
 		cfg.Logs.ContainerName = env.Docker.ContainerName
 		cfg.Resources.ContainerName = env.Docker.ContainerName
-		cfg.Resources.Source = "both"
+		cfg.Resources.Source = ResSourceBoth
 		if env.Docker.RPCPort != 0 {
 			cfg.RPC.RPCURL = fmt.Sprintf("http://localhost:%d", env.Docker.RPCPort)
 		}
@@ -159,11 +161,11 @@ func applyDetection(cfg *Config, env *Environment) {
 		cfg.Metadata.ConfigGetCmd = fmt.Sprintf("docker exec %s gnoland config get %%s --raw", env.Docker.ContainerName)
 		cfg.Metadata.ConfigPath = ""
 	} else if env.Journald != nil {
-		cfg.Logs.Source = "journald"
+		cfg.Logs.Source = LogSourceJournald
 		cfg.Logs.JournaldUnit = env.Journald.UnitName
 		cfg.Logs.ContainerName = ""
 		cfg.Resources.ContainerName = ""
-		cfg.Resources.Source = "host"
+		cfg.Resources.Source = ResSourceHost
 	}
 
 	// Binary probe results apply to path-mode metadata (when not in docker mode).

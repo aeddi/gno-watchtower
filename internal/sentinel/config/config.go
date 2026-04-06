@@ -15,6 +15,26 @@ import (
 // Duration wraps time.Duration to support TOML string values like "3s", "30s".
 type Duration = tomlutil.Duration
 
+// Byte size multipliers.
+const (
+	KB = 1024
+	MB = 1024 * KB
+	GB = 1024 * MB
+)
+
+// Log source values.
+const (
+	LogSourceDocker   = "docker"
+	LogSourceJournald = "journald"
+)
+
+// Resource source values.
+const (
+	ResSourceHost   = "host"
+	ResSourceDocker = "docker"
+	ResSourceBoth   = "both"
+)
+
 // ByteSize is an int64 that unmarshals from TOML strings like "1MB", "512KB", "1GB".
 // Plain integers are also accepted (e.g. "1024" = 1024 bytes).
 type ByteSize int64
@@ -25,9 +45,9 @@ func (b *ByteSize) UnmarshalText(text []byte) error {
 		suffix string
 		mult   int64
 	}{
-		{"GB", 1024 * 1024 * 1024},
-		{"MB", 1024 * 1024},
-		{"KB", 1024},
+		{"GB", GB},
+		{"MB", MB},
+		{"KB", KB},
 	} {
 		if strings.HasSuffix(s, m.suffix) {
 			n, err := strconv.ParseInt(strings.TrimSuffix(s, m.suffix), 10, 64)
@@ -49,14 +69,14 @@ func (b *ByteSize) UnmarshalText(text []byte) error {
 func (b ByteSize) MarshalText() ([]byte, error) {
 	v := int64(b)
 	switch {
-	case v > 0 && v%(1024*1024*1024) == 0:
-		return []byte(fmt.Sprintf("%dGB", v/(1024*1024*1024))), nil
-	case v > 0 && v%(1024*1024) == 0:
-		return []byte(fmt.Sprintf("%dMB", v/(1024*1024))), nil
-	case v > 0 && v%1024 == 0:
-		return []byte(fmt.Sprintf("%dKB", v/1024)), nil
+	case v > 0 && v%GB == 0:
+		return fmt.Appendf(nil, "%dGB", v/GB), nil
+	case v > 0 && v%MB == 0:
+		return fmt.Appendf(nil, "%dMB", v/MB), nil
+	case v > 0 && v%KB == 0:
+		return fmt.Appendf(nil, "%dKB", v/KB), nil
 	default:
-		return []byte(strconv.FormatInt(v, 10)), nil
+		return strconv.AppendInt(nil, v, 10), nil
 	}
 }
 
@@ -175,9 +195,9 @@ func DefaultConfig() *Config {
 		},
 		Logs: LogsConfig{
 			Enabled:       true,
-			Source:        "docker",
+			Source:        LogSourceDocker,
 			ContainerName: PlaceholderContainerName,
-			BatchSize:     ByteSize(1024 * 1024),
+			BatchSize:     ByteSize(MB),
 			BatchTimeout:  Duration{Duration: 5 * time.Second},
 			MinLevel:      "info",
 		},
@@ -188,7 +208,7 @@ func DefaultConfig() *Config {
 		Resources: ResourcesConfig{
 			Enabled:       true,
 			PollInterval:  Duration{Duration: 10 * time.Second},
-			Source:        "host",
+			Source:        ResSourceHost,
 			ContainerName: PlaceholderContainerName,
 		},
 		Metadata: MetadataConfig{

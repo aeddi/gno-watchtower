@@ -50,7 +50,7 @@ func CheckRemoteTokenAndPermissions(ctx context.Context, cfg *config.Config) ([]
 	remote := CheckResult{Name: "Watchtower", Status: StatusGreen, Detail: cfg.Server.URL}
 
 	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		token := CheckResult{
 			Name:   "Token valid",
 			Status: StatusRed,

@@ -54,7 +54,9 @@ func generateConfigCmd(args []string) {
 
 	if err := config.Generate(f); err != nil {
 		f.Close()
-		os.Remove(path)
+		if rmErr := os.Remove(path); rmErr != nil {
+			log.Printf("warning: failed to clean up %s: %v", path, rmErr)
+		}
 		log.Fatalf("generate config: %v", err)
 	}
 	if err := f.Close(); err != nil {

@@ -20,10 +20,10 @@ type alternative struct {
 
 // Generate detects the environment, builds a default config with detected values,
 // and writes annotated TOML to stdout. Detection progress is printed to stderr.
-func Generate(ctx context.Context, stderr, stdout io.Writer) error {
+func Generate(ctx context.Context, progress, output io.Writer) error {
 	cfg := DefaultConfig()
-	env := Detect(ctx, stderr)
-	fmt.Fprintln(stderr)
+	env := Detect(ctx, progress)
+	fmt.Fprintln(progress)
 	applyDetection(cfg, env)
 
 	data, err := toml.Marshal(cfg)
@@ -31,8 +31,8 @@ func Generate(ctx context.Context, stderr, stdout io.Writer) error {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
-	output := injectAlternatives(string(data), buildAlternatives(cfg, env))
-	_, err = io.WriteString(stdout, output)
+	result := injectAlternatives(string(data), buildAlternatives(cfg, env))
+	_, err = io.WriteString(output, result)
 	return err
 }
 
@@ -42,7 +42,7 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 	var alts []alternative
 
 	// ---- Logs source alternatives
-	if cfg.Logs.Source == "docker" {
+	if cfg.Logs.Source == LogSourceDocker {
 		alts = append(alts, alternative{
 			section:  "logs",
 			afterKey: "container_name",
@@ -50,7 +50,7 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 			key:      "journald_unit",
 			value:    PlaceholderJournaldUnit,
 		})
-	} else if cfg.Logs.Source == "journald" {
+	} else if cfg.Logs.Source == LogSourceJournald {
 		alts = append(alts, alternative{
 			section:  "logs",
 			afterKey: "journald_unit",

@@ -30,12 +30,12 @@ func TestCheckRemoteTokenAndPermissions_AllGreen(t *testing.T) {
 	defer srv.Close()
 
 	cfg := &config.Config{
-		Server: config.ServerConfig{URL: srv.URL, Token: "test-token"},
-		RPC:    config.RPCConfig{Enabled: true},
-		Logs:   config.LogsConfig{Enabled: true},
-		OTLP:   config.OTLPConfig{Enabled: true},
+		Server:    config.ServerConfig{URL: srv.URL, Token: "test-token"},
+		RPC:       config.RPCConfig{Enabled: true},
+		Logs:      config.LogsConfig{Enabled: true},
+		OTLP:      config.OTLPConfig{Enabled: true},
 		Resources: config.ResourcesConfig{Enabled: true},
-		Metadata: config.MetadataConfig{Enabled: true},
+		Metadata:  config.MetadataConfig{Enabled: true},
 	}
 
 	results, ar := doctor.CheckRemoteTokenAndPermissions(context.Background(), cfg)

@@ -15,7 +15,7 @@ func TestApplyDetection_DockerFound(t *testing.T) {
 
 	applyDetection(cfg, env)
 
-	if cfg.Logs.Source != "docker" {
+	if cfg.Logs.Source != LogSourceDocker {
 		t.Errorf("Logs.Source: got %q, want docker", cfg.Logs.Source)
 	}
 	if cfg.Logs.ContainerName != "gnoland-mainnet" {
@@ -24,7 +24,7 @@ func TestApplyDetection_DockerFound(t *testing.T) {
 	if cfg.Resources.ContainerName != "gnoland-mainnet" {
 		t.Errorf("Resources.ContainerName: got %q", cfg.Resources.ContainerName)
 	}
-	if cfg.Resources.Source != "both" {
+	if cfg.Resources.Source != ResSourceBoth {
 		t.Errorf("Resources.Source: got %q, want both", cfg.Resources.Source)
 	}
 	if cfg.RPC.RPCURL != "http://localhost:26657" {
@@ -68,7 +68,7 @@ func TestApplyDetection_JournaldFound(t *testing.T) {
 
 	applyDetection(cfg, env)
 
-	if cfg.Logs.Source != "journald" {
+	if cfg.Logs.Source != LogSourceJournald {
 		t.Errorf("Logs.Source: got %q, want journald", cfg.Logs.Source)
 	}
 	if cfg.Logs.JournaldUnit != "gnoland.service" {
@@ -77,7 +77,7 @@ func TestApplyDetection_JournaldFound(t *testing.T) {
 	if cfg.Logs.ContainerName != "" {
 		t.Errorf("Logs.ContainerName should be empty, got %q", cfg.Logs.ContainerName)
 	}
-	if cfg.Resources.Source != "host" {
+	if cfg.Resources.Source != ResSourceHost {
 		t.Errorf("Resources.Source: got %q, want host", cfg.Resources.Source)
 	}
 }
@@ -114,7 +114,7 @@ func TestApplyDetection_DockerPlusJournald_DockerWins(t *testing.T) {
 
 	applyDetection(cfg, env)
 
-	if cfg.Logs.Source != "docker" {
+	if cfg.Logs.Source != LogSourceDocker {
 		t.Errorf("Docker should take precedence: Logs.Source got %q", cfg.Logs.Source)
 	}
 }
@@ -125,7 +125,7 @@ func TestApplyDetection_NothingFound(t *testing.T) {
 
 	applyDetection(cfg, env)
 
-	if cfg.Logs.Source != "docker" {
+	if cfg.Logs.Source != LogSourceDocker {
 		t.Errorf("Logs.Source: got %q, want docker (default)", cfg.Logs.Source)
 	}
 	if cfg.Logs.ContainerName != "<gnoland-container-name>" {
