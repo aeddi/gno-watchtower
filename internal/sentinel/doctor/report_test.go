@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gnolang/val-companion/internal/sentinel/doctor"
+	"github.com/gnolang/val-companion/pkg/termstyle"
 )
 
 func TestPrintReport_ContainsAllResults(t *testing.T) {
@@ -23,11 +24,11 @@ func TestPrintReport_ContainsAllResults(t *testing.T) {
 		"sentinel doctor",
 		"/etc/sentinel.toml",
 		"Remote reachable",
-		"[GREEN]",
+		termstyle.SymOK,
 		"Token valid",
-		"[RED]",
-		"[ORANGE]",
-		"[GREY]",
+		termstyle.SymFail,
+		termstyle.SymOff,
+		termstyle.SymSkip,
 	}
 	for _, want := range checks {
 		if !strings.Contains(out, want) {
