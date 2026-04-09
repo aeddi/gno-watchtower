@@ -109,7 +109,7 @@ Validator machine(s)                    Central server
 
     ```ini
     [Unit]
-    Description=Gnoland sentinel
+    Description=Gnoland Sentinel
     After=network.target
 
     [Service]
