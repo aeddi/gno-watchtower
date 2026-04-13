@@ -6,7 +6,7 @@ A two-binary (sentinel/watchtower) monitoring system for gnoland validator nodes
 
 ```
 Validator machine(s)                    Central server
-────────────────────                    ──────────────────────────────────────────────
+────────────────────                    ─────────────────────────────────────────────────
 ┌──────────────────┐                    ┌────────┐  ┌─────────────┐
 │    sentinel      │                    │        │  │ watchtower  │   ┌─────────────────┐
 │ ──────────────── │    HTTPS POST      │        │  │ ─────────── │──▶│ Loki +          │
