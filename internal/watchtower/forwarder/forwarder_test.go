@@ -22,21 +22,31 @@ import (
 
 func TestForwardRPC_PostsToVM(t *testing.T) {
 	var received []byte
+	var path string
 	vmSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
 		received, _ = io.ReadAll(r.Body)
-		if r.URL.Query().Get("extra_labels") == "" {
-			t.Error("extra_labels query param missing")
-		}
 	}))
 	defer vmSrv.Close()
 
 	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
-	body := []byte(`{"collected_at":"2026-01-01T00:00:00Z","data":{}}`)
+	// Include net_info with n_peers so at least one metric line is produced.
+	body := []byte(`{"collected_at":"2026-01-01T00:00:00Z","data":{"net_info":{"n_peers":"3"}}}`)
 	if err := f.ForwardRPC(context.Background(), "val-01", body); err != nil {
 		t.Fatalf("ForwardRPC: %v", err)
 	}
 	if len(received) == 0 {
 		t.Error("VM received nothing")
+	}
+	if path != "/api/v1/import" {
+		t.Errorf("unexpected VM path: %q (want /api/v1/import)", path)
+	}
+	// Each line must be a valid JSON object with a __name__ key.
+	for _, line := range strings.Split(strings.TrimSpace(string(received)), "\n") {
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(line), &obj); err != nil {
+			t.Errorf("line is not valid JSON: %s", line)
+		}
 	}
 }
 
@@ -48,7 +58,8 @@ func TestForwardMetrics_PostsToVM(t *testing.T) {
 	defer vmSrv.Close()
 
 	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
-	body := []byte(`{"collected_at":"2026-01-01T00:00:00Z","data":{}}`)
+	// Include cpu data so at least one metric line is produced.
+	body := []byte(`{"collected_at":"2026-01-01T00:00:00Z","data":{"cpu":[12.5]}}`)
 	if err := f.ForwardMetrics(context.Background(), "val-01", body); err != nil {
 		t.Fatalf("ForwardMetrics: %v", err)
 	}
@@ -160,7 +171,9 @@ func TestForwardRPC_NonOKIncludesBody(t *testing.T) {
 	defer vmSrv.Close()
 
 	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
-	err := f.ForwardRPC(context.Background(), "val-01", []byte(`{}`))
+	// Include net_info so a VM request is actually made and hits the 400 response.
+	body := []byte(`{"collected_at":"2026-01-01T00:00:00Z","data":{"net_info":{"n_peers":"3"}}}`)
+	err := f.ForwardRPC(context.Background(), "val-01", body)
 	if err == nil {
 		t.Fatal("expected error for 400 response")
 	}

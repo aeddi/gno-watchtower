@@ -39,6 +39,7 @@ func (s *DockerSource) Tail(ctx context.Context, out chan<- LogLine) error {
 		Follow:     true,
 		ShowStdout: true,
 		ShowStderr: true,
+		Tail:       "0", // don't replay historical logs, only follow new entries
 	})
 	if err != nil {
 		return fmt.Errorf("container logs %q: %w", s.containerName, err)
@@ -58,6 +59,10 @@ func (s *DockerSource) Tail(ctx context.Context, out chan<- LogLine) error {
 	for scanner.Scan() {
 		// Copy scanner bytes — scanner reuses the underlying buffer on next call.
 		raw := json.RawMessage(append([]byte(nil), scanner.Bytes()...))
+		// Skip non-JSON lines (e.g. plain-text startup messages before the JSON logger is ready).
+		if !json.Valid(raw) {
+			continue
+		}
 		level := ParseLevel(raw)
 		select {
 		case out <- LogLine{Level: level, Raw: raw}:

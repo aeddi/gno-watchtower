@@ -2,12 +2,12 @@ package forwarder
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -36,20 +36,122 @@ func New(vmURL, lokiURL string) *Forwarder {
 	}
 }
 
-// forwardVM forwards a raw JSON body to VictoriaMetrics with the specified data type.
-func (f *Forwarder) forwardVM(ctx context.Context, validator, dataType string, body []byte) error {
-	u := f.vmURL + "/api/v1/import/json?extra_labels=validator=" + url.QueryEscape(validator) + ",type=" + url.QueryEscape(dataType)
-	return f.post(ctx, u, body, "application/json")
+// vmLine is one entry in the VictoriaMetrics /api/v1/import JSON lines format.
+type vmLine struct {
+	Metric     map[string]string `json:"metric"`
+	Values     []float64         `json:"values"`
+	Timestamps []int64           `json:"timestamps"`
 }
 
-// ForwardRPC forwards a raw MetricsPayload JSON body to VictoriaMetrics.
+// postVMLines encodes lines as newline-delimited JSON and POSTs to /api/v1/import.
+func (f *Forwarder) postVMLines(ctx context.Context, lines []vmLine) error {
+	if len(lines) == 0 {
+		return nil
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	for _, l := range lines {
+		if err := enc.Encode(l); err != nil {
+			return fmt.Errorf("encode vm line: %w", err)
+		}
+	}
+	return f.post(ctx, f.vmURL+"/api/v1/import", buf.Bytes(), "application/json")
+}
+
+// ForwardRPC extracts time-series metrics from the RPC payload and forwards them to VictoriaMetrics.
+// Extracted metrics: peers (from net_info.n_peers), mempool_size (from num_unconfirmed_txs.n_txs).
 func (f *Forwarder) ForwardRPC(ctx context.Context, validator string, body []byte) error {
-	return f.forwardVM(ctx, validator, "rpc", body)
+	var payload protocol.RPCPayload
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return fmt.Errorf("unmarshal rpc payload: %w", err)
+	}
+	ts := payload.CollectedAt.UnixMilli()
+	var lines []vmLine
+
+	if raw, ok := payload.Data["net_info"]; ok {
+		var info struct {
+			NPeers json.Number `json:"n_peers"`
+		}
+		if err := json.Unmarshal(raw, &info); err == nil {
+			if v, err := info.NPeers.Float64(); err == nil {
+				lines = append(lines, vmLine{
+					Metric:     map[string]string{"__name__": "peers", "validator": validator},
+					Values:     []float64{v},
+					Timestamps: []int64{ts},
+				})
+			}
+		}
+	}
+
+	if raw, ok := payload.Data["num_unconfirmed_txs"]; ok {
+		var info struct {
+			NTxs json.Number `json:"n_txs"`
+		}
+		if err := json.Unmarshal(raw, &info); err == nil {
+			if v, err := info.NTxs.Float64(); err == nil {
+				lines = append(lines, vmLine{
+					Metric:     map[string]string{"__name__": "mempool_size", "validator": validator},
+					Values:     []float64{v},
+					Timestamps: []int64{ts},
+				})
+			}
+		}
+	}
+
+	return f.postVMLines(ctx, lines)
 }
 
-// ForwardMetrics forwards a raw MetricsPayload JSON body to VictoriaMetrics.
+// ForwardMetrics extracts time-series metrics from the resource/metadata payload and forwards them
+// to VictoriaMetrics. Extracted metrics: cpu_percent, memory_used_percent, disk_used_percent.
 func (f *Forwarder) ForwardMetrics(ctx context.Context, validator string, body []byte) error {
-	return f.forwardVM(ctx, validator, "metrics", body)
+	var payload protocol.MetricsPayload
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return fmt.Errorf("unmarshal metrics payload: %w", err)
+	}
+	ts := payload.CollectedAt.UnixMilli()
+	var lines []vmLine
+
+	// cpu is a []float64 from gopsutil; first element is overall CPU usage percent.
+	if raw, ok := payload.Data["cpu"]; ok {
+		var percents []float64
+		if err := json.Unmarshal(raw, &percents); err == nil && len(percents) > 0 {
+			lines = append(lines, vmLine{
+				Metric:     map[string]string{"__name__": "cpu_percent", "validator": validator},
+				Values:     []float64{percents[0]},
+				Timestamps: []int64{ts},
+			})
+		}
+	}
+
+	// memory is a gopsutil VirtualMemoryStat object.
+	if raw, ok := payload.Data["memory"]; ok {
+		var mem struct {
+			UsedPercent float64 `json:"usedPercent"`
+		}
+		if err := json.Unmarshal(raw, &mem); err == nil {
+			lines = append(lines, vmLine{
+				Metric:     map[string]string{"__name__": "memory_used_percent", "validator": validator},
+				Values:     []float64{mem.UsedPercent},
+				Timestamps: []int64{ts},
+			})
+		}
+	}
+
+	// disk is a gopsutil UsageStat object.
+	if raw, ok := payload.Data["disk"]; ok {
+		var disk struct {
+			UsedPercent float64 `json:"usedPercent"`
+		}
+		if err := json.Unmarshal(raw, &disk); err == nil {
+			lines = append(lines, vmLine{
+				Metric:     map[string]string{"__name__": "disk_used_percent", "validator": validator},
+				Values:     []float64{disk.UsedPercent},
+				Timestamps: []int64{ts},
+			})
+		}
+	}
+
+	return f.postVMLines(ctx, lines)
 }
 
 // ForwardLogs decompresses the zstd-encoded LogPayload body and pushes it to Loki.
@@ -74,7 +176,21 @@ func (f *Forwarder) ForwardLogs(ctx context.Context, validator string, body []by
 }
 
 // ForwardOTLP injects the validator resource attribute and forwards protobuf to VictoriaMetrics.
+// Automatically decompresses gzip-encoded bodies (the OTel Collector default).
 func (f *Forwarder) ForwardOTLP(ctx context.Context, validator string, body []byte) error {
+	// Auto-detect gzip compression (magic bytes 0x1f 0x8b).
+	if len(body) >= 2 && body[0] == 0x1f && body[1] == 0x8b {
+		gr, err := gzip.NewReader(bytes.NewReader(body))
+		if err != nil {
+			return fmt.Errorf("gzip reader: %w", err)
+		}
+		defer gr.Close()
+		body, err = io.ReadAll(gr)
+		if err != nil {
+			return fmt.Errorf("gzip decompress: %w", err)
+		}
+	}
+
 	var req collectorpb.ExportMetricsServiceRequest
 	if err := proto.Unmarshal(body, &req); err != nil {
 		return fmt.Errorf("unmarshal otlp: %w", err)

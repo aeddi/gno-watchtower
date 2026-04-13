@@ -35,7 +35,7 @@ Validator machine(s)                    Central server
 
 **Validator machine:**
 
-- Linux (not tested on macOS)
+- Linux Debian
 - gnoland Docker image or standalone binary
 - `sentinel` binary
 - Network access to the central server on port 443
@@ -61,7 +61,7 @@ Validator machine(s)                    Central server
     ```sh
     cat > watchtower.toml <<'EOF'
     [server]
-    listen_addr = "127.0.0.1:8080"
+    listen_addr = "0.0.0.0:8080"
 
     [security]
     rate_limit_rps   = 10

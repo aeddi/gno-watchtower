@@ -128,9 +128,17 @@ func TestCollector_DeltaSkipsUnchangedEndpoints(t *testing.T) {
 		payloads = append(payloads, <-out)
 	}
 
-	// After the first payload, delta must filter all subsequent polls (all responses unchanged).
-	// Exactly one payload should have been emitted.
-	if len(payloads) != 1 {
-		t.Errorf("expected exactly 1 payload after delta filtering, got %d", len(payloads))
+	// num_unconfirmed_txs bypasses the delta and is always included, so multiple
+	// payloads are expected (one per poll tick).  Verify that subsequent payloads
+	// contain only num_unconfirmed_txs and no other keys (delta still filters those).
+	if len(payloads) < 1 {
+		t.Fatal("expected at least one payload")
+	}
+	for i, p := range payloads[1:] {
+		for key := range p.Data {
+			if key != "num_unconfirmed_txs" {
+				t.Errorf("payload[%d]: unexpected key %q — delta should have filtered it", i+1, key)
+			}
+		}
 	}
 }

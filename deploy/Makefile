@@ -22,10 +22,11 @@ add-validator:
 	@if [ -z "$(permissions)" ]; then echo "ERROR: permissions is required"; exit 1; fi
 	@if [ -z "$(logs_min_level)" ]; then echo "ERROR: logs_min_level is required"; exit 1; fi
 	@TOKEN=$$(openssl rand -hex 32); \
+	PERMS=$$(echo "$(permissions)" | sed 's/,/", "/g; s/^/"/; s/$$/"/'); \
 	printf '\n[validators.%s]\ntoken          = "%s"\npermissions    = [%s]\nlogs_min_level = "%s"\n' \
 		"$(name)" \
 		"$$TOKEN" \
-		"$(shell echo "$(permissions)" | sed 's/,/", "/g; s/^/"/; s/$$/"/)" \
+		"$$PERMS" \
 		"$(logs_min_level)" \
 		>> watchtower.toml; \
 	$(COMPOSE) restart watchtower; \

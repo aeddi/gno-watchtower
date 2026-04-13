@@ -29,7 +29,7 @@ var ConfigKeys = []string{
 	"p2p.laddr",
 	"p2p.persistent_peers",
 	"rpc.laddr",
-	"telemetry.enabled",
+	"telemetry.metrics_enabled",
 	"telemetry.exporter_endpoint",
 }
 
