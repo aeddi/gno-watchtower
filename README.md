@@ -1,6 +1,6 @@
 # Gno Watchtower
 
-A two-binary monitoring system for gnoland validator nodes.
+A two-binary (sentinel/watchtower) monitoring system for gnoland validator nodes.
 
 ## Architecture
 
@@ -8,13 +8,13 @@ A two-binary monitoring system for gnoland validator nodes.
 Validator machine(s)                    Central server
 ────────────────────                    ──────────────────────────────────────────────
 ┌──────────────────┐                    ┌────────┐  ┌─────────────┐
-│    sentinel      │                    │        │  │ watchtower  │
-│ ──────────────── │   HTTPS POST       │        │─▶│ auth        │──▶ VictoriaMetrics
-│ RPC collector    │───────────────────▶│ Caddy  │  │ rate limit  │──▶ Loki
-│ Log collector    │                    │ (TLS)  │  │ IP ban      │
-│ OTLP relay       │                    │        │  └─────────────┘
-│ Resource monitor │                    └────────┘
-│ Metadata         │                    Grafana ◀── VictoriaMetrics + Loki
+│    sentinel      │                    │        │  │ watchtower  │   ┌─────────────────┐
+│ ──────────────── │    HTTPS POST      │        │  │ ─────────── │──▶│ Loki +          │
+│ RPC collector    │───────────────────▶│ Caddy  │─▶│ auth        │──▶│ VictoriaMetrics │
+│ Log collector    │                    │ (TLS)  │  │ rate limit  │   └─────────────────┘
+│ OTLP relay       │                    │        │  │ IP ban      │       ┌─────────┐  │
+│ Resource monitor │                    └────────┘  └─────────────┘       │ Grafana │◀─┘
+│ Metadata         │                                                      └─────────┘
 └──────────────────┘
 ```
 
