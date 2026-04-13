@@ -9,7 +9,7 @@ Validator machine(s)                    Central server
 ────────────────────                    ─────────────────────────────────────────────────
 ┌──────────────────┐                    ┌────────┐  ┌─────────────┐
 │    sentinel      │                    │        │  │ watchtower  │   ┌─────────────────┐
-│ ──────────────── │    HTTPS POST      │        │  │ ─────────── │──▶│ Loki +          │
+│ ──────────────── │     HTTPS POST     │        │  │ ─────────── │──▶│ Loki +          │
 │ RPC collector    │───────────────────▶│ Caddy  │─▶│ auth        │──▶│ VictoriaMetrics │
 │ Log collector    │                    │ (TLS)  │  │ rate limit  │   └─────────────────┘
 │ OTLP relay       │                    │        │  │ IP ban      │       ┌─────────┐  │
