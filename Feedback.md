@@ -122,6 +122,22 @@ if !json.Valid(raw) {
 
 ---
 
+### Bug 10 — `docker.go`: Log collector does not reconnect after container restart
+
+**File:** `internal/sentinel/logs/docker.go`
+
+When the validator's Docker Compose stack restarts (gnoland update, server reboot), the sentinel loses its connection to the container and stops forwarding data to the watchtower entirely. A manual `systemctl restart sentinel` is required to recover.
+
+Root cause: the Docker log collector holds a long-lived connection to the container via `ContainerLogs`. When the container restarts, that connection is terminated and the collector exits with an error instead of reconnecting automatically.
+
+The RPC collector is not affected — it polls on a ticker and simply logs a warning on each failed attempt, recovering on its own once gnoland is back up.
+
+Fix: wrap the streaming logic in a retry loop. When the container goes away or the connection drops, the collector logs a warning, waits 5 seconds, and attempts to reconnect. Only a context cancellation (sentinel shutdown) exits the loop cleanly.
+
+**Status: Fixed.**
+
+---
+
 ### Bug 9 — `metadata/collector.go`: `telemetry.enabled` key no longer exists in gnoland test12
 
 **File:** `internal/sentinel/metadata/collector.go:26`
@@ -266,6 +282,19 @@ service:
 
 Make sure `otlphttp/watchtower` is listed in `service.pipelines.metrics.exporters` — defining it under `exporters:` without referencing it in the pipeline means it is never used.
 
+### OTel Collector behind a sentry: `extra_hosts` required in Docker Compose
+
+When the OTel Collector runs in Docker and forwards to the watchtower through the sentry's nginx reverse proxy, the container cannot resolve the sentry's internal hostname by default. Adding `extra_hosts` in the Docker Compose service injects the mapping directly into the container's `/etc/hosts`:
+
+```yaml
+services:
+  otel-collector:
+    extra_hosts:
+      - "sentinel-proxy.internal:172.16.20.2"
+```
+
+Without this, the `otlphttp/watchtower` exporter fails to resolve the proxy hostname and the metrics never reach the watchtower.
+
 ---
 
 ### Loki: retention requires `delete_request_store`
@@ -292,3 +321,4 @@ In some container environments, `localhost` resolves to an IPv6 address while Vi
 | Low | Bug 1 — `j.Wait()` compile error | Sentinel | **Fixed** |
 | Low | Bug 2 — Docker `Tail:"0"` log history | Sentinel | **Fixed** |
 | Low | Bug 3 — `json.Valid()` non-JSON lines | Sentinel | **Fixed** |
+| Low | Bug 10 — Docker log collector no auto-reconnect | Sentinel | **Fixed** |
