@@ -98,7 +98,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 	var logBuf *sender.Buffer[protocol.LogPayload]
 	var logSendCh <-chan time.Time
 	if cfg.Logs.Enabled {
-		src, err := logs.NewSource(cfg.Logs.Source, cfg.Logs.ContainerName, cfg.Logs.JournaldUnit)
+		src, err := logs.NewSource(cfg.Logs.Source, cfg.Logs.ContainerName, cfg.Logs.JournaldUnit, appLog)
 		if err != nil {
 			appLog.Error("invalid log source config", "err", err)
 		} else {

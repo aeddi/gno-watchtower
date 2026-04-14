@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 )
 
 // LogLine is a single log line from gnoland with the level pre-parsed for filtering.
@@ -21,10 +22,10 @@ type Source interface {
 
 // NewSource constructs a Source based on sourceType ("docker" or "journald").
 // containerName is used for "docker"; unit is used for "journald".
-func NewSource(sourceType, containerName, unit string) (Source, error) {
+func NewSource(sourceType, containerName, unit string, log *slog.Logger) (Source, error) {
 	switch sourceType {
 	case "docker":
-		return NewDockerSource(containerName), nil
+		return NewDockerSource(containerName, log), nil
 	case "journald":
 		return NewJournaldSource(unit), nil
 	default:
