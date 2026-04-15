@@ -27,7 +27,7 @@ func NewSource(sourceType, containerName, unit string, log *slog.Logger) (Source
 	case "docker":
 		return NewDockerSource(containerName, log), nil
 	case "journald":
-		return NewJournaldSource(unit), nil
+		return NewJournaldSource(unit, log), nil
 	default:
 		return nil, fmt.Errorf("unknown log source %q: must be docker or journald", sourceType)
 	}
@@ -48,6 +48,21 @@ func ParseLevel(raw json.RawMessage) string {
 	default:
 		return "info"
 	}
+}
+
+// consecutiveTransformWarnThreshold is the number of consecutive auto-transformed log lines
+// after which a warning is emitted both in the sentinel logs and in the forwarded stream.
+const consecutiveTransformWarnThreshold = 30
+
+// syntheticWarnLine returns a LogLine injected into the forwarded stream when the
+// consecutive-transform threshold is exceeded. It will appear in Loki alongside the
+// validator's own logs, making the misconfiguration visible directly in Grafana.
+func syntheticWarnLine() LogLine {
+	raw, _ := json.Marshal(map[string]string{
+		"level": "warn",
+		"msg":   "[WARN][sentinel] log output in wrong format — add --log-format=json when launching your validator",
+	})
+	return LogLine{Level: "warn", Raw: json.RawMessage(raw)}
 }
 
 // NormalizeLogLine ensures raw is a valid JSON object suitable for the wire payload.

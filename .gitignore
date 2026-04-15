@@ -11,5 +11,5 @@
 .DS_Store
 .worktrees/
 .claude/**
-CLAUDE.MD
 feat*
+CLAUDE.md

@@ -87,8 +87,22 @@ func (s *DockerSource) stream(ctx context.Context, cli *dockerclient.Client, out
 	}()
 
 	scanner := bufio.NewScanner(pr)
+	consecutiveTransformed := 0
 	for scanner.Scan() {
-		normalized, _ := NormalizeLogLine(scanner.Bytes())
+		normalized, transformed := NormalizeLogLine(scanner.Bytes())
+		if transformed {
+			consecutiveTransformed++
+			if consecutiveTransformed == consecutiveTransformWarnThreshold+1 {
+				s.log.Warn("more than 30 consecutive non-JSON log lines were auto-transformed; add --log-format=json to gnoland")
+				select {
+				case out <- syntheticWarnLine():
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		} else {
+			consecutiveTransformed = 0
+		}
 		level := ParseLevel(normalized)
 		select {
 		case out <- LogLine{Level: level, Raw: normalized}:

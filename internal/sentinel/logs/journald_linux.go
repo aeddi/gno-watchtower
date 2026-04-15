@@ -4,6 +4,7 @@ package logs
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -13,12 +14,16 @@ import (
 // JournaldSource tails logs from a systemd journal unit.
 type JournaldSource struct {
 	unit string
+	log  *slog.Logger
 }
 
 // NewJournaldSource creates a JournaldSource for the named systemd unit.
 // The .service suffix is accepted but stripped: "gnoland" and "gnoland.service" are equivalent.
-func NewJournaldSource(unit string) *JournaldSource {
-	return &JournaldSource{unit: strings.TrimSuffix(unit, ".service")}
+func NewJournaldSource(unit string, log *slog.Logger) *JournaldSource {
+	return &JournaldSource{
+		unit: strings.TrimSuffix(unit, ".service"),
+		log:  log.With("component", "journald_log_source", "unit", unit),
+	}
 }
 
 // Tail streams log entries from the journal until ctx is cancelled.
@@ -38,6 +43,7 @@ func (s *JournaldSource) Tail(ctx context.Context, out chan<- LogLine) error {
 		return fmt.Errorf("seek journal tail: %w", err)
 	}
 
+	consecutiveTransformed := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -71,7 +77,20 @@ func (s *JournaldSource) Tail(ctx context.Context, out chan<- LogLine) error {
 				continue
 			}
 
-			normalized, _ := NormalizeLogLine([]byte(msg))
+			normalized, transformed := NormalizeLogLine([]byte(msg))
+			if transformed {
+				consecutiveTransformed++
+				if consecutiveTransformed == consecutiveTransformWarnThreshold+1 {
+					s.log.Warn("more than 30 consecutive non-JSON log lines were auto-transformed; add --log-format=json to gnoland")
+					select {
+					case out <- syntheticWarnLine():
+					case <-ctx.Done():
+						return ctx.Err()
+					}
+				}
+			} else {
+				consecutiveTransformed = 0
+			}
 			level := ParseLevel(normalized)
 			select {
 			case out <- LogLine{Level: level, Raw: normalized}:

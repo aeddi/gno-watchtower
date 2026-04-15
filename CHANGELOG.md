@@ -13,6 +13,14 @@ Testing performed on the Gno test12 testnet against a real validator infrastruct
 
 #### Added
 
+- **`internal/sentinel/logs/source.go`** — Warning emitted after 30 consecutive auto-transformed log lines
+  If more than 30 consecutive non-JSON lines are received from gnoland, a `slog.Warn` is emitted in
+  the sentinel's own logs and a synthetic `LogLine` is injected into the forwarded stream:
+  `[WARN][sentinel] log output in wrong format — add --log-format=json when launching your validator`.
+  The synthetic line is forwarded to the watchtower and indexed in Loki, making the misconfiguration
+  visible directly in Grafana alongside the validator's logs. The counter resets on each valid JSON line.
+  Both `DockerSource` and `JournaldSource` implement this behaviour.
+
 - **`internal/sentinel/logs/source.go`** — Non-JSON log lines are now auto-transformed instead of silently dropped
   Gnoland occasionally emits plain-text lines (e.g. during startup or after a crash) that are not valid JSON.
   Previously these lines were discarded by a `json.Valid()` guard. They are now wrapped into a valid JSON object
