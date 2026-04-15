@@ -56,7 +56,8 @@ func TestConsecutiveTransformLogic(t *testing.T) {
 		{
 			name: "threshold not reached",
 			steps: func() []step {
-				steps := make([]step, threshold)
+				// 29 consecutive non-JSON lines: one short of the threshold, no synthetic emitted.
+				steps := make([]step, threshold-1)
 				for i := range steps {
 					steps[i] = step{input: "plain text", wantSynthetic: false}
 				}
@@ -64,21 +65,22 @@ func TestConsecutiveTransformLogic(t *testing.T) {
 			}(),
 		},
 		{
-			name: "threshold reached on 31st line",
+			name: "threshold reached on 30th line",
 			steps: func() []step {
-				steps := make([]step, threshold+1)
+				steps := make([]step, threshold)
 				for i := range steps {
-					steps[i] = step{input: "plain text", wantSynthetic: i == threshold}
+					steps[i] = step{input: "plain text", wantSynthetic: i == threshold-1}
 				}
 				return steps
 			}(),
 		},
 		{
-			name: "no spam after threshold",
+			name: "repeats every 30 lines",
 			steps: func() []step {
-				steps := make([]step, threshold+5)
+				// 90 non-JSON lines: synthetic fires at step 29 (30th), 59 (60th), 89 (90th).
+				steps := make([]step, threshold*3)
 				for i := range steps {
-					steps[i] = step{input: "plain text", wantSynthetic: i == threshold}
+					steps[i] = step{input: "plain text", wantSynthetic: (i+1)%threshold == 0}
 				}
 				return steps
 			}(),
@@ -87,15 +89,15 @@ func TestConsecutiveTransformLogic(t *testing.T) {
 			name: "reset on valid JSON then re-trigger",
 			steps: func() []step {
 				var steps []step
-				// first sequence: triggers at position threshold
-				for i := 0; i <= threshold; i++ {
-					steps = append(steps, step{input: "plain text", wantSynthetic: i == threshold})
+				// first sequence: triggers at 30th line (index threshold-1)
+				for i := 0; i < threshold; i++ {
+					steps = append(steps, step{input: "plain text", wantSynthetic: i == threshold-1})
 				}
 				// valid JSON resets the counter
 				steps = append(steps, step{input: `{"level":"info","msg":"ok"}`, wantSynthetic: false})
-				// second sequence: triggers again at threshold
-				for i := 0; i <= threshold; i++ {
-					steps = append(steps, step{input: "plain text", wantSynthetic: i == threshold})
+				// second sequence: triggers again at 30th line
+				for i := 0; i < threshold; i++ {
+					steps = append(steps, step{input: "plain text", wantSynthetic: i == threshold-1})
 				}
 				return steps
 			}(),
@@ -120,7 +122,7 @@ func TestConsecutiveTransformLogic(t *testing.T) {
 				var gotSynthetic bool
 				if transformed {
 					consecutiveTransformed++
-					if consecutiveTransformed == threshold+1 {
+					if consecutiveTransformed%threshold == 0 {
 						gotSynthetic = true
 					}
 				} else {
