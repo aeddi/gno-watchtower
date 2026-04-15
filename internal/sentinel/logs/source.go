@@ -49,3 +49,21 @@ func ParseLevel(raw json.RawMessage) string {
 		return "info"
 	}
 }
+
+// NormalizeLogLine ensures raw is a valid JSON object suitable for the wire payload.
+// If raw is already valid JSON it is returned unchanged (transformed = false).
+// Otherwise the bytes are treated as plain text and wrapped into:
+//
+//	{"level":"info","msg":"<escaped text>"}
+//
+// transformed = true signals to callers that a conversion took place.
+func NormalizeLogLine(raw []byte) (line json.RawMessage, transformed bool) {
+	if json.Valid(raw) {
+		return json.RawMessage(append([]byte(nil), raw...)), false
+	}
+	wrapped, _ := json.Marshal(map[string]string{
+		"level": "info",
+		"msg":   string(raw),
+	})
+	return json.RawMessage(wrapped), true
+}

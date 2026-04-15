@@ -3,7 +3,6 @@ package logs
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -89,15 +88,10 @@ func (s *DockerSource) stream(ctx context.Context, cli *dockerclient.Client, out
 
 	scanner := bufio.NewScanner(pr)
 	for scanner.Scan() {
-		// Copy scanner bytes — scanner reuses the underlying buffer on next call.
-		raw := json.RawMessage(append([]byte(nil), scanner.Bytes()...))
-		// Skip non-JSON lines (e.g. plain-text startup messages before the JSON logger is ready).
-		if !json.Valid(raw) {
-			continue
-		}
-		level := ParseLevel(raw)
+		normalized, _ := NormalizeLogLine(scanner.Bytes())
+		level := ParseLevel(normalized)
 		select {
-		case out <- LogLine{Level: level, Raw: raw}:
+		case out <- LogLine{Level: level, Raw: normalized}:
 		case <-ctx.Done():
 			return ctx.Err()
 		}

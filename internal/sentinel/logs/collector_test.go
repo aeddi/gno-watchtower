@@ -46,6 +46,71 @@ func drainPayloads(ch <-chan protocol.LogPayload, waitFor time.Duration) []proto
 	}
 }
 
+func TestNormalizeLogLine(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantMsg     string // non-empty only when transformed = true
+		transformed bool
+	}{
+		{
+			name:        "valid JSON passthrough",
+			input:       `{"level":"warn","msg":"ok"}`,
+			transformed: false,
+		},
+		{
+			name:        "plain text wrapped",
+			input:       "starting gnoland…",
+			wantMsg:     "starting gnoland…",
+			transformed: true,
+		},
+		{
+			name:        "partial JSON wrapped",
+			input:       `{bad json`,
+			wantMsg:     `{bad json`,
+			transformed: true,
+		},
+		{
+			name:        "text with double quotes escaped",
+			input:       `say "hello"`,
+			wantMsg:     `say "hello"`,
+			transformed: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, transformed := logs.NormalizeLogLine([]byte(tt.input))
+
+			if transformed != tt.transformed {
+				t.Fatalf("transformed: got %v, want %v", transformed, tt.transformed)
+			}
+			if !json.Valid(got) {
+				t.Fatalf("result is not valid JSON: %s", got)
+			}
+			if tt.transformed {
+				var parsed struct {
+					Level string `json:"level"`
+					Msg   string `json:"msg"`
+				}
+				if err := json.Unmarshal(got, &parsed); err != nil {
+					t.Fatalf("unmarshal result: %v", err)
+				}
+				if parsed.Level != "info" {
+					t.Errorf("level: got %q, want %q", parsed.Level, "info")
+				}
+				if parsed.Msg != tt.wantMsg {
+					t.Errorf("msg: got %q, want %q", parsed.Msg, tt.wantMsg)
+				}
+			} else {
+				if string(got) != tt.input {
+					t.Errorf("passthrough: got %q, want %q", string(got), tt.input)
+				}
+			}
+		})
+	}
+}
+
 func TestParseLevel(t *testing.T) {
 	tests := []struct {
 		input string

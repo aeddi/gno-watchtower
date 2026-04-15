@@ -3,7 +3,6 @@ package logs
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -72,10 +71,10 @@ func (s *JournaldSource) Tail(ctx context.Context, out chan<- LogLine) error {
 				continue
 			}
 
-			raw := json.RawMessage(msg)
-			level := ParseLevel(raw)
+			normalized, _ := NormalizeLogLine([]byte(msg))
+			level := ParseLevel(normalized)
 			select {
-			case out <- LogLine{Level: level, Raw: raw}:
+			case out <- LogLine{Level: level, Raw: normalized}:
 			case <-ctx.Done():
 				return ctx.Err()
 			}
