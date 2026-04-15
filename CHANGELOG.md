@@ -13,9 +13,10 @@ Testing performed on the Gno test12 testnet against a real validator infrastruct
 
 #### Added
 
-- **`internal/sentinel/logs/source.go`** — Warning emitted after 30 consecutive auto-transformed log lines
-  If more than 30 consecutive non-JSON lines are received from gnoland, a `slog.Warn` is emitted in
-  the sentinel's own logs and a synthetic `LogLine` is injected into the forwarded stream:
+- **`internal/sentinel/logs/source.go`** — Warning emitted every 30 consecutive auto-transformed log lines
+  When gnoland emits non-JSON lines continuously (e.g. launched without `--log-format=json`), a
+  `slog.Warn` is emitted in the sentinel's own logs and a synthetic `LogLine` is injected into the
+  forwarded stream every 30 consecutive non-JSON lines (at line 30, 60, 90, …):
   `[WARN][sentinel] log output in wrong format — add --log-format=json when launching your validator`.
   The synthetic line is forwarded to the watchtower and indexed in Loki, making the misconfiguration
   visible directly in Grafana alongside the validator's logs. The counter resets on each valid JSON line.
