@@ -50,19 +50,19 @@ func ParseLevel(raw json.RawMessage) string {
 	}
 }
 
-// consecutiveTransformWarnThreshold is the number of consecutive auto-transformed log lines
-// after which a warning is emitted both in the sentinel logs and in the forwarded stream.
-const consecutiveTransformWarnThreshold = 30
+// consecutiveTransformThreshold is the number of consecutive auto-transformed log lines
+// after which an error is emitted both in the sentinel logs and in the forwarded stream.
+const consecutiveTransformThreshold = 30
 
-// syntheticWarnLine returns a LogLine injected into the forwarded stream when the
+// syntheticErrorLine returns a LogLine injected into the forwarded stream when the
 // consecutive-transform threshold is exceeded. It will appear in Loki alongside the
 // validator's own logs, making the misconfiguration visible directly in Grafana.
-func syntheticWarnLine() LogLine {
+func syntheticErrorLine() LogLine {
 	raw, _ := json.Marshal(map[string]string{
-		"level": "warn",
-		"msg":   "[WARN][sentinel] log output in wrong format — add --log-format=json when launching your validator",
+		"level": "error",
+		"msg":   "[ERROR][sentinel] log output in wrong format — add --log-format=json when launching your validator",
 	})
-	return LogLine{Level: "warn", Raw: json.RawMessage(raw)}
+	return LogLine{Level: "error", Raw: json.RawMessage(raw)}
 }
 
 // NormalizeLogLine ensures raw is a valid JSON object suitable for the wire payload.

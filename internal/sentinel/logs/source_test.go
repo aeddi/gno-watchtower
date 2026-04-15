@@ -6,11 +6,11 @@ import (
 	"testing"
 )
 
-func TestSyntheticWarnLine(t *testing.T) {
-	line := syntheticWarnLine()
+func TestSyntheticErrorLine(t *testing.T) {
+	line := syntheticErrorLine()
 
-	if line.Level != "warn" {
-		t.Errorf("Level: got %q, want %q", line.Level, "warn")
+	if line.Level != "error" {
+		t.Errorf("Level: got %q, want %q", line.Level, "error")
 	}
 	if !json.Valid(line.Raw) {
 		t.Fatalf("Raw is not valid JSON: %s", line.Raw)
@@ -22,27 +22,27 @@ func TestSyntheticWarnLine(t *testing.T) {
 	if err := json.Unmarshal(line.Raw, &parsed); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if parsed.Level != "warn" {
-		t.Errorf("JSON level: got %q, want %q", parsed.Level, "warn")
+	if parsed.Level != "error" {
+		t.Errorf("JSON level: got %q, want %q", parsed.Level, "error")
 	}
-	if !strings.Contains(parsed.Msg, "[WARN][sentinel]") {
-		t.Errorf("msg missing [WARN][sentinel] tag: %q", parsed.Msg)
+	if !strings.Contains(parsed.Msg, "[ERROR][sentinel]") {
+		t.Errorf("msg missing [ERROR][sentinel] tag: %q", parsed.Msg)
 	}
 	if !strings.Contains(parsed.Msg, "--log-format=json") {
 		t.Errorf("msg missing --log-format=json hint: %q", parsed.Msg)
 	}
 }
 
-func TestConsecutiveTransformWarnThreshold(t *testing.T) {
-	if consecutiveTransformWarnThreshold != 30 {
-		t.Errorf("threshold: got %d, want 30", consecutiveTransformWarnThreshold)
+func TestConsecutiveTransformThreshold(t *testing.T) {
+	if consecutiveTransformThreshold != 30 {
+		t.Errorf("threshold: got %d, want 30", consecutiveTransformThreshold)
 	}
 }
 
 // TestConsecutiveTransformLogic simulates the counter logic used in DockerSource
 // and JournaldSource without requiring a real Docker/journald connection.
 func TestConsecutiveTransformLogic(t *testing.T) {
-	threshold := consecutiveTransformWarnThreshold
+	threshold := consecutiveTransformThreshold
 
 	type step struct {
 		input        string

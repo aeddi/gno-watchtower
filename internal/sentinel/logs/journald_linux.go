@@ -80,10 +80,10 @@ func (s *JournaldSource) Tail(ctx context.Context, out chan<- LogLine) error {
 			normalized, transformed := NormalizeLogLine([]byte(msg))
 			if transformed {
 				consecutiveTransformed++
-				if consecutiveTransformed%consecutiveTransformWarnThreshold == 0 {
-					s.log.Warn("more than 30 consecutive non-JSON log lines were auto-transformed; add --log-format=json to gnoland")
+				if consecutiveTransformed%consecutiveTransformThreshold == 0 {
+					s.log.Error("more than 30 consecutive non-JSON log lines were auto-transformed; add --log-format=json to gnoland")
 					select {
-					case out <- syntheticWarnLine():
+					case out <- syntheticErrorLine():
 					case <-ctx.Done():
 						return ctx.Err()
 					}
