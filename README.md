@@ -35,7 +35,7 @@ Validator machine(s)                    Central server
 
 **Validator machine:**
 
-- Linux Debian
+- Linux (not tested on macOS)
 - gnoland Docker image or standalone binary
 - `sentinel` binary
 - Network access to the central server on port 443
