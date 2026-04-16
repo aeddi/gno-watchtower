@@ -10,6 +10,3 @@
 # OS
 .DS_Store
 .worktrees/
-.claude/**
-feat*
-CLAUDE.md
