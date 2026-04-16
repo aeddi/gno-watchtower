@@ -14,7 +14,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/gnolang/val-companion/internal/sentinel/sender"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/sender"
 )
 
 func TestSender_SendSuccess(t *testing.T) {

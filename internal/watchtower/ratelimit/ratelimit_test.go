@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gnolang/val-companion/internal/watchtower/auth"
-	"github.com/gnolang/val-companion/internal/watchtower/config"
-	"github.com/gnolang/val-companion/internal/watchtower/ratelimit"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/auth"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/ratelimit"
 )
 
 // injectValidator returns a middleware that sets a validator in context.

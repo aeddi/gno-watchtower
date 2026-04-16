@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/watchtower/config"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
 )
 
 // contextKey is the unexported type for context values set by this package.

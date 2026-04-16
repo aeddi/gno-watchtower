@@ -13,9 +13,9 @@ import (
 	gopsutilmem "github.com/shirou/gopsutil/v3/mem"
 	gopsutilnet "github.com/shirou/gopsutil/v3/net"
 
-	"github.com/gnolang/val-companion/internal/sentinel/config"
-	"github.com/gnolang/val-companion/internal/sentinel/delta"
-	"github.com/gnolang/val-companion/pkg/protocol"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/delta"
+	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
 // Collector polls host and/or container resource metrics on a configurable interval.

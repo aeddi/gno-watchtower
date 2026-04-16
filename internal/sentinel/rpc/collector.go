@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/delta"
-	"github.com/gnolang/val-companion/pkg/protocol"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/delta"
+	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
 type statusResult struct {

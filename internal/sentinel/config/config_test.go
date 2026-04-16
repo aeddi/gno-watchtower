@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/config"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
 )
 
 func TestLoad(t *testing.T) {

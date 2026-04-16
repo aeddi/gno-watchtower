@@ -4,7 +4,7 @@ package sender_test
 import (
 	"testing"
 
-	"github.com/gnolang/val-companion/internal/sentinel/sender"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/sender"
 )
 
 func TestBuffer_PushAndDrain(t *testing.T) {

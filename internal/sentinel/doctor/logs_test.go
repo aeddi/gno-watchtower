@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/config"
-	"github.com/gnolang/val-companion/internal/sentinel/doctor"
-	"github.com/gnolang/val-companion/internal/sentinel/logs"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/doctor"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/logs"
 )
 
 // staticSource is a test Source that emits a fixed set of lines then blocks.

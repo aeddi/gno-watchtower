@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/config"
-	"github.com/gnolang/val-companion/internal/sentinel/logs"
-	pkglogger "github.com/gnolang/val-companion/pkg/logger"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/logs"
+	pkglogger "github.com/aeddi/gno-watchtower/pkg/logger"
 )
 
 // checkDuration is how long CheckLogs listens for log lines.

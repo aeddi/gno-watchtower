@@ -9,11 +9,11 @@ import (
 	"slices"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/watchtower/auth"
-	"github.com/gnolang/val-companion/internal/watchtower/config"
-	"github.com/gnolang/val-companion/internal/watchtower/forwarder"
-	"github.com/gnolang/val-companion/internal/watchtower/ratelimit"
-	"github.com/gnolang/val-companion/internal/watchtower/stats"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/auth"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/forwarder"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/ratelimit"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/stats"
 )
 
 // maxBodyBytes is the maximum request body size accepted by all endpoints.

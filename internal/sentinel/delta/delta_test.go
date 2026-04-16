@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/gnolang/val-companion/internal/sentinel/delta"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/delta"
 )
 
 func TestDelta_FirstCallAlwaysChanged(t *testing.T) {

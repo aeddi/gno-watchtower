@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/rpc"
-	"github.com/gnolang/val-companion/pkg/logger"
-	"github.com/gnolang/val-companion/pkg/protocol"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/rpc"
+	"github.com/aeddi/gno-watchtower/pkg/logger"
+	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
 // buildMockNode returns a test server that simulates a gnoland RPC node.

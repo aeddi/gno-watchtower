@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/watchtower/auth"
-	"github.com/gnolang/val-companion/internal/watchtower/config"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/auth"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
 )
 
 func makeAuth(t *testing.T) *auth.Authenticator {

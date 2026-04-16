@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/rpc"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/rpc"
 )
 
 // rpcResponse mimics a gnoland JSON-RPC 2.0 envelope.

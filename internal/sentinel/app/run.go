@@ -7,15 +7,15 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/config"
-	"github.com/gnolang/val-companion/internal/sentinel/logs"
-	"github.com/gnolang/val-companion/internal/sentinel/metadata"
-	"github.com/gnolang/val-companion/internal/sentinel/otlp"
-	"github.com/gnolang/val-companion/internal/sentinel/resources"
-	"github.com/gnolang/val-companion/internal/sentinel/rpc"
-	"github.com/gnolang/val-companion/internal/sentinel/sender"
-	"github.com/gnolang/val-companion/internal/sentinel/stats"
-	"github.com/gnolang/val-companion/pkg/protocol"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/logs"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/metadata"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/otlp"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/resources"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/rpc"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/sender"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/stats"
+	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
 const (

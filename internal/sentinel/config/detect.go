@@ -12,7 +12,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 
-	"github.com/gnolang/val-companion/pkg/termstyle"
+	"github.com/aeddi/gno-watchtower/pkg/termstyle"
 )
 
 // Environment holds the results of environment detection probes.

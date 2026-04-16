@@ -3,9 +3,9 @@ package doctor_test
 import (
 	"testing"
 
-	"github.com/gnolang/val-companion/internal/sentinel/doctor"
-	"github.com/gnolang/val-companion/internal/sentinel/metadata"
-	"github.com/gnolang/val-companion/internal/sentinel/resources"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/doctor"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/metadata"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/resources"
 )
 
 func TestCheckResult_Fields(t *testing.T) {

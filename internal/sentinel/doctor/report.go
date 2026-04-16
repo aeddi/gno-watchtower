@@ -2,7 +2,7 @@
 package doctor
 
 import (
-	"github.com/gnolang/val-companion/pkg/termstyle"
+	"github.com/aeddi/gno-watchtower/pkg/termstyle"
 )
 
 func formatResult(r CheckResult) string {

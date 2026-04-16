@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/stats"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/stats"
 )
 
 func TestStats_RecordAndSnapshot(t *testing.T) {

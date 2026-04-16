@@ -17,7 +17,7 @@ import (
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/gnolang/val-companion/pkg/protocol"
+	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
 // Forwarder sends payloads to VictoriaMetrics and Loki.

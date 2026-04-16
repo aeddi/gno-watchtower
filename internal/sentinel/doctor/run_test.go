@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gnolang/val-companion/internal/sentinel/config"
-	"github.com/gnolang/val-companion/internal/sentinel/doctor"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/doctor"
 )
 
 func TestRun_AllDisabled_ExitsZero(t *testing.T) {

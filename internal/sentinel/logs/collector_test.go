@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/logs"
-	"github.com/gnolang/val-companion/pkg/logger"
-	"github.com/gnolang/val-companion/pkg/protocol"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/logs"
+	"github.com/aeddi/gno-watchtower/pkg/logger"
+	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
 // fakeSource emits the given lines then blocks until ctx is cancelled.

@@ -8,7 +8,7 @@ import (
 
 	toml "github.com/pelletier/go-toml/v2"
 
-	"github.com/gnolang/val-companion/pkg/tomlutil"
+	"github.com/aeddi/gno-watchtower/pkg/tomlutil"
 )
 
 // Duration wraps time.Duration for TOML string unmarshaling.

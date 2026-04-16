@@ -16,8 +16,8 @@ import (
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/gnolang/val-companion/internal/watchtower/forwarder"
-	"github.com/gnolang/val-companion/pkg/protocol"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/forwarder"
+	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
 func TestForwardRPC_PostsToVM(t *testing.T) {

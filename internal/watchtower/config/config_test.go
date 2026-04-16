@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/watchtower/config"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
 )
 
 const exampleTOML = `

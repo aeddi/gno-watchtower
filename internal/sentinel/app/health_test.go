@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/app"
-	"github.com/gnolang/val-companion/internal/sentinel/config"
-	pkglogger "github.com/gnolang/val-companion/pkg/logger"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/app"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
+	pkglogger "github.com/aeddi/gno-watchtower/pkg/logger"
 )
 
 func TestRun_HealthEndpoint_Responds(t *testing.T) {
