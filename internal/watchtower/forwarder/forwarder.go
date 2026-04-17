@@ -20,6 +20,8 @@ import (
 	"github.com/gnolang/val-companion/pkg/protocol"
 )
 
+
+
 // Forwarder sends payloads to VictoriaMetrics and Loki.
 type Forwarder struct {
 	vmURL   string
@@ -58,100 +60,26 @@ func (f *Forwarder) postVMLines(ctx context.Context, lines []vmLine) error {
 	return f.post(ctx, f.vmURL+"/api/v1/import", buf.Bytes(), "application/json")
 }
 
-// ForwardRPC extracts time-series metrics from the RPC payload and forwards them to VictoriaMetrics.
-// Extracted metrics: peers (from net_info.n_peers), mempool_size (from num_unconfirmed_txs.n_txs).
+// ForwardRPC forwards a placeholder metric to VictoriaMetrics to validate the wiring.
+// TODO: implement proper RPC metrics extraction — tracked in dedicated PR.
 func (f *Forwarder) ForwardRPC(ctx context.Context, validator string, body []byte) error {
-	var payload protocol.RPCPayload
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return fmt.Errorf("unmarshal rpc payload: %w", err)
+	line := vmLine{
+		Metric:     map[string]string{"__name__": "sentinel_rpc_received", "validator": validator},
+		Values:     []float64{1},
+		Timestamps: []int64{time.Now().UnixMilli()},
 	}
-	ts := payload.CollectedAt.UnixMilli()
-	var lines []vmLine
-
-	if raw, ok := payload.Data["net_info"]; ok {
-		var info struct {
-			NPeers json.Number `json:"n_peers"`
-		}
-		if err := json.Unmarshal(raw, &info); err == nil {
-			if v, err := info.NPeers.Float64(); err == nil {
-				lines = append(lines, vmLine{
-					Metric:     map[string]string{"__name__": "peers", "validator": validator},
-					Values:     []float64{v},
-					Timestamps: []int64{ts},
-				})
-			}
-		}
-	}
-
-	if raw, ok := payload.Data["num_unconfirmed_txs"]; ok {
-		var info struct {
-			NTxs json.Number `json:"n_txs"`
-		}
-		if err := json.Unmarshal(raw, &info); err == nil {
-			if v, err := info.NTxs.Float64(); err == nil {
-				lines = append(lines, vmLine{
-					Metric:     map[string]string{"__name__": "mempool_size", "validator": validator},
-					Values:     []float64{v},
-					Timestamps: []int64{ts},
-				})
-			}
-		}
-	}
-
-	return f.postVMLines(ctx, lines)
+	return f.postVMLines(ctx, []vmLine{line})
 }
 
-// ForwardMetrics extracts time-series metrics from the resource/metadata payload and forwards them
-// to VictoriaMetrics. Extracted metrics: cpu_percent, memory_used_percent, disk_used_percent.
+// ForwardMetrics forwards a placeholder metric to VictoriaMetrics to validate the wiring.
+// TODO: implement proper resource metrics extraction — tracked in dedicated PR.
 func (f *Forwarder) ForwardMetrics(ctx context.Context, validator string, body []byte) error {
-	var payload protocol.MetricsPayload
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return fmt.Errorf("unmarshal metrics payload: %w", err)
+	line := vmLine{
+		Metric:     map[string]string{"__name__": "sentinel_metrics_received", "validator": validator},
+		Values:     []float64{1},
+		Timestamps: []int64{time.Now().UnixMilli()},
 	}
-	ts := payload.CollectedAt.UnixMilli()
-	var lines []vmLine
-
-	// cpu is a []float64 from gopsutil; first element is overall CPU usage percent.
-	if raw, ok := payload.Data["cpu"]; ok {
-		var percents []float64
-		if err := json.Unmarshal(raw, &percents); err == nil && len(percents) > 0 {
-			lines = append(lines, vmLine{
-				Metric:     map[string]string{"__name__": "cpu_percent", "validator": validator},
-				Values:     []float64{percents[0]},
-				Timestamps: []int64{ts},
-			})
-		}
-	}
-
-	// memory is a gopsutil VirtualMemoryStat object.
-	if raw, ok := payload.Data["memory"]; ok {
-		var mem struct {
-			UsedPercent float64 `json:"usedPercent"`
-		}
-		if err := json.Unmarshal(raw, &mem); err == nil {
-			lines = append(lines, vmLine{
-				Metric:     map[string]string{"__name__": "memory_used_percent", "validator": validator},
-				Values:     []float64{mem.UsedPercent},
-				Timestamps: []int64{ts},
-			})
-		}
-	}
-
-	// disk is a gopsutil UsageStat object.
-	if raw, ok := payload.Data["disk"]; ok {
-		var disk struct {
-			UsedPercent float64 `json:"usedPercent"`
-		}
-		if err := json.Unmarshal(raw, &disk); err == nil {
-			lines = append(lines, vmLine{
-				Metric:     map[string]string{"__name__": "disk_used_percent", "validator": validator},
-				Values:     []float64{disk.UsedPercent},
-				Timestamps: []int64{ts},
-			})
-		}
-	}
-
-	return f.postVMLines(ctx, lines)
+	return f.postVMLines(ctx, []vmLine{line})
 }
 
 // ForwardLogs decompresses the zstd-encoded LogPayload body and pushes it to Loki.

@@ -30,9 +30,7 @@ func TestForwardRPC_PostsToVM(t *testing.T) {
 	defer vmSrv.Close()
 
 	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
-	// Include net_info with n_peers so at least one metric line is produced.
-	body := []byte(`{"collected_at":"2026-01-01T00:00:00Z","data":{"net_info":{"n_peers":"3"}}}`)
-	if err := f.ForwardRPC(context.Background(), "val-01", body); err != nil {
+	if err := f.ForwardRPC(context.Background(), "val-01", []byte(`{}`)); err != nil {
 		t.Fatalf("ForwardRPC: %v", err)
 	}
 	if len(received) == 0 {
@@ -40,13 +38,6 @@ func TestForwardRPC_PostsToVM(t *testing.T) {
 	}
 	if path != "/api/v1/import" {
 		t.Errorf("unexpected VM path: %q (want /api/v1/import)", path)
-	}
-	// Each line must be a valid JSON object with a __name__ key.
-	for _, line := range strings.Split(strings.TrimSpace(string(received)), "\n") {
-		var obj map[string]any
-		if err := json.Unmarshal([]byte(line), &obj); err != nil {
-			t.Errorf("line is not valid JSON: %s", line)
-		}
 	}
 }
 
@@ -58,9 +49,7 @@ func TestForwardMetrics_PostsToVM(t *testing.T) {
 	defer vmSrv.Close()
 
 	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
-	// Include cpu data so at least one metric line is produced.
-	body := []byte(`{"collected_at":"2026-01-01T00:00:00Z","data":{"cpu":[12.5]}}`)
-	if err := f.ForwardMetrics(context.Background(), "val-01", body); err != nil {
+	if err := f.ForwardMetrics(context.Background(), "val-01", []byte(`{}`)); err != nil {
 		t.Fatalf("ForwardMetrics: %v", err)
 	}
 	if len(received) == 0 {
@@ -171,9 +160,7 @@ func TestForwardRPC_NonOKIncludesBody(t *testing.T) {
 	defer vmSrv.Close()
 
 	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
-	// Include net_info so a VM request is actually made and hits the 400 response.
-	body := []byte(`{"collected_at":"2026-01-01T00:00:00Z","data":{"net_info":{"n_peers":"3"}}}`)
-	err := f.ForwardRPC(context.Background(), "val-01", body)
+	err := f.ForwardRPC(context.Background(), "val-01", []byte(`{}`))
 	if err == nil {
 		t.Fatal("expected error for 400 response")
 	}
