@@ -2,12 +2,12 @@ package forwarder
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -19,6 +19,8 @@ import (
 
 	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
+
+
 
 // Forwarder sends payloads to VictoriaMetrics and Loki.
 type Forwarder struct {
@@ -36,20 +38,48 @@ func New(vmURL, lokiURL string) *Forwarder {
 	}
 }
 
-// forwardVM forwards a raw JSON body to VictoriaMetrics with the specified data type.
-func (f *Forwarder) forwardVM(ctx context.Context, validator, dataType string, body []byte) error {
-	u := f.vmURL + "/api/v1/import/json?extra_labels=validator=" + url.QueryEscape(validator) + ",type=" + url.QueryEscape(dataType)
-	return f.post(ctx, u, body, "application/json")
+// vmLine is one entry in the VictoriaMetrics /api/v1/import JSON lines format.
+type vmLine struct {
+	Metric     map[string]string `json:"metric"`
+	Values     []float64         `json:"values"`
+	Timestamps []int64           `json:"timestamps"`
 }
 
-// ForwardRPC forwards a raw MetricsPayload JSON body to VictoriaMetrics.
+// postVMLines encodes lines as newline-delimited JSON and POSTs to /api/v1/import.
+func (f *Forwarder) postVMLines(ctx context.Context, lines []vmLine) error {
+	if len(lines) == 0 {
+		return nil
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	for _, l := range lines {
+		if err := enc.Encode(l); err != nil {
+			return fmt.Errorf("encode vm line: %w", err)
+		}
+	}
+	return f.post(ctx, f.vmURL+"/api/v1/import", buf.Bytes(), "application/json")
+}
+
+// ForwardRPC forwards a placeholder metric to VictoriaMetrics to validate the wiring.
+// TODO: implement proper RPC metrics extraction — tracked in dedicated PR.
 func (f *Forwarder) ForwardRPC(ctx context.Context, validator string, body []byte) error {
-	return f.forwardVM(ctx, validator, "rpc", body)
+	line := vmLine{
+		Metric:     map[string]string{"__name__": "sentinel_rpc_received", "validator": validator},
+		Values:     []float64{1},
+		Timestamps: []int64{time.Now().UnixMilli()},
+	}
+	return f.postVMLines(ctx, []vmLine{line})
 }
 
-// ForwardMetrics forwards a raw MetricsPayload JSON body to VictoriaMetrics.
+// ForwardMetrics forwards a placeholder metric to VictoriaMetrics to validate the wiring.
+// TODO: implement proper resource metrics extraction — tracked in dedicated PR.
 func (f *Forwarder) ForwardMetrics(ctx context.Context, validator string, body []byte) error {
-	return f.forwardVM(ctx, validator, "metrics", body)
+	line := vmLine{
+		Metric:     map[string]string{"__name__": "sentinel_metrics_received", "validator": validator},
+		Values:     []float64{1},
+		Timestamps: []int64{time.Now().UnixMilli()},
+	}
+	return f.postVMLines(ctx, []vmLine{line})
 }
 
 // ForwardLogs decompresses the zstd-encoded LogPayload body and pushes it to Loki.
@@ -74,7 +104,21 @@ func (f *Forwarder) ForwardLogs(ctx context.Context, validator string, body []by
 }
 
 // ForwardOTLP injects the validator resource attribute and forwards protobuf to VictoriaMetrics.
+// Automatically decompresses gzip-encoded bodies (the OTel Collector default).
 func (f *Forwarder) ForwardOTLP(ctx context.Context, validator string, body []byte) error {
+	// Auto-detect gzip compression (magic bytes 0x1f 0x8b).
+	if len(body) >= 2 && body[0] == 0x1f && body[1] == 0x8b {
+		gr, err := gzip.NewReader(bytes.NewReader(body))
+		if err != nil {
+			return fmt.Errorf("gzip reader: %w", err)
+		}
+		defer gr.Close()
+		body, err = io.ReadAll(gr)
+		if err != nil {
+			return fmt.Errorf("gzip decompress: %w", err)
+		}
+	}
+
 	var req collectorpb.ExportMetricsServiceRequest
 	if err := proto.Unmarshal(body, &req); err != nil {
 		return fmt.Errorf("unmarshal otlp: %w", err)

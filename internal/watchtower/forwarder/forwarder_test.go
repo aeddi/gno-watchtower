@@ -22,21 +22,22 @@ import (
 
 func TestForwardRPC_PostsToVM(t *testing.T) {
 	var received []byte
+	var path string
 	vmSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
 		received, _ = io.ReadAll(r.Body)
-		if r.URL.Query().Get("extra_labels") == "" {
-			t.Error("extra_labels query param missing")
-		}
 	}))
 	defer vmSrv.Close()
 
 	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
-	body := []byte(`{"collected_at":"2026-01-01T00:00:00Z","data":{}}`)
-	if err := f.ForwardRPC(context.Background(), "val-01", body); err != nil {
+	if err := f.ForwardRPC(context.Background(), "val-01", []byte(`{}`)); err != nil {
 		t.Fatalf("ForwardRPC: %v", err)
 	}
 	if len(received) == 0 {
 		t.Error("VM received nothing")
+	}
+	if path != "/api/v1/import" {
+		t.Errorf("unexpected VM path: %q (want /api/v1/import)", path)
 	}
 }
 
@@ -48,8 +49,7 @@ func TestForwardMetrics_PostsToVM(t *testing.T) {
 	defer vmSrv.Close()
 
 	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
-	body := []byte(`{"collected_at":"2026-01-01T00:00:00Z","data":{}}`)
-	if err := f.ForwardMetrics(context.Background(), "val-01", body); err != nil {
+	if err := f.ForwardMetrics(context.Background(), "val-01", []byte(`{}`)); err != nil {
 		t.Fatalf("ForwardMetrics: %v", err)
 	}
 	if len(received) == 0 {

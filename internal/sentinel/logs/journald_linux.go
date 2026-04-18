@@ -47,8 +47,8 @@ func (s *JournaldSource) Tail(ctx context.Context, out chan<- LogLine) error {
 		}
 
 		// Wait up to 1s for new entries to arrive.
-		if _, err := j.Wait(time.Second); err != nil {
-			return fmt.Errorf("journal wait: %w", err)
+		if r := j.Wait(time.Second); r < 0 {
+			return fmt.Errorf("journal wait: error code %d", r)
 		}
 
 		// Drain all newly available entries.

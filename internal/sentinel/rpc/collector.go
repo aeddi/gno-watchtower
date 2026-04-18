@@ -84,7 +84,10 @@ func (c *Collector) collect(ctx context.Context) error {
 		if p.key == "status" {
 			currentHeight = c.parseHeight(raw)
 		}
-		if c.delta.Changed(p.key, raw) {
+		// num_unconfirmed_txs is always included regardless of the delta so that
+		// mempool_size is continuously sampled in VictoriaMetrics even when the
+		// value stays at 0 (idle testnet / quiet validator).
+		if p.key == "num_unconfirmed_txs" || c.delta.Changed(p.key, raw) {
 			payload.Data[p.key] = raw
 			changed = append(changed, p.key)
 		}
