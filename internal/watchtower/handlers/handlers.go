@@ -124,7 +124,11 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
-	s.handlePayload(w, r, "logs", s.fwd.ForwardLogs)
+	_, vcfg, _ := auth.ValidatorFromContext(r.Context())
+	minLevel := vcfg.LogsMinLevel
+	s.handlePayload(w, r, "logs", func(ctx context.Context, validator string, body []byte) error {
+		return s.fwd.ForwardLogs(ctx, validator, body, minLevel)
+	})
 }
 
 func (s *Server) handleOTLP(w http.ResponseWriter, r *http.Request) {

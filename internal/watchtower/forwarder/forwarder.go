@@ -17,6 +17,7 @@ import (
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/aeddi/gno-watchtower/pkg/logger"
 	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
@@ -83,7 +84,10 @@ func (f *Forwarder) ForwardMetrics(ctx context.Context, validator string, body [
 }
 
 // ForwardLogs decompresses the zstd-encoded LogPayload body and pushes it to Loki.
-func (f *Forwarder) ForwardLogs(ctx context.Context, validator string, body []byte) error {
+// If minLevel is non-empty and the payload level ranks below it, the payload is
+// dropped silently (nil error). This is the server-side level filter; the sentinel
+// also filters at source, so dropped payloads normally shouldn't reach here.
+func (f *Forwarder) ForwardLogs(ctx context.Context, validator string, body []byte, minLevel string) error {
 	decompressed, err := zstdDecompress(body)
 	if err != nil {
 		return fmt.Errorf("decompress logs: %w", err)
@@ -91,6 +95,9 @@ func (f *Forwarder) ForwardLogs(ctx context.Context, validator string, body []by
 	var payload protocol.LogPayload
 	if err := json.Unmarshal(decompressed, &payload); err != nil {
 		return fmt.Errorf("unmarshal log payload: %w", err)
+	}
+	if minLevel != "" && logger.LevelRank(payload.Level) < logger.LevelRank(minLevel) {
+		return nil
 	}
 	push, err := toLokiPush(validator, payload)
 	if err != nil {
