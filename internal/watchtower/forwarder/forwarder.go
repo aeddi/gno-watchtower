@@ -181,17 +181,29 @@ func toLokiPush(validator string, payload protocol.LogPayload) (*lokiPush, error
 	return &lokiPush{Streams: []lokiStream{stream}}, nil
 }
 
-// extractTS extracts the "ts" field from a raw JSON line and parses it as RFC3339.
-// Falls back to fallback if absent or unparseable.
+// extractTS extracts the "ts" field from a raw JSON line.
+// Accepts a JSON number (epoch seconds, possibly fractional — gnoland/zap format)
+// or an RFC3339/RFC3339Nano string. Falls back if absent or unparseable.
 func extractTS(raw json.RawMessage, fallback time.Time) time.Time {
 	var line struct {
-		TS string `json:"ts"`
+		TS json.RawMessage `json:"ts"`
 	}
-	if err := json.Unmarshal(raw, &line); err != nil || line.TS == "" {
+	if err := json.Unmarshal(raw, &line); err != nil || len(line.TS) == 0 {
 		return fallback
 	}
-	if t, err := time.Parse(time.RFC3339Nano, line.TS); err == nil {
-		return t
+	// Numeric epoch: 1776544197.2256565
+	var epoch float64
+	if err := json.Unmarshal(line.TS, &epoch); err == nil {
+		sec := int64(epoch)
+		nsec := int64((epoch - float64(sec)) * 1e9)
+		return time.Unix(sec, nsec)
+	}
+	// String RFC3339: "2026-04-18T19:30:00Z"
+	var s string
+	if err := json.Unmarshal(line.TS, &s); err == nil && s != "" {
+		if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+			return t
+		}
 	}
 	return fallback
 }

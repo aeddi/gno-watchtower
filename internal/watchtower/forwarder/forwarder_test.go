@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/klauspost/compress/zstd"
 	collectorpb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
@@ -84,6 +86,54 @@ func TestForwardLogs_ForwardsWhenPayloadLevelAtOrAboveMinLevel(t *testing.T) {
 	}
 	if !called {
 		t.Error("Loki was not called but payload should have been forwarded (error >= warn)")
+	}
+}
+
+func TestForwardLogs_UsesGnoFloatEpochTimestamp(t *testing.T) {
+	var lokiBody []byte
+	lokiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lokiBody, _ = io.ReadAll(r.Body)
+	}))
+	defer lokiSrv.Close()
+
+	// gnoland emits `ts` as a JSON number (seconds since epoch with fractional part).
+	payload := protocol.LogPayload{
+		Level: "info",
+		Lines: []json.RawMessage{
+			json.RawMessage(`{"level":"info","ts":1776544197.2256565,"msg":"hi"}`),
+		},
+	}
+	body, _ := json.Marshal(payload)
+	compressed, _ := zstdCompress(body)
+
+	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL)
+	if err := f.ForwardLogs(context.Background(), "val-01", compressed, ""); err != nil {
+		t.Fatalf("ForwardLogs: %v", err)
+	}
+
+	var push struct {
+		Streams []struct {
+			Stream map[string]string `json:"stream"`
+			Values [][]string        `json:"values"`
+		} `json:"streams"`
+	}
+	if err := json.Unmarshal(lokiBody, &push); err != nil {
+		t.Fatalf("parse loki body: %v", err)
+	}
+	if len(push.Streams) == 0 || len(push.Streams[0].Values) == 0 {
+		t.Fatal("no values pushed to loki")
+	}
+	gotTS := push.Streams[0].Values[0][0]
+	// 1776544197.2256565 seconds → 1776544197225656500 ns. Allow ±1ms rounding slack.
+	const wantNs = int64(1776544197225656500)
+	var got int64
+	if _, err := fmt.Sscanf(gotTS, "%d", &got); err != nil {
+		t.Fatalf("parse pushed ts %q: %v", gotTS, err)
+	}
+	delta := got - wantNs
+	if delta < -int64(time.Millisecond) || delta > int64(time.Millisecond) {
+		t.Errorf("loki ts %d off from gno ts %d by %s (want: use gno `ts`, not push-time fallback)",
+			got, wantNs, time.Duration(delta))
 	}
 }
 
