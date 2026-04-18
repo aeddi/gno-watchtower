@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 // LogLine is a single log line from gnoland with the level pre-parsed for filtering.
@@ -21,10 +22,12 @@ type Source interface {
 
 // NewSource constructs a Source based on sourceType ("docker" or "journald").
 // containerName is used for "docker"; unit is used for "journald".
-func NewSource(sourceType, containerName, unit string) (Source, error) {
+// resumeLookback controls how far back the source reads on each (re)connect
+// (docker only; journald has its own cursor mechanism).
+func NewSource(sourceType, containerName, unit string, resumeLookback time.Duration) (Source, error) {
 	switch sourceType {
 	case "docker":
-		return NewDockerSource(containerName), nil
+		return NewDockerSource(containerName, resumeLookback), nil
 	case "journald":
 		return NewJournaldSource(unit), nil
 	default:

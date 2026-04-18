@@ -120,13 +120,14 @@ type RPCConfig struct {
 
 // LogsConfig holds log collector settings.
 type LogsConfig struct {
-	Enabled       bool     `toml:"enabled"`
-	Source        string   `toml:"source" comment:"docker or journald"`
-	ContainerName string   `toml:"container_name,omitempty" comment:"docker source only"`
-	JournaldUnit  string   `toml:"journald_unit,omitempty" comment:"journald source only"`
-	BatchSize     ByteSize `toml:"batch_size"`
-	BatchTimeout  Duration `toml:"batch_timeout"`
-	MinLevel      string   `toml:"min_level" comment:"debug, info, warn, or error"`
+	Enabled        bool     `toml:"enabled"`
+	Source         string   `toml:"source" comment:"docker or journald"`
+	ContainerName  string   `toml:"container_name,omitempty" comment:"docker source only"`
+	JournaldUnit   string   `toml:"journald_unit,omitempty" comment:"journald source only"`
+	BatchSize      ByteSize `toml:"batch_size"`
+	BatchTimeout   Duration `toml:"batch_timeout"`
+	MinLevel       string   `toml:"min_level" comment:"debug, info, warn, or error"`
+	ResumeLookback Duration `toml:"resume_lookback" comment:"on restart, re-read logs from this far back (docker only)"`
 }
 
 // OTLPConfig holds OTLP relay settings.
@@ -194,12 +195,13 @@ func DefaultConfig() *Config {
 			DumpConsensusStateInterval: Duration{Duration: 30 * time.Second},
 		},
 		Logs: LogsConfig{
-			Enabled:       true,
-			Source:        LogSourceDocker,
-			ContainerName: PlaceholderContainerName,
-			BatchSize:     ByteSize(MB),
-			BatchTimeout:  Duration{Duration: 5 * time.Second},
-			MinLevel:      "info",
+			Enabled:        true,
+			Source:         LogSourceDocker,
+			ContainerName:  PlaceholderContainerName,
+			BatchSize:      ByteSize(MB),
+			BatchTimeout:   Duration{Duration: 5 * time.Second},
+			MinLevel:       "info",
+			ResumeLookback: Duration{Duration: 60 * time.Second},
 		},
 		OTLP: OTLPConfig{
 			Enabled:    true,

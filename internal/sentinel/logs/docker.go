@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
@@ -15,12 +17,28 @@ import (
 // DockerSource tails logs from a Docker container.
 // The Docker daemon is reached via DOCKER_HOST or the default Unix socket.
 type DockerSource struct {
-	containerName string
+	containerName  string
+	resumeLookback time.Duration
 }
 
 // NewDockerSource creates a DockerSource for the named container.
-func NewDockerSource(containerName string) *DockerSource {
-	return &DockerSource{containerName: containerName}
+// resumeLookback is how far back to read on each connect; 0 means only follow new entries.
+// A non-zero value is used on sentinel restart to catch up logs written during downtime
+// (the Docker API has no persistent cursor, so we rewind by a time window).
+func NewDockerSource(containerName string, resumeLookback time.Duration) *DockerSource {
+	return &DockerSource{containerName: containerName, resumeLookback: resumeLookback}
+}
+
+// BuildLogsOptions returns the Docker ContainerLogs options for the given lookback.
+// lookback > 0 uses Since; lookback == 0 uses Tail:"0" (follow-only).
+func BuildLogsOptions(lookback time.Duration, now time.Time) container.LogsOptions {
+	opts := container.LogsOptions{Follow: true, ShowStdout: true, ShowStderr: true}
+	if lookback > 0 {
+		opts.Since = strconv.FormatInt(now.Add(-lookback).Unix(), 10)
+	} else {
+		opts.Tail = "0"
+	}
+	return opts
 }
 
 // Tail streams log lines from the container until ctx is cancelled.
@@ -35,12 +53,7 @@ func (s *DockerSource) Tail(ctx context.Context, out chan<- LogLine) error {
 	}
 	defer cli.Close()
 
-	logStream, err := cli.ContainerLogs(ctx, s.containerName, container.LogsOptions{
-		Follow:     true,
-		ShowStdout: true,
-		ShowStderr: true,
-		Tail:       "0", // don't replay historical logs, only follow new entries
-	})
+	logStream, err := cli.ContainerLogs(ctx, s.containerName, BuildLogsOptions(s.resumeLookback, time.Now()))
 	if err != nil {
 		return fmt.Errorf("container logs %q: %w", s.containerName, err)
 	}

@@ -88,7 +88,7 @@ func logsCheck(ctx context.Context, cfg *config.Config, ar *AuthResponse) CheckR
 	if ar != nil && !slices.Contains(ar.Permissions, "logs") {
 		return CheckResult{Name: "Logs", Status: StatusGrey, Detail: "logs permission not granted"}
 	}
-	src, err := logs.NewSource(cfg.Logs.Source, cfg.Logs.ContainerName, cfg.Logs.JournaldUnit)
+	src, err := logs.NewSource(cfg.Logs.Source, cfg.Logs.ContainerName, cfg.Logs.JournaldUnit, cfg.Logs.ResumeLookback.Duration)
 	if err != nil {
 		return CheckResult{Name: "Logs", Status: StatusRed, Detail: fmt.Sprintf("invalid source config: %v", err)}
 	}
