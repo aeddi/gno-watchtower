@@ -7,7 +7,6 @@
   "graphTooltip": 0,
   "id": null,
   "links": [],
-  "liveNow": true,
   "panels": [
     {
       "datasource": {
@@ -27,7 +26,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -89,7 +89,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -151,7 +152,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -213,7 +215,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -382,14 +385,17 @@
       "id": 5,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
+          "calcs": [
+            "last",
+            "max"
+          ],
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
-          "mode": "multi",
-          "sort": "none"
+          "mode": "all",
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.4.1",
@@ -423,11 +429,11 @@
       "id": 6,
       "options": {
         "dedupStrategy": "none",
-        "enableInfiniteScrolling": false,
+        "enableInfiniteScrolling": true,
         "enableLogDetails": true,
-        "prettifyLogMessage": true,
+        "prettifyLogMessage": false,
         "showCommonLabels": false,
-        "showLabels": false,
+        "showLabels": true,
         "showTime": true,
         "sortOrder": "Descending",
         "wrapLogMessage": true
@@ -440,7 +446,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{validator=~\"$validator\", level=~\"$level\"} | json | module=~\"$module\" |~ \"(?i)$search\"",
+          "expr": "{validator=~\"$validator\", level=~\"$level\"} | json | __error__=\"\" | module=~\"$module\" |~ \"(?i)$search\" | line_format \"{{.msg}}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -471,17 +477,18 @@
           "type": "loki",
           "uid": "loki"
         },
-        "definition": "",
+        "definition": "label_values(validator)",
         "includeAll": true,
         "label": "Validator",
         "multi": true,
         "name": "validator",
         "options": [],
         "query": {
-          "label": "validator",
           "refId": "LokiVariableQueryEditor-VariableQuery",
+          "type": 1,
+          "label": "validator",
           "stream": "",
-          "type": 1
+          "expr": "label_values(validator)"
         },
         "refresh": 2,
         "regex": "",
@@ -503,17 +510,18 @@
           "type": "loki",
           "uid": "loki"
         },
-        "definition": "",
+        "definition": "label_values(level)",
         "includeAll": true,
         "label": "Level",
         "multi": true,
         "name": "level",
         "options": [],
         "query": {
-          "label": "level",
           "refId": "LokiVariableQueryEditor-VariableQuery",
+          "type": 1,
+          "label": "level",
           "stream": "",
-          "type": 1
+          "expr": "label_values(level)"
         },
         "refresh": 2,
         "regex": "",
@@ -535,18 +543,19 @@
           "type": "loki",
           "uid": "loki"
         },
-        "definition": "",
+        "definition": "label_values({validator=~\"$validator\"} | json, module)",
         "includeAll": true,
         "label": "Module",
         "multi": true,
         "name": "module",
         "options": [],
         "query": {
-          "label": "module",
-          "parser": "json",
           "refId": "LokiVariableQueryEditor-VariableQuery",
+          "type": 1,
+          "label": "module",
           "stream": "{validator=~\"$validator\"}",
-          "type": 1
+          "parser": "json",
+          "expr": "label_values({validator=~\"$validator\"} | json, module)"
         },
         "refresh": 2,
         "regex": "",
