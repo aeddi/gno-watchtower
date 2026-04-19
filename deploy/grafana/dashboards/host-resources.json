@@ -1,0 +1,119 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "User+system CPU time as a percentage. 100% = one core fully busy.",
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 2, "stacking": {"mode": "normal"}}, "color": {"mode": "palette-classic"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"calcs": ["last", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "100 * avg by (mode) (rate(node_cpu_seconds_total{mode!=\"idle\",mode!=\"iowait\"}[$__rate_interval]))", "legendFormat": "{{mode}}", "refId": "A"}
+      ],
+      "title": "CPU usage (busy modes, % of 1 core avg)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Used = total − available. Available counts reclaimable cache, not just free.",
+      "fieldConfig": {"defaults": {"unit": "bytes", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 2}, "color": {"mode": "palette-classic"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "options": {"legend": {"calcs": ["last", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes", "legendFormat": "used", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "node_memory_MemTotal_bytes", "legendFormat": "total", "refId": "B"}
+      ],
+      "title": "Memory used / total",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Load avg. Sustained >N (where N = cores) means the system is over-saturated.",
+      "fieldConfig": {"defaults": {"unit": "short", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2}, "color": {"mode": "palette-classic"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "options": {"legend": {"calcs": ["last", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "node_load1", "legendFormat": "1m", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "node_load5", "legendFormat": "5m", "refId": "B"},
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "node_load15", "legendFormat": "15m", "refId": "C"}
+      ],
+      "title": "Load average",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Disk IO on the root device. Helps spot storage saturation (e.g. compactor overload, log rotation storms).",
+      "fieldConfig": {"defaults": {"unit": "Bps", "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2}, "color": {"mode": "palette-classic"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "options": {"legend": {"calcs": ["last", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum(rate(node_disk_read_bytes_total[$__rate_interval]))", "legendFormat": "read", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum(rate(node_disk_written_bytes_total[$__rate_interval]))", "legendFormat": "write", "refId": "B"}
+      ],
+      "title": "Disk I/O (host, sum across devices)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Throughput on physical NICs (loopback + docker bridges excluded).",
+      "fieldConfig": {"defaults": {"unit": "Bps", "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2}, "color": {"mode": "palette-classic"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "id": 5,
+      "options": {"legend": {"calcs": ["last", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum(rate(node_network_receive_bytes_total{device!~\"lo|docker.*|br-.*|veth.*\"}[$__rate_interval]))", "legendFormat": "rx", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum(rate(node_network_transmit_bytes_total{device!~\"lo|docker.*|br-.*|veth.*\"}[$__rate_interval]))", "legendFormat": "tx", "refId": "B"}
+      ],
+      "title": "Network (external NICs, rx+tx)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Percentage of root-filesystem space used. Sustained >80% is a problem for Loki/VM.",
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 16},
+      "id": 6,
+      "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max(100 * (1 - node_filesystem_avail_bytes{fstype=~\"ext4|xfs|btrfs|zfs\"} / node_filesystem_size_bytes{fstype=~\"ext4|xfs|btrfs|zfs\"}))", "refId": "A", "instant": true}
+      ],
+      "title": "Root disk used",
+      "type": "gauge"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Time since the host booted.",
+      "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "fixed", "fixedColor": "text"}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 16},
+      "id": 7,
+      "options": {"colorMode": "none", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "node_time_seconds - node_boot_time_seconds", "refId": "A", "instant": true}
+      ],
+      "title": "Uptime",
+      "type": "stat"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["host", "infra"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Host Resources",
+  "uid": "host-resources",
+  "version": 1,
+  "weekStart": ""
+}

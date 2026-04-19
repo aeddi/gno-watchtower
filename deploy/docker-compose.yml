@@ -45,8 +45,10 @@ services:
       - "-retentionPeriod=${METRICS_RETENTION}"
       - "-storageDataPath=/data"
       - "-storage.minFreeDiskSpaceBytes=10737418240"
+      - "-promscrape.config=/etc/vm/scrape.yml"
     volumes:
       - vm_data:/data
+      - ./victoria-metrics/scrape.yml:/etc/vm/scrape.yml:ro
     networks:
       - monitoring
     restart: unless-stopped
@@ -55,6 +57,37 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    command:
+      - "--path.rootfs=/host"
+      # Collectors off by default because they're noisy or useless in containers.
+      - "--no-collector.wifi"
+      - "--no-collector.hwmon"
+      - "--no-collector.ipvs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+    pid: host
+    volumes:
+      - "/:/host:ro,rslave"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - monitoring
+    restart: unless-stopped
 
   loki:
     image: grafana/loki:3.4.4
