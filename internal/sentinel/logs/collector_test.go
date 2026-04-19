@@ -3,6 +3,8 @@ package logs_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -143,6 +145,40 @@ func TestCollector_BatchesBySize(t *testing.T) {
 		}
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("expected size-triggered batch, not timeout-triggered")
+	}
+}
+
+// reconnectingSource returns from Tail immediately (simulating a closed stream,
+// e.g. when the source docker container restarts). Callers must reconnect.
+type reconnectingSource struct {
+	calls atomic.Int32
+}
+
+func (s *reconnectingSource) Tail(_ context.Context, _ chan<- logs.LogLine) error {
+	s.calls.Add(1)
+	return errors.New("source closed")
+}
+
+func TestCollector_ReconnectsAfterSourceTailReturns(t *testing.T) {
+	// Regression: collector.Run used to start Tail in a fire-and-forget goroutine;
+	// when the source container restarted and Tail returned, sentinel silently
+	// stopped forwarding until its OWN restart. We want Tail to be re-invoked.
+	origBackoff := logs.ReconnectBackoff
+	logs.ReconnectBackoff = 20 * time.Millisecond
+	defer func() { logs.ReconnectBackoff = origBackoff }()
+
+	src := &reconnectingSource{}
+	out := make(chan protocol.LogPayload, 4)
+	c := logs.NewCollector(src, "info", 1024*1024, 10*time.Millisecond, out, logger.Noop())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	go c.Run(ctx)
+	<-ctx.Done()
+
+	got := src.calls.Load()
+	if got < 3 {
+		t.Errorf("Tail call count: got %d, want ≥3 (collector must reconnect after Tail returns)", got)
 	}
 }
 

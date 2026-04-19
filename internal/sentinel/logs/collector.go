@@ -40,13 +40,28 @@ func NewCollector(source Source, minLevel string, batchSize int64, batchTimeout 
 	}
 }
 
+// ReconnectBackoff is how long the Tail goroutine sleeps before reconnecting
+// after the source returns (e.g. because the source container restarted).
+// Exposed as a var (not a const) so tests can set it shorter.
+var ReconnectBackoff = 2 * time.Second
+
 // Run starts the collection loop. It blocks until ctx is cancelled.
 func (c *Collector) Run(ctx context.Context) error {
 	lineCh := make(chan LogLine, lineBufferSize)
 	go func() {
-		// collect errors are transient; log and continue.
-		if err := c.source.Tail(ctx, lineCh); err != nil && ctx.Err() == nil {
-			c.log.Error("source error", "err", err)
+		// Reconnect loop: if the source's Tail returns (source container
+		// restarted, network hiccup, …), sleep briefly and call it again.
+		// Without this loop the collector goes silent after the first
+		// disconnect until the entire sentinel process restarts.
+		for ctx.Err() == nil {
+			if err := c.source.Tail(ctx, lineCh); err != nil && ctx.Err() == nil {
+				c.log.Error("source error, reconnecting", "err", err, "backoff", ReconnectBackoff)
+			}
+			select {
+			case <-time.After(ReconnectBackoff):
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
