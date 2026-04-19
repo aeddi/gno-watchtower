@@ -22,7 +22,7 @@ import (
 	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
-func TestForwardRPC_PostsToVM(t *testing.T) {
+func TestForwardRPC_PostsSentinelMetricsToVM(t *testing.T) {
 	var received []byte
 	var path string
 	vmSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -31,15 +31,44 @@ func TestForwardRPC_PostsToVM(t *testing.T) {
 	}))
 	defer vmSrv.Close()
 
+	payload := protocol.RPCPayload{
+		CollectedAt: time.Now().UTC(),
+		Data: map[string]json.RawMessage{
+			"net_info": json.RawMessage(`{"n_peers":"7"}`),
+		},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
 	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
-	if err := f.ForwardRPC(context.Background(), "val-01", []byte(`{}`)); err != nil {
+	if err := f.ForwardRPC(context.Background(), "val-01", body); err != nil {
 		t.Fatalf("ForwardRPC: %v", err)
 	}
-	if len(received) == 0 {
-		t.Error("VM received nothing")
-	}
 	if path != "/api/v1/import" {
-		t.Errorf("unexpected VM path: %q (want /api/v1/import)", path)
+		t.Errorf("VM path = %q, want /api/v1/import", path)
+	}
+	if !strings.Contains(string(received), `"sentinel_rpc_peers"`) {
+		t.Errorf("VM body missing sentinel_rpc_peers: %s", received)
+	}
+	if !strings.Contains(string(received), `"val-01"`) {
+		t.Errorf("VM body missing validator label: %s", received)
+	}
+}
+
+func TestForwardRPC_EmptyPayloadNoPost(t *testing.T) {
+	var called bool
+	vmSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+	defer vmSrv.Close()
+	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
+	body := []byte(`{"collected_at":"2026-04-19T12:00:00Z","data":{}}`)
+	if err := f.ForwardRPC(context.Background(), "val-01", body); err != nil {
+		t.Fatalf("ForwardRPC: %v", err)
+	}
+	if called {
+		t.Error("empty payload should not POST to VM")
 	}
 }
 
@@ -420,8 +449,16 @@ func TestForwardRPC_NonOKIncludesBody(t *testing.T) {
 	}))
 	defer vmSrv.Close()
 
+	payload := protocol.RPCPayload{
+		CollectedAt: time.Now().UTC(),
+		Data:        map[string]json.RawMessage{"net_info": json.RawMessage(`{"n_peers":"1"}`)},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
 	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
-	err := f.ForwardRPC(context.Background(), "val-01", []byte(`{}`))
+	err = f.ForwardRPC(context.Background(), "val-01", body)
 	if err == nil {
 		t.Fatal("expected error for 400 response")
 	}

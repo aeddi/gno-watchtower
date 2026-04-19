@@ -60,15 +60,15 @@ func (f *Forwarder) postVMLines(ctx context.Context, lines []vmLine) error {
 	return f.post(ctx, f.vmURL+"/api/v1/import", buf.Bytes(), "application/json")
 }
 
-// ForwardRPC forwards a placeholder metric to VictoriaMetrics to validate the wiring.
-// TODO: implement proper RPC metrics extraction — tracked in dedicated PR.
+// ForwardRPC decodes a sentinel RPC payload and forwards named Prometheus
+// metrics (sentinel_rpc_*) to VictoriaMetrics. An empty payload (no changed
+// endpoints from the sentinel's delta filter) is a no-op.
 func (f *Forwarder) ForwardRPC(ctx context.Context, validator string, body []byte) error {
-	line := vmLine{
-		Metric:     map[string]string{"__name__": "sentinel_rpc_received", "validator": validator},
-		Values:     []float64{1},
-		Timestamps: []int64{time.Now().UnixMilli()},
+	var payload protocol.RPCPayload
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return fmt.Errorf("unmarshal rpc payload: %w", err)
 	}
-	return f.postVMLines(ctx, []vmLine{line})
+	return f.postVMLines(ctx, extractRPC(validator, payload))
 }
 
 // ForwardMetrics decodes a sentinel resource payload and forwards named
