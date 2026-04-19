@@ -22,8 +22,6 @@ import (
 	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
-
-
 // Forwarder sends payloads to VictoriaMetrics and Loki.
 type Forwarder struct {
 	vmURL   string
@@ -73,15 +71,16 @@ func (f *Forwarder) ForwardRPC(ctx context.Context, validator string, body []byt
 	return f.postVMLines(ctx, []vmLine{line})
 }
 
-// ForwardMetrics forwards a placeholder metric to VictoriaMetrics to validate the wiring.
-// TODO: implement proper resource metrics extraction — tracked in dedicated PR.
+// ForwardMetrics decodes a sentinel resource payload and forwards named
+// Prometheus metrics (sentinel_host_* and sentinel_container_*) to VictoriaMetrics.
+// An empty payload (no changed keys from the sentinel's delta filter) is a no-op.
 func (f *Forwarder) ForwardMetrics(ctx context.Context, validator string, body []byte) error {
-	line := vmLine{
-		Metric:     map[string]string{"__name__": "sentinel_metrics_received", "validator": validator},
-		Values:     []float64{1},
-		Timestamps: []int64{time.Now().UnixMilli()},
+	var payload protocol.MetricsPayload
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return fmt.Errorf("unmarshal metrics payload: %w", err)
 	}
-	return f.postVMLines(ctx, []vmLine{line})
+	lines := extractMetrics(validator, payload)
+	return f.postVMLines(ctx, lines)
 }
 
 // ForwardLogs decompresses the zstd-encoded LogPayload body and pushes it to Loki.

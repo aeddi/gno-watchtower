@@ -160,19 +160,65 @@ func TestForwardLogs_EmptyMinLevelMeansNoFilter(t *testing.T) {
 	}
 }
 
-func TestForwardMetrics_PostsToVM(t *testing.T) {
+func TestForwardMetrics_PostsSentinelMetricsToVM(t *testing.T) {
 	var received []byte
+	var path string
 	vmSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
 		received, _ = io.ReadAll(r.Body)
 	}))
 	defer vmSrv.Close()
 
+	payload := protocol.MetricsPayload{
+		CollectedAt: time.Now().UTC(),
+		Data:        map[string]json.RawMessage{"cpu": json.RawMessage(`[33.0]`)},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
 	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
-	if err := f.ForwardMetrics(context.Background(), "val-01", []byte(`{}`)); err != nil {
+	if err := f.ForwardMetrics(context.Background(), "val-01", body); err != nil {
 		t.Fatalf("ForwardMetrics: %v", err)
 	}
-	if len(received) == 0 {
-		t.Error("VM received nothing")
+	if path != "/api/v1/import" {
+		t.Errorf("VM path = %q, want /api/v1/import", path)
+	}
+	// The VM /api/v1/import body is newline-delimited JSON; we posted one sample.
+	var line struct {
+		Metric     map[string]string `json:"metric"`
+		Values     []float64         `json:"values"`
+		Timestamps []int64           `json:"timestamps"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(received))
+	if err := dec.Decode(&line); err != nil {
+		t.Fatalf("decode VM body: %v (body=%q)", err, received)
+	}
+	if line.Metric["__name__"] != "sentinel_host_cpu_percent" {
+		t.Errorf("__name__ = %q, want sentinel_host_cpu_percent", line.Metric["__name__"])
+	}
+	if line.Metric["validator"] != "val-01" {
+		t.Errorf("validator = %q, want val-01", line.Metric["validator"])
+	}
+	if len(line.Values) != 1 || line.Values[0] != 33.0 {
+		t.Errorf("values = %v, want [33]", line.Values)
+	}
+}
+
+func TestForwardMetrics_EmptyPayloadNoPost(t *testing.T) {
+	var called bool
+	vmSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+	defer vmSrv.Close()
+
+	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
+	body := []byte(`{"collected_at":"2026-04-19T12:00:00Z","data":{}}`)
+	if err := f.ForwardMetrics(context.Background(), "val-01", body); err != nil {
+		t.Fatalf("ForwardMetrics: %v", err)
+	}
+	if called {
+		t.Error("empty payload should not POST to VM")
 	}
 }
 
