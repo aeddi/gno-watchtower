@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -162,23 +163,53 @@ type lokiStream struct {
 // toLokiPush converts a LogPayload to the Loki push API format.
 // Timestamps are extracted from the "ts" field of each line (nanoseconds since epoch).
 // Lines without a parseable "ts" field use the current time.
+//
+// Lines are split across streams by their "module" field so that `module`
+// becomes an indexed Loki label (required for Grafana's label_values(module)
+// dropdown — structured metadata extracted at query time via `| json` doesn't
+// populate the index). Missing/empty module falls back to "unknown"; sentinel
+// guarantees non-JSON stdout arrives here tagged as module="sentinel-raw".
 func toLokiPush(validator string, payload protocol.LogPayload) (*lokiPush, error) {
-	stream := lokiStream{
-		Stream: map[string]string{
-			"validator": validator,
-			"level":     payload.Level,
-		},
-		Values: make([][]string, 0, len(payload.Lines)),
-	}
 	now := time.Now()
+	byModule := make(map[string][][]string)
 	for _, raw := range payload.Lines {
+		mod := extractModule(raw)
 		ts := extractTS(raw, now)
-		stream.Values = append(stream.Values, []string{
+		byModule[mod] = append(byModule[mod], []string{
 			strconv.FormatInt(ts.UnixNano(), 10),
 			string(raw),
 		})
 	}
-	return &lokiPush{Streams: []lokiStream{stream}}, nil
+	streams := make([]lokiStream, 0, len(byModule))
+	for mod, values := range byModule {
+		// Loki rejects out-of-order entries per stream with 400. Upstream
+		// sentinel batches preserve order from docker, but sort defensively so
+		// a future reordering upstream can't silently break ingestion.
+		sort.Slice(values, func(i, j int) bool { return values[i][0] < values[j][0] })
+		streams = append(streams, lokiStream{
+			Stream: map[string]string{
+				"validator": validator,
+				"level":     payload.Level,
+				"module":    mod,
+			},
+			Values: values,
+		})
+	}
+	return &lokiPush{Streams: streams}, nil
+}
+
+// extractModule reads the "module" field from a raw JSON line. Returns
+// "unknown" when the field is missing, empty, or the line isn't JSON.
+// Sentinel's EnsureJSON should already populate "module" for every line —
+// this is defensive for pre-existing data or non-sentinel producers.
+func extractModule(raw json.RawMessage) string {
+	var line struct {
+		Module string `json:"module"`
+	}
+	if err := json.Unmarshal(raw, &line); err != nil || line.Module == "" {
+		return "unknown"
+	}
+	return line.Module
 }
 
 // extractTS extracts the "ts" field from a raw JSON line.

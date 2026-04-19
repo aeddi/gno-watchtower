@@ -189,7 +189,7 @@ func TestForwardLogs_DecompressesAndPushesToLoki(t *testing.T) {
 	payload := protocol.LogPayload{
 		Level: "warn",
 		Lines: []json.RawMessage{
-			json.RawMessage(`{"level":"warn","msg":"test","ts":"2026-01-01T00:00:01Z"}`),
+			json.RawMessage(`{"level":"warn","msg":"test","ts":"2026-01-01T00:00:01Z","module":"rpc-server"}`),
 		},
 	}
 	body, _ := json.Marshal(payload)
@@ -212,11 +212,107 @@ func TestForwardLogs_DecompressesAndPushesToLoki(t *testing.T) {
 	if len(push.Streams) == 0 {
 		t.Fatal("no streams in loki push")
 	}
-	if push.Streams[0].Stream["validator"] != "val-01" {
-		t.Errorf("validator label: got %q", push.Streams[0].Stream["validator"])
+	s := push.Streams[0]
+	if s.Stream["validator"] != "val-01" {
+		t.Errorf("validator label: got %q", s.Stream["validator"])
 	}
-	if push.Streams[0].Stream["level"] != "warn" {
-		t.Errorf("level label: got %q", push.Streams[0].Stream["level"])
+	if s.Stream["level"] != "warn" {
+		t.Errorf("level label: got %q", s.Stream["level"])
+	}
+	if s.Stream["module"] != "rpc-server" {
+		t.Errorf("module label: got %q (want rpc-server)", s.Stream["module"])
+	}
+}
+
+func TestForwardLogs_SplitsByModule(t *testing.T) {
+	// One payload with lines from multiple modules must produce one Loki stream
+	// per (validator, level, module) tuple so `module` is an indexed label
+	// (required for Grafana's label_values(module) dropdown).
+	var lokiBody []byte
+	lokiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lokiBody, _ = io.ReadAll(r.Body)
+	}))
+	defer lokiSrv.Close()
+
+	payload := protocol.LogPayload{
+		Level: "info",
+		Lines: []json.RawMessage{
+			json.RawMessage(`{"level":"info","ts":1.0,"msg":"a","module":"rpc-server"}`),
+			json.RawMessage(`{"level":"info","ts":2.0,"msg":"b","module":"consensus"}`),
+			json.RawMessage(`{"level":"info","ts":3.0,"msg":"c","module":"rpc-server"}`),
+		},
+	}
+	body, _ := json.Marshal(payload)
+	compressed, _ := zstdCompress(body)
+
+	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL)
+	if err := f.ForwardLogs(context.Background(), "val-01", compressed, ""); err != nil {
+		t.Fatalf("ForwardLogs: %v", err)
+	}
+
+	var push struct {
+		Streams []struct {
+			Stream map[string]string `json:"stream"`
+			Values [][]string        `json:"values"`
+		} `json:"streams"`
+	}
+	if err := json.Unmarshal(lokiBody, &push); err != nil {
+		t.Fatalf("parse loki body: %v", err)
+	}
+	byModule := make(map[string]int)
+	for _, s := range push.Streams {
+		if s.Stream["validator"] != "val-01" || s.Stream["level"] != "info" {
+			t.Errorf("unexpected stream labels: %v", s.Stream)
+		}
+		byModule[s.Stream["module"]] += len(s.Values)
+	}
+	if byModule["rpc-server"] != 2 {
+		t.Errorf("rpc-server line count: got %d, want 2", byModule["rpc-server"])
+	}
+	if byModule["consensus"] != 1 {
+		t.Errorf("consensus line count: got %d, want 1", byModule["consensus"])
+	}
+	if len(byModule) != 2 {
+		t.Errorf("distinct modules: got %d (%v), want 2", len(byModule), byModule)
+	}
+}
+
+func TestForwardLogs_MissingModuleFallsBackToUnknown(t *testing.T) {
+	// Defensive: if a line somehow reaches watchtower without a module field
+	// (pre-EnsureJSON data, or a broken producer), route it to module="unknown"
+	// rather than silently dropping the module label.
+	var lokiBody []byte
+	lokiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lokiBody, _ = io.ReadAll(r.Body)
+	}))
+	defer lokiSrv.Close()
+
+	payload := protocol.LogPayload{
+		Level: "info",
+		Lines: []json.RawMessage{
+			json.RawMessage(`{"level":"info","ts":1.0,"msg":"no module here"}`),
+		},
+	}
+	body, _ := json.Marshal(payload)
+	compressed, _ := zstdCompress(body)
+
+	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL)
+	if err := f.ForwardLogs(context.Background(), "val-01", compressed, ""); err != nil {
+		t.Fatalf("ForwardLogs: %v", err)
+	}
+	var push struct {
+		Streams []struct {
+			Stream map[string]string `json:"stream"`
+		} `json:"streams"`
+	}
+	if err := json.Unmarshal(lokiBody, &push); err != nil {
+		t.Fatalf("parse loki body: %v", err)
+	}
+	if len(push.Streams) != 1 {
+		t.Fatalf("stream count: got %d, want 1", len(push.Streams))
+	}
+	if push.Streams[0].Stream["module"] != "unknown" {
+		t.Errorf("missing module: got %q, want 'unknown'", push.Streams[0].Stream["module"])
 	}
 }
 
