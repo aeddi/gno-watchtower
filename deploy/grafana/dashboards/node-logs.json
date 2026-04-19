@@ -431,8 +431,8 @@
         "dedupStrategy": "none",
         "enableInfiniteScrolling": true,
         "enableLogDetails": true,
-        "prettifyLogMessage": false,
-        "showCommonLabels": false,
+        "prettifyLogMessage": true,
+        "showCommonLabels": true,
         "showLabels": true,
         "showTime": true,
         "sortOrder": "Descending",
@@ -446,7 +446,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{validator=~\"$validator\", level=~\"$level\", module=~\"$module\"} |~ \"(?i)$search\" | json | __error__=\"\" | line_format \"[{{.validator}}] [{{.module}}] {{.msg}}\" | drop msg, ts, validator, module, detected_level, level_extracted, module_extracted, validator_extracted",
+          "expr": "{validator=~\"$validator\", level=~\"$level\", module=~\"$module\"} |~ \"(?i)$search\" | line_format \"{{regexReplaceAll \\\",\\\\\\\"(level|ts|module)\\\\\\\":(\\\\\\\"[^\\\\\\\"]*\\\\\\\"|[0-9.eE+-]+)\\\" (regexReplaceAll \\\"\\\\\\\"(level|ts|module)\\\\\\\":(\\\\\\\"[^\\\\\\\"]*\\\\\\\"|[0-9.eE+-]+),\\\" __line__ \\\"\\\") \\\"\\\"}}\" | drop detected_level",
           "queryType": "range",
           "refId": "A"
         }
