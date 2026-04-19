@@ -3,6 +3,7 @@ package logs
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -68,6 +69,13 @@ func (s *DockerSource) Tail(ctx context.Context, out chan<- LogLine) error {
 	}()
 
 	scanner := bufio.NewScanner(pr)
+	// Default Scanner buffer caps lines at 64KB; gnoland can emit much larger
+	// single lines (e.g. dumped consensus state, or operator/test injection).
+	// Use a 1MB ceiling — large enough for real-world lines while bounding
+	// memory. Lines above the ceiling still error with ErrTooLong, which we
+	// handle below by skipping to the next newline instead of crashing Tail.
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+
 	for scanner.Scan() {
 		// Copy scanner bytes — scanner reuses the underlying buffer on next call.
 		raw := append([]byte(nil), scanner.Bytes()...)
@@ -85,7 +93,13 @@ func (s *DockerSource) Tail(ctx context.Context, out chan<- LogLine) error {
 			return ctx.Err()
 		}
 	}
+	// bufio.ErrTooLong here means a single line exceeded our 1MB ceiling. We
+	// surface it but return nil so the caller reconnects instead of treating it
+	// as fatal. The oversized line is lost, but the rest of the stream survives.
 	if err := scanner.Err(); err != nil {
+		if errors.Is(err, bufio.ErrTooLong) {
+			return nil
+		}
 		return fmt.Errorf("scan docker logs: %w", err)
 	}
 	return nil
