@@ -110,15 +110,11 @@ func EnsureJSON(raw []byte, now time.Time) json.RawMessage {
 
 // wrapAsSentinelRaw produces a synthetic JSON line for input that isn't a
 // valid JSON object. msg carries the original bytes as a UTF-8 string.
-//
-// Level is "warn" (not "info") because a non-JSON line reaching the collector
-// means the JSON logger either wasn't active (startup banner) or was bypassed
-// (panic stack trace, third-party library output). Those are abnormal events
-// that should stand out rather than dilute the info level — especially in a
-// crash-loop, where a single panic can produce thousands of synthetic lines.
+// Level is "info" — the line content is not known, so info is the neutral
+// default. Dashboards can exclude module="sentinel-raw" to keep counts clean.
 func wrapAsSentinelRaw(raw []byte, now time.Time) json.RawMessage {
 	wrapped, err := json.Marshal(map[string]any{
-		"level":  "warn",
+		"level":  "info",
 		"ts":     float64(now.UnixNano()) / 1e9,
 		"module": "sentinel-raw",
 		"msg":    string(raw),
@@ -126,7 +122,7 @@ func wrapAsSentinelRaw(raw []byte, now time.Time) json.RawMessage {
 	if err != nil {
 		// json.Marshal only fails on unsupported types — none here — but be
 		// defensive: fall back to a minimal constant envelope.
-		return json.RawMessage(`{"level":"warn","module":"sentinel-raw","msg":"<unserializable>"}`)
+		return json.RawMessage(`{"level":"info","module":"sentinel-raw","msg":"<unserializable>"}`)
 	}
 	return json.RawMessage(wrapped)
 }
