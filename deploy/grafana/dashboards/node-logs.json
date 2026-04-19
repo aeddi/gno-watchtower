@@ -446,7 +446,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{validator=~\"$validator\", level=~\"$level\", module=~\"$module\"} |~ \"(?i)$search\" | json | __error__=\"\" | line_format \"{{.msg}}{{range $k := keys . | sortAlpha}}{{if not (has $k (list \"msg\" \"level\" \"level_extracted\" \"detected_level\" \"ts\" \"module\" \"module_extracted\" \"validator\" \"validator_extracted\" \"service_name\" \"service_namespace\" \"service_instance_id\" \"observed_timestamp\" \"severity_number\" \"severity_text\" \"time\" \"__error__\" \"__error_details__\" \"__stream_shard__\"))}} {{$k}}={{index $ $k}}{{end}}{{end}}\" | drop msg, ts, detected_level, level_extracted, module_extracted, validator_extracted",
+          "expr": "{validator=~\"$validator\", level=~\"$level\", module=~\"$module\"} |~ \"(?i)$search\" | json | __error__=\"\" | line_format \"{{.msg}}\" | drop msg, ts, detected_level, level_extracted, module_extracted, validator_extracted",
           "queryType": "range",
           "refId": "A"
         }
