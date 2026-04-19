@@ -3,7 +3,6 @@ package logs
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
@@ -71,14 +70,17 @@ func (s *DockerSource) Tail(ctx context.Context, out chan<- LogLine) error {
 	scanner := bufio.NewScanner(pr)
 	for scanner.Scan() {
 		// Copy scanner bytes — scanner reuses the underlying buffer on next call.
-		raw := json.RawMessage(append([]byte(nil), scanner.Bytes()...))
-		// Skip non-JSON lines (e.g. plain-text startup messages before the JSON logger is ready).
-		if !json.Valid(raw) {
+		raw := append([]byte(nil), scanner.Bytes()...)
+		// Non-JSON gnoland output (startup banners, stack traces) is wrapped as
+		// a synthetic JSON line so it still reaches Loki under module=sentinel-raw.
+		// Empty lines return nil and are skipped.
+		line := EnsureJSON(raw, time.Now())
+		if line == nil {
 			continue
 		}
-		level := ParseLevel(raw)
+		level := ParseLevel(line)
 		select {
-		case out <- LogLine{Level: level, Raw: raw}:
+		case out <- LogLine{Level: level, Raw: line}:
 		case <-ctx.Done():
 			return ctx.Err()
 		}
