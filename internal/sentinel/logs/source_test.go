@@ -125,8 +125,8 @@ func TestEnsureJSON_WrapsNonJSON(t *testing.T) {
 	if err := json.Unmarshal(got, &parsed); err != nil {
 		t.Fatalf("wrapped output is not valid JSON: %v\n  got: %s", err, got)
 	}
-	if parsed["level"] != "info" {
-		t.Errorf("level: got %v, want info", parsed["level"])
+	if parsed["level"] != "warn" {
+		t.Errorf("level: got %v, want warn (sentinel-raw is abnormal output)", parsed["level"])
 	}
 	if parsed["module"] != "sentinel-raw" {
 		t.Errorf("module: got %v, want sentinel-raw", parsed["module"])
