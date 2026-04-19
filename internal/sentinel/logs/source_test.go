@@ -9,11 +9,108 @@ import (
 	"github.com/aeddi/gno-watchtower/internal/sentinel/logs"
 )
 
-func TestEnsureJSON_PassesThroughValidJSON(t *testing.T) {
-	raw := []byte(`{"level":"info","msg":"hello","ts":1234567890.5}`)
+func TestEnsureJSON_PassesThroughValidJSONWithAllMandatoryFields(t *testing.T) {
+	// All 4 mandatory fields (ts, level, msg, module) present → no modification.
+	raw := []byte(`{"level":"info","ts":1234567890.5,"msg":"hello","module":"rpc-server","extra":42}`)
 	got := logs.EnsureJSON(raw, time.Now())
 	if !bytes.Equal(got, raw) {
-		t.Errorf("valid JSON was modified:\n  in:  %s\n  out: %s", raw, got)
+		t.Errorf("fully-populated JSON was modified:\n  in:  %s\n  out: %s", raw, got)
+	}
+}
+
+func TestEnsureJSON_FillsMissingLevel(t *testing.T) {
+	raw := []byte(`{"ts":1.0,"msg":"x","module":"m"}`)
+	got := logs.EnsureJSON(raw, time.Now())
+	var p map[string]any
+	if err := json.Unmarshal(got, &p); err != nil {
+		t.Fatalf("output not valid JSON: %v", err)
+	}
+	if p["level"] != "info" {
+		t.Errorf("missing level should default to info; got %v", p["level"])
+	}
+}
+
+func TestEnsureJSON_FillsMissingTs(t *testing.T) {
+	raw := []byte(`{"level":"warn","msg":"x","module":"m"}`)
+	now := time.Unix(1234567890, 500_000_000)
+	got := logs.EnsureJSON(raw, now)
+	var p map[string]any
+	if err := json.Unmarshal(got, &p); err != nil {
+		t.Fatalf("output not valid JSON: %v", err)
+	}
+	ts, ok := p["ts"].(float64)
+	if !ok {
+		t.Fatalf("ts not a float: got %T (%v)", p["ts"], p["ts"])
+	}
+	if ts < 1234567890.4 || ts > 1234567890.6 {
+		t.Errorf("ts: got %v, want ~1234567890.5", ts)
+	}
+}
+
+func TestEnsureJSON_FillsMissingMsg(t *testing.T) {
+	raw := []byte(`{"level":"info","ts":1.0,"module":"m"}`)
+	got := logs.EnsureJSON(raw, time.Now())
+	var p map[string]any
+	if err := json.Unmarshal(got, &p); err != nil {
+		t.Fatalf("output not valid JSON: %v", err)
+	}
+	if p["msg"] != "" {
+		t.Errorf("missing msg should default to empty string; got %v", p["msg"])
+	}
+}
+
+func TestEnsureJSON_FillsMissingModule(t *testing.T) {
+	raw := []byte(`{"level":"info","ts":1.0,"msg":"x"}`)
+	got := logs.EnsureJSON(raw, time.Now())
+	var p map[string]any
+	if err := json.Unmarshal(got, &p); err != nil {
+		t.Fatalf("output not valid JSON: %v", err)
+	}
+	if p["module"] != "unknown" {
+		t.Errorf("missing module should default to 'unknown' (distinct from sentinel-raw); got %v", p["module"])
+	}
+}
+
+func TestEnsureJSON_FillsMultipleMissingFields(t *testing.T) {
+	// Minimal JSON — only one field present. All others get filled.
+	raw := []byte(`{"msg":"hi there"}`)
+	got := logs.EnsureJSON(raw, time.Now())
+	var p map[string]any
+	if err := json.Unmarshal(got, &p); err != nil {
+		t.Fatalf("output not valid JSON: %v", err)
+	}
+	if p["level"] != "info" {
+		t.Errorf("level: got %v", p["level"])
+	}
+	if p["module"] != "unknown" {
+		t.Errorf("module: got %v", p["module"])
+	}
+	if _, ok := p["ts"].(float64); !ok {
+		t.Errorf("ts: got %T (%v)", p["ts"], p["ts"])
+	}
+	// Existing msg must not be overwritten.
+	if p["msg"] != "hi there" {
+		t.Errorf("msg: got %v, want original 'hi there'", p["msg"])
+	}
+}
+
+func TestEnsureJSON_WrapsValidJSONThatIsNotAnObject(t *testing.T) {
+	// A JSON number, string, or array is technically valid JSON but can't have
+	// fields added. Treat as raw and wrap.
+	for _, in := range []string{`42`, `"string literal"`, `[1,2,3]`, `null`} {
+		got := logs.EnsureJSON([]byte(in), time.Now())
+		if got == nil {
+			t.Errorf("got nil for %q, want wrapped", in)
+			continue
+		}
+		var p map[string]any
+		if err := json.Unmarshal(got, &p); err != nil {
+			t.Errorf("not a wrapped JSON object for %q: %v", in, err)
+			continue
+		}
+		if p["module"] != "sentinel-raw" {
+			t.Errorf("input %q: expected sentinel-raw wrap, got module=%v", in, p["module"])
+		}
 	}
 }
 

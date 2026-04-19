@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -53,18 +54,63 @@ func ParseLevel(raw json.RawMessage) string {
 	}
 }
 
-// EnsureJSON returns raw unchanged if it's already valid JSON; otherwise it
-// wraps raw as a synthetic info-level line with module="sentinel-raw", so
-// non-JSON stdout (e.g. gnoland startup banners emitted before the JSON logger
-// is ready) is still observable in Loki instead of being silently dropped.
-// Returns nil for empty/whitespace-only input — callers should skip those.
+// EnsureJSON normalizes a raw log line so downstream consumers (Loki, Grafana)
+// can rely on four invariants: the payload is a valid JSON object, and it
+// always has "ts", "level", "msg", and "module" fields.
+//
+//   - Empty/whitespace input → nil (caller should skip).
+//   - Non-JSON or JSON that isn't an object (e.g. `42`, `"x"`, `[…]`, `null`)
+//     → wrapped as a synthetic line with module="sentinel-raw" and msg=original.
+//   - Valid JSON object missing any mandatory field → missing fields filled
+//     with defaults (ts=now, level="info", msg="", module="unknown").
+//     module="unknown" is deliberately distinct from "sentinel-raw" so
+//     dashboards can tell a fill-in apart from a non-JSON wrap.
+//   - Valid JSON object with all 4 mandatory fields → returned unchanged.
 func EnsureJSON(raw []byte, now time.Time) json.RawMessage {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return nil
 	}
-	if json.Valid(raw) {
-		return json.RawMessage(raw)
+	if !json.Valid(raw) {
+		return wrapAsSentinelRaw(raw, now)
 	}
+	// Valid JSON. Must also be an OBJECT to carry the mandatory fields.
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil || obj == nil {
+		return wrapAsSentinelRaw(raw, now)
+	}
+	// Fast path: all 4 mandatory fields present → no reserialization.
+	if _, ok1 := obj["ts"]; ok1 {
+		if _, ok2 := obj["level"]; ok2 {
+			if _, ok3 := obj["msg"]; ok3 {
+				if _, ok4 := obj["module"]; ok4 {
+					return json.RawMessage(raw)
+				}
+			}
+		}
+	}
+	// Fill missing mandatory fields while preserving original extras.
+	if _, ok := obj["ts"]; !ok {
+		obj["ts"] = json.RawMessage(strconv.FormatFloat(float64(now.UnixNano())/1e9, 'f', -1, 64))
+	}
+	if _, ok := obj["level"]; !ok {
+		obj["level"] = json.RawMessage(`"info"`)
+	}
+	if _, ok := obj["msg"]; !ok {
+		obj["msg"] = json.RawMessage(`""`)
+	}
+	if _, ok := obj["module"]; !ok {
+		obj["module"] = json.RawMessage(`"unknown"`)
+	}
+	filled, err := json.Marshal(obj)
+	if err != nil {
+		return wrapAsSentinelRaw(raw, now)
+	}
+	return json.RawMessage(filled)
+}
+
+// wrapAsSentinelRaw produces a synthetic JSON line for input that isn't a
+// valid JSON object. msg carries the original bytes as a UTF-8 string.
+func wrapAsSentinelRaw(raw []byte, now time.Time) json.RawMessage {
 	wrapped, err := json.Marshal(map[string]any{
 		"level":  "info",
 		"ts":     float64(now.UnixNano()) / 1e9,
@@ -72,9 +118,8 @@ func EnsureJSON(raw []byte, now time.Time) json.RawMessage {
 		"msg":    string(raw),
 	})
 	if err != nil {
-		// json.Marshal can fail only on unsupported types — none here — but
-		// be defensive: fall back to a minimal constant envelope so we still
-		// emit *something* for every line.
+		// json.Marshal only fails on unsupported types — none here — but be
+		// defensive: fall back to a minimal constant envelope.
 		return json.RawMessage(`{"level":"info","module":"sentinel-raw","msg":"<unserializable>"}`)
 	}
 	return json.RawMessage(wrapped)
