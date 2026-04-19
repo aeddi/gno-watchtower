@@ -446,7 +446,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{validator=~\"$validator\", level=~\"$level\", module=~\"$module\"} |~ \"(?i)$search\" | json | __error__=\"\" | line_format \"{{.msg}}\" | drop msg, ts, detected_level, level_extracted, module_extracted, validator_extracted",
+          "expr": "{validator=~\"$validator\", level=~\"$level\", module=~\"$module\"} |~ \"(?i)$search\" | json | __error__=\"\" | line_format \"[{{.validator}}] [{{.module}}] {{.msg}}\" | drop msg, ts, validator, module, detected_level, level_extracted, module_extracted, validator_extracted",
           "queryType": "range",
           "refId": "A"
         }
