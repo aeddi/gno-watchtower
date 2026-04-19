@@ -161,7 +161,13 @@ func appendContainer(lines []vmLine, validator string, ts int64, raw json.RawMes
 		log.Debug("metrics: container unmarshal failed", "validator", validator, "err", err)
 		return lines
 	}
+	// docker's ContainerStatsOneShot response omits the Name field on some
+	// API versions; fall back to the validator label so dashboards still have
+	// a container identifier to group/legend by.
 	name := strings.TrimPrefix(c.Name, "/")
+	if name == "" {
+		name = validator
+	}
 	labels := map[string]string{"validator": validator, "container": name}
 
 	// Docker reports cumulative CPU time in nanoseconds; Prometheus convention is seconds.

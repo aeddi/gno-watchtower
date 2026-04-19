@@ -213,6 +213,25 @@ func TestExtractMetrics_Container_StripsLeadingSlashFromName(t *testing.T) {
 	}
 }
 
+func TestExtractMetrics_Container_FallbackNameToValidator(t *testing.T) {
+	// Docker's ContainerStatsOneShot response omits Name on some API versions;
+	// we fall back to the validator label so the "container" label is never empty.
+	const noName = `{
+		"cpu_stats":{"cpu_usage":{"total_usage":0}},
+		"memory_stats":{"usage":0,"limit":0,"stats":{}},
+		"networks":{}
+	}`
+	lines := extractMetrics("node-5", payload(map[string]string{"container": noName}))
+	if len(lines) == 0 {
+		t.Fatal("no lines emitted")
+	}
+	for _, l := range lines {
+		if l.Metric["container"] != "node-5" {
+			t.Errorf("%s: container = %q, want node-5 (fallback to validator)", l.Metric["__name__"], l.Metric["container"])
+		}
+	}
+}
+
 func TestExtractMetrics_Container_FallbackWorkingSetToUsage(t *testing.T) {
 	// When stats.inactive_file is absent, working_set should fall back to usage.
 	const noInactiveFile = `{
