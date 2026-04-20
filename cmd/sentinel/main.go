@@ -14,6 +14,7 @@ import (
 	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
 	"github.com/aeddi/gno-watchtower/internal/sentinel/doctor"
 	pkglogger "github.com/aeddi/gno-watchtower/pkg/logger"
+	"github.com/aeddi/gno-watchtower/pkg/version"
 )
 
 func main() {
@@ -28,9 +29,24 @@ func main() {
 		generateConfigCmd(os.Args[2:])
 	case "doctor":
 		doctorCmd(os.Args[2:])
+	case "version":
+		versionCmd(os.Args[2:])
 	default:
 		usage()
 		os.Exit(1)
+	}
+}
+
+func versionCmd(args []string) {
+	fs := flag.NewFlagSet("version", flag.ExitOnError)
+	verbose := fs.Bool("v", false, "verbose: include commit, build time, Go toolchain")
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	if *verbose {
+		fmt.Print(version.Long())
+	} else {
+		fmt.Println(version.Short())
 	}
 }
 
@@ -130,4 +146,5 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  run [--log-format=...] [--log-level=...] <config>  Start the sentinel")
 	fmt.Fprintln(os.Stderr, "  generate-config <output-file>                      Generate example config file")
 	fmt.Fprintln(os.Stderr, "  doctor <config>                                    Check config and setup")
+	fmt.Fprintln(os.Stderr, "  version [-v]                                       Print the build version")
 }
