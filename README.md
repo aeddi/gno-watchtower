@@ -93,7 +93,7 @@ Validator machine(s)                    Central server
 2. Generate an example config:
 
     ```sh
-    sentinel generate-config > /etc/sentinel/config.toml
+    sentinel generate-config /etc/sentinel/config.toml
     $EDITOR /etc/sentinel/config.toml
     ```
 
@@ -190,4 +190,4 @@ Run it before deploying or after any configuration change:
 sentinel doctor /etc/sentinel/config.toml
 ```
 
-Checks performed: metadata binary/genesis/config access, metadata path/cmd conflicts, log visibility and JSON format, OTLP connectivity, resource access, remote reachability, token validity, and token permissions alignment.
+Checks performed: metadata config access, metadata path/cmd conflicts, log visibility and JSON format, OTLP connectivity, resource access, remote reachability, token validity, and token permissions alignment.
