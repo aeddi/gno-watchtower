@@ -271,6 +271,22 @@ func TestExtractMetrics_MalformedJSON_SkipsKey(t *testing.T) {
 	}
 }
 
+func TestExtractMetrics_Config_EmitsInfoGauges(t *testing.T) {
+	const configJSON = `{"mempool.size":"10000","p2p.pex":"true"}`
+	lines := extractMetrics("node-1", payload(map[string]string{"config": configJSON}))
+	want := []string{"sentinel_node_config", "sentinel_node_config"}
+	if got := metricNames(t, lines); !slices.Equal(got, want) {
+		t.Fatalf("config metric names = %v, want %v", got, want)
+	}
+	pex := findLine(t, lines, map[string]string{"__name__": "sentinel_node_config", "key": "p2p.pex"})
+	if pex == nil || pex.Metric["value"] != "true" {
+		t.Errorf("p2p.pex config sample missing or wrong: %v", pex)
+	}
+	if pex != nil && pex.Values[0] != 1 {
+		t.Errorf("config gauge value = %v, want 1", pex.Values[0])
+	}
+}
+
 func TestExtractMetrics_UnknownKey_Ignored(t *testing.T) {
 	lines := extractMetrics("node-1", payload(map[string]string{"mystery_key": `{"x":1}`}))
 	if len(lines) != 0 {

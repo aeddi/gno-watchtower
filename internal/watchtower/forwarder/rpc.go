@@ -3,6 +3,7 @@ package forwarder
 import (
 	"encoding/json"
 	"log/slog"
+	"strings"
 
 	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
@@ -31,8 +32,10 @@ import (
 // entry fails to parse, the group is dropped rather than silently understated.
 func extractRPC(validator string, payload protocol.RPCPayload) []vmLine {
 	ts := payload.CollectedAt.UnixMilli()
-	// 3 (status) + 1 (net_info) + 2 (mempool) + 3 (consensus) + 2 (validators) + 1 (block) = 12 max.
-	lines := make([]vmLine, 0, 12)
+	// status 4 + net_info 1 + mempool 2 + consensus 3 + validators 2 + block 1 = 13;
+	// genesis one-shot adds 1 info + up to 6 consensus_params + N validators.
+	// 32 covers a small validator set; runtime growth is cheap.
+	lines := make([]vmLine, 0, 32)
 
 	for key, raw := range payload.Data {
 		switch key {
@@ -48,14 +51,18 @@ func extractRPC(validator string, payload protocol.RPCPayload) []vmLine {
 			lines = appendRPCValidators(lines, validator, ts, raw)
 		case "block":
 			lines = appendRPCBlock(lines, validator, ts, raw)
+		case "genesis":
+			lines = appendRPCGenesis(lines, validator, ts, raw)
 		}
 	}
 	return lines
 }
 
-// decodeResult unmarshals raw into T. Returns (zero, false) on error with a
-// Debug log so operators can grep for persistent shape drift without the
-// extractors needing a logger parameter.
+// decodeResult unmarshals raw into T. The raw payload is the inner `result`
+// object from the gnoland JSON-RPC envelope; the envelope itself is stripped
+// by the sentinel's rpc.Client.get — see internal/sentinel/rpc/client.go.
+// Returns (zero, false) on error with a Debug log so operators can grep for
+// persistent shape drift without the extractors needing a logger parameter.
 func decodeResult[T any](raw json.RawMessage, key, validator string) (T, bool) {
 	var v T
 	if err := json.Unmarshal(raw, &v); err != nil {
@@ -80,6 +87,11 @@ func intSample(name string, labels map[string]string, num json.Number, ts int64,
 }
 
 type rpcStatus struct {
+	NodeInfo struct {
+		Moniker string `json:"moniker"`
+		Network string `json:"network"` // chain_id
+		Version string `json:"version"` // gnoland build version (e.g. master.12345+abcdef0)
+	} `json:"node_info"`
 	SyncInfo struct {
 		LatestBlockHeight json.Number `json:"latest_block_height"`
 		CatchingUp        bool        `json:"catching_up"`
@@ -104,6 +116,18 @@ func appendRPCStatus(lines []vmLine, validator string, ts int64, raw json.RawMes
 			lines = append(lines, s)
 		}
 	}
+
+	// Build-info gauge: Prometheus-style info metric carrying identifying
+	// labels at value 1. Operators dashboard these to spot version drift.
+	// Missing fields degrade to empty-label series rather than being dropped —
+	// a moniker-less node is still a node and still deserves a series.
+	infoLabels := map[string]string{
+		"validator": validator,
+		"chain_id":  r.NodeInfo.Network,
+		"moniker":   r.NodeInfo.Moniker,
+		"version":   r.NodeInfo.Version,
+	}
+	lines = append(lines, vmSample("sentinel_node_build_info", infoLabels, 1, ts))
 	return lines
 }
 
@@ -224,4 +248,123 @@ func boolToFloat(b bool) float64 {
 		return 1
 	}
 	return 0
+}
+
+// rpcGenesisBlockParams mirrors the nested consensus_params.Block object in
+// /genesis. Fields use gnoland's PascalCase (see tm2/pkg/bft/types/genesis.go).
+type rpcGenesisBlockParams struct {
+	MaxTxBytes    json.Number `json:"MaxTxBytes"`
+	MaxDataBytes  json.Number `json:"MaxDataBytes"`
+	MaxBlockBytes json.Number `json:"MaxBlockBytes"`
+	MaxGas        json.Number `json:"MaxGas"`
+	TimeIotaMS    json.Number `json:"TimeIotaMS"`
+}
+
+type rpcGenesisValidatorParams struct {
+	PubKeyTypeURLs []string `json:"PubKeyTypeURLs"`
+}
+
+type rpcGenesisConsensusParams struct {
+	Block     rpcGenesisBlockParams     `json:"Block"`
+	Validator rpcGenesisValidatorParams `json:"Validator"`
+}
+
+type rpcGenesisValidator struct {
+	Address string `json:"address"`
+	PubKey  struct {
+		Value string `json:"value"`
+	} `json:"pub_key"`
+	Power json.Number `json:"power"`
+	Name  string      `json:"name"`
+}
+
+type rpcGenesisDoc struct {
+	GenesisTime     string                    `json:"genesis_time"`
+	ChainID         string                    `json:"chain_id"`
+	AppHash         json.RawMessage           `json:"app_hash"`
+	ConsensusParams rpcGenesisConsensusParams `json:"consensus_params"`
+	Validators      []rpcGenesisValidator     `json:"validators"`
+}
+
+// rpcGenesisResult is the outer shape of /genesis after the JSON-RPC envelope
+// has been stripped in the sentinel's rpc.Client — i.e. `{"genesis": {...}}`.
+type rpcGenesisResult struct {
+	Genesis rpcGenesisDoc `json:"genesis"`
+}
+
+// normalizeAppHash handles the three shapes gnoland may emit for app_hash in
+// /genesis: a quoted hex string, an empty string, or literal JSON null. We
+// collapse the last two to the empty string so the dashboard label is either
+// a real hex value or absent (VM drops empty labels on ingest).
+func normalizeAppHash(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	// Try to unmarshal as a string first — handles the quoted case correctly
+	// regardless of any whitespace-padding from the JSON encoder.
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return s
+	}
+	// Fallback: raw token is null/unknown; treat as absent.
+	return ""
+}
+
+// appendRPCGenesis emits the static-per-chain genesis info. Each field becomes
+// a label on an *_info gauge (value=1), matching the Prometheus info-metric
+// idiom — the operator dashboards compare these across the fleet and any
+// value drift stands out as a column with a different string.
+func appendRPCGenesis(lines []vmLine, validator string, ts int64, raw json.RawMessage) []vmLine {
+	r, ok := decodeResult[rpcGenesisResult](raw, "genesis", validator)
+	if !ok {
+		return lines
+	}
+	g := r.Genesis
+	appHash := normalizeAppHash(g.AppHash)
+
+	// Top-level genesis info: one series per validator carrying chain identity.
+	lines = append(lines, vmSample("sentinel_genesis_info", map[string]string{
+		"validator":    validator,
+		"chain_id":     g.ChainID,
+		"genesis_time": g.GenesisTime,
+		"app_hash":     appHash,
+	}, 1, ts))
+
+	// Consensus params: flat "param=value" rows so the dashboard can lay them
+	// out as a matrix of (param × validator) cells. String values preserve
+	// unit hints (e.g. ms) the operator might compare at a glance.
+	type cp struct {
+		name, value string
+	}
+	params := []cp{
+		{"block.max_tx_bytes", g.ConsensusParams.Block.MaxTxBytes.String()},
+		{"block.max_data_bytes", g.ConsensusParams.Block.MaxDataBytes.String()},
+		{"block.max_block_bytes", g.ConsensusParams.Block.MaxBlockBytes.String()},
+		{"block.max_gas", g.ConsensusParams.Block.MaxGas.String()},
+		{"block.time_iota_ms", g.ConsensusParams.Block.TimeIotaMS.String()},
+		{"validator.pub_key_types", strings.Join(g.ConsensusParams.Validator.PubKeyTypeURLs, ",")},
+	}
+	for _, p := range params {
+		if p.value == "" {
+			continue
+		}
+		lines = append(lines, vmSample("sentinel_genesis_consensus_param", map[string]string{
+			"validator": validator,
+			"param":     p.name,
+			"value":     p.value,
+		}, 1, ts))
+	}
+
+	// Genesis validator set: one series per genesis validator per reporter.
+	// Cardinality is bounded by (fleet size × genesis validator count).
+	for _, v := range g.Validators {
+		lines = append(lines, vmSample("sentinel_genesis_validator", map[string]string{
+			"validator": validator,
+			"address":   v.Address,
+			"pub_key":   v.PubKey.Value,
+			"power":     v.Power.String(),
+			"name":      v.Name,
+		}, 1, ts))
+	}
+	return lines
 }

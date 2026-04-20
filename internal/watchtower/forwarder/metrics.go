@@ -41,7 +41,30 @@ func extractMetrics(validator string, payload protocol.MetricsPayload) []vmLine 
 			lines = appendHostNetwork(lines, validator, ts, raw, log)
 		case "container":
 			lines = appendContainer(lines, validator, ts, raw, log)
+		case "config":
+			lines = appendNodeConfig(lines, validator, ts, raw, log)
 		}
+	}
+	return lines
+}
+
+// appendNodeConfig turns the metadata collector's {key: value} map into
+// Prometheus info-style gauges: sentinel_node_config{validator, key, value}=1.
+// The dashboard layer pivots this on key/validator so mismatches surface as
+// rows with differing values across columns. Values stay as raw strings —
+// the metadata collector already normalises them.
+func appendNodeConfig(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	var values map[string]string
+	if err := json.Unmarshal(raw, &values); err != nil {
+		log.Debug("metrics: config unmarshal failed", "validator", validator, "err", err)
+		return lines
+	}
+	for k, v := range values {
+		lines = append(lines, vmSample("sentinel_node_config", map[string]string{
+			"validator": validator,
+			"key":       k,
+			"value":     v,
+		}, 1, ts))
 	}
 	return lines
 }

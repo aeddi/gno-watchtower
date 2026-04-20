@@ -55,6 +55,7 @@ func TestExtractRPC_EmptyPayload(t *testing.T) {
 func TestExtractRPC_Status(t *testing.T) {
 	lines := extractRPC("node-1", rpcPayload(map[string]string{"status": statusJSON}))
 	want := []string{
+		"sentinel_node_build_info",
 		"sentinel_rpc_catching_up",
 		"sentinel_rpc_latest_block_height",
 		"sentinel_rpc_validator_voting_power",
@@ -172,9 +173,9 @@ func TestExtractRPC_MultipleKeys(t *testing.T) {
 		"validators":           validatorsJSON,
 		"block":                blockJSON,
 	}))
-	// 3 + 1 + 2 + 3 + 2 + 1 = 12
-	if len(lines) != 12 {
-		t.Errorf("got %d lines, want 12", len(lines))
+	// status: 3 rpc + 1 build_info = 4; net_info 1; mempool 2; consensus 3; validators 2; block 1 = 13.
+	if len(lines) != 13 {
+		t.Errorf("got %d lines, want 13", len(lines))
 	}
 	for _, l := range lines {
 		if l.Metric["validator"] != "node-1" {
@@ -196,6 +197,82 @@ func TestExtractRPC_MalformedJSON_SkipsKey(t *testing.T) {
 	}
 	if len(lines) == 0 {
 		t.Error("no lines emitted; status should still parse")
+	}
+}
+
+func TestExtractRPC_Status_BuildInfoCarriesChainAndVersion(t *testing.T) {
+	const statusWithNode = `{
+		"node_info":{"moniker":"mynode","network":"test-chain","version":"master.12345+abcdef0"},
+		"sync_info":{"latest_block_height":"1","catching_up":false},
+		"validator_info":{"voting_power":"1"}
+	}`
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"status": statusWithNode}))
+	info := findLine(t, lines, map[string]string{"__name__": "sentinel_node_build_info"})
+	if info == nil {
+		t.Fatal("sentinel_node_build_info not emitted")
+	}
+	if info.Metric["chain_id"] != "test-chain" {
+		t.Errorf("chain_id = %q, want test-chain", info.Metric["chain_id"])
+	}
+	if info.Metric["version"] != "master.12345+abcdef0" {
+		t.Errorf("version = %q", info.Metric["version"])
+	}
+	if info.Metric["moniker"] != "mynode" {
+		t.Errorf("moniker = %q", info.Metric["moniker"])
+	}
+	if info.Values[0] != 1 {
+		t.Errorf("info value = %v, want 1", info.Values[0])
+	}
+}
+
+const genesisJSON = `{
+	"genesis":{
+		"genesis_time":"2026-01-01T00:00:00Z",
+		"chain_id":"test-chain",
+		"app_hash":"deadbeef",
+		"consensus_params":{
+			"Block":{"MaxTxBytes":"1000000","MaxDataBytes":"2000000","MaxBlockBytes":"0","MaxGas":"3000000000","TimeIotaMS":"100"},
+			"Validator":{"PubKeyTypeURLs":["/tm.PubKeyEd25519","/tm.PubKeySecp256k1"]}
+		},
+		"validators":[
+			{"address":"g1abc","pub_key":{"value":"vkA"},"power":"1","name":"node-1"},
+			{"address":"g1def","pub_key":{"value":"vkB"},"power":"2","name":"node-2"}
+		]
+	}
+}`
+
+func TestExtractRPC_Genesis(t *testing.T) {
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"genesis": genesisJSON}))
+	// 1 genesis_info + 6 consensus_params + 2 validators = 9 lines.
+	if len(lines) != 9 {
+		t.Fatalf("got %d lines, want 9", len(lines))
+	}
+	info := findLine(t, lines, map[string]string{"__name__": "sentinel_genesis_info"})
+	if info == nil || info.Metric["chain_id"] != "test-chain" {
+		t.Errorf("genesis_info chain_id not carried: %v", info)
+	}
+	if info != nil && info.Metric["app_hash"] != "deadbeef" {
+		t.Errorf("app_hash = %q, want deadbeef", info.Metric["app_hash"])
+	}
+	// consensus_params: expect block.max_tx_bytes=1000000.
+	maxTx := findLine(t, lines, map[string]string{"__name__": "sentinel_genesis_consensus_param", "param": "block.max_tx_bytes"})
+	if maxTx == nil || maxTx.Metric["value"] != "1000000" {
+		t.Errorf("max_tx_bytes param missing or wrong: %v", maxTx)
+	}
+	// validator pub key types joined with comma.
+	pkt := findLine(t, lines, map[string]string{"__name__": "sentinel_genesis_consensus_param", "param": "validator.pub_key_types"})
+	if pkt == nil || pkt.Metric["value"] != "/tm.PubKeyEd25519,/tm.PubKeySecp256k1" {
+		t.Errorf("pub_key_types join failed: %v", pkt)
+	}
+	// Each genesis validator gets a series.
+	var gotValidators int
+	for _, l := range lines {
+		if l.Metric["__name__"] == "sentinel_genesis_validator" {
+			gotValidators++
+		}
+	}
+	if gotValidators != 2 {
+		t.Errorf("sentinel_genesis_validator count = %d, want 2", gotValidators)
 	}
 }
 
