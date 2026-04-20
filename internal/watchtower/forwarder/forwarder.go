@@ -2,13 +2,14 @@ package forwarder
 
 import (
 	"bytes"
+	"cmp"
 	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
+	"slices"
 	"strconv"
 	"time"
 
@@ -172,8 +173,7 @@ func toLokiPush(validator string, payload protocol.LogPayload) (*lokiPush, error
 	now := time.Now()
 	byModule := make(map[string][][]string)
 	for _, raw := range payload.Lines {
-		mod := extractModule(raw)
-		ts := extractTS(raw, now)
+		mod, ts := extractModuleAndTS(raw, now)
 		byModule[mod] = append(byModule[mod], []string{
 			strconv.FormatInt(ts.UnixNano(), 10),
 			string(raw),
@@ -184,7 +184,7 @@ func toLokiPush(validator string, payload protocol.LogPayload) (*lokiPush, error
 		// Loki rejects out-of-order entries per stream with 400. Upstream
 		// sentinel batches preserve order from docker, but sort defensively so
 		// a future reordering upstream can't silently break ingestion.
-		sort.Slice(values, func(i, j int) bool { return values[i][0] < values[j][0] })
+		slices.SortFunc(values, func(a, b []string) int { return cmp.Compare(a[0], b[0]) })
 		streams = append(streams, lokiStream{
 			Stream: map[string]string{
 				"validator": validator,
@@ -197,45 +197,40 @@ func toLokiPush(validator string, payload protocol.LogPayload) (*lokiPush, error
 	return &lokiPush{Streams: streams}, nil
 }
 
-// extractModule reads the "module" field from a raw JSON line. Returns
-// "unknown" when the field is missing, empty, or the line isn't JSON.
-// Sentinel's EnsureJSON should already populate "module" for every line —
-// this is defensive for pre-existing data or non-sentinel producers.
-func extractModule(raw json.RawMessage) string {
+// extractModuleAndTS reads both the "module" and "ts" fields from a raw JSON
+// line in a single Unmarshal call. Module defaults to "unknown" when missing/
+// empty; timestamp falls back to the caller-provided time when absent or
+// unparseable. "ts" is accepted as either a JSON number (epoch seconds,
+// possibly fractional — gnoland/zap format) or an RFC3339/RFC3339Nano string.
+func extractModuleAndTS(raw json.RawMessage, fallback time.Time) (string, time.Time) {
 	var line struct {
-		Module string `json:"module"`
+		Module string          `json:"module"`
+		TS     json.RawMessage `json:"ts"`
 	}
-	if err := json.Unmarshal(raw, &line); err != nil || line.Module == "" {
-		return "unknown"
+	if err := json.Unmarshal(raw, &line); err != nil {
+		return "unknown", fallback
 	}
-	return line.Module
-}
-
-// extractTS extracts the "ts" field from a raw JSON line.
-// Accepts a JSON number (epoch seconds, possibly fractional — gnoland/zap format)
-// or an RFC3339/RFC3339Nano string. Falls back if absent or unparseable.
-func extractTS(raw json.RawMessage, fallback time.Time) time.Time {
-	var line struct {
-		TS json.RawMessage `json:"ts"`
+	mod := line.Module
+	if mod == "" {
+		mod = "unknown"
 	}
-	if err := json.Unmarshal(raw, &line); err != nil || len(line.TS) == 0 {
-		return fallback
-	}
-	// Numeric epoch: 1776544197.2256565
-	var epoch float64
-	if err := json.Unmarshal(line.TS, &epoch); err == nil {
-		sec := int64(epoch)
-		nsec := int64((epoch - float64(sec)) * 1e9)
-		return time.Unix(sec, nsec)
-	}
-	// String RFC3339: "2026-04-18T19:30:00Z"
-	var s string
-	if err := json.Unmarshal(line.TS, &s); err == nil && s != "" {
-		if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-			return t
+	ts := fallback
+	if len(line.TS) > 0 {
+		var epoch float64
+		if err := json.Unmarshal(line.TS, &epoch); err == nil {
+			sec := int64(epoch)
+			nsec := int64((epoch - float64(sec)) * 1e9)
+			ts = time.Unix(sec, nsec)
+		} else {
+			var s string
+			if err := json.Unmarshal(line.TS, &s); err == nil && s != "" {
+				if parsed, err := time.Parse(time.RFC3339Nano, s); err == nil {
+					ts = parsed
+				}
+			}
 		}
 	}
-	return fallback
+	return mod, ts
 }
 
 func (f *Forwarder) post(ctx context.Context, url string, body []byte, contentType string) error {

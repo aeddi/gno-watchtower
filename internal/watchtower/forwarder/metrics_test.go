@@ -3,7 +3,6 @@ package forwarder
 import (
 	"encoding/json"
 	"slices"
-	"sort"
 	"testing"
 	"time"
 
@@ -47,7 +46,7 @@ func metricNames(t *testing.T, lines []vmLine) []string {
 	for _, l := range lines {
 		out = append(out, l.Metric["__name__"])
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out
 }
 

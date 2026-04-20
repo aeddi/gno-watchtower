@@ -36,23 +36,24 @@ func extractRPC(validator string, payload protocol.RPCPayload) []vmLine {
 	// genesis one-shot adds 1 info + up to 6 consensus_params + N validators.
 	// 32 covers a small validator set; runtime growth is cheap.
 	lines := make([]vmLine, 0, 32)
+	log := slog.Default()
 
 	for key, raw := range payload.Data {
 		switch key {
 		case "status":
-			lines = appendRPCStatus(lines, validator, ts, raw)
+			lines = appendRPCStatus(lines, validator, ts, raw, log)
 		case "net_info":
-			lines = appendRPCNetInfo(lines, validator, ts, raw)
+			lines = appendRPCNetInfo(lines, validator, ts, raw, log)
 		case "num_unconfirmed_txs":
-			lines = appendRPCMempool(lines, validator, ts, raw)
+			lines = appendRPCMempool(lines, validator, ts, raw, log)
 		case "dump_consensus_state":
-			lines = appendRPCConsensus(lines, validator, ts, raw)
+			lines = appendRPCConsensus(lines, validator, ts, raw, log)
 		case "validators":
-			lines = appendRPCValidators(lines, validator, ts, raw)
+			lines = appendRPCValidators(lines, validator, ts, raw, log)
 		case "block":
-			lines = appendRPCBlock(lines, validator, ts, raw)
+			lines = appendRPCBlock(lines, validator, ts, raw, log)
 		case "genesis":
-			lines = appendRPCGenesis(lines, validator, ts, raw)
+			lines = appendRPCGenesis(lines, validator, ts, raw, log)
 		}
 	}
 	return lines
@@ -62,11 +63,11 @@ func extractRPC(validator string, payload protocol.RPCPayload) []vmLine {
 // object from the gnoland JSON-RPC envelope; the envelope itself is stripped
 // by the sentinel's rpc.Client.get — see internal/sentinel/rpc/client.go.
 // Returns (zero, false) on error with a Debug log so operators can grep for
-// persistent shape drift without the extractors needing a logger parameter.
-func decodeResult[T any](raw json.RawMessage, key, validator string) (T, bool) {
+// persistent shape drift.
+func decodeResult[T any](raw json.RawMessage, key, validator string, log *slog.Logger) (T, bool) {
 	var v T
 	if err := json.Unmarshal(raw, &v); err != nil {
-		slog.Default().Debug("rpc: unmarshal failed", "key", key, "validator", validator, "err", err)
+		log.Debug("rpc: unmarshal failed", "key", key, "validator", validator, "err", err)
 		var zero T
 		return zero, false
 	}
@@ -77,10 +78,10 @@ func decodeResult[T any](raw json.RawMessage, key, validator string) (T, bool) {
 // (_, false) + Debug-logs if the number isn't parseable as int64. Callers
 // use this to keep per-field partial-emission semantics while still leaving
 // a grep-able trail when tendermint's numeric encoding drifts.
-func intSample(name string, labels map[string]string, num json.Number, ts int64, key, validator string) (vmLine, bool) {
+func intSample(name string, labels map[string]string, num json.Number, ts int64, key, validator string, log *slog.Logger) (vmLine, bool) {
 	n, err := num.Int64()
 	if err != nil {
-		slog.Default().Debug("rpc: int64 parse failed", "metric", name, "key", key, "validator", validator, "err", err)
+		log.Debug("rpc: int64 parse failed", "metric", name, "key", key, "validator", validator, "err", err)
 		return vmLine{}, false
 	}
 	return vmSample(name, labels, float64(n), ts), true
@@ -102,13 +103,13 @@ type rpcStatus struct {
 	} `json:"validator_info"`
 }
 
-func appendRPCStatus(lines []vmLine, validator string, ts int64, raw json.RawMessage) []vmLine {
-	r, ok := decodeResult[rpcStatus](raw, "status", validator)
+func appendRPCStatus(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	r, ok := decodeResult[rpcStatus](raw, "status", validator, log)
 	if !ok {
 		return lines
 	}
 	base := map[string]string{"validator": validator}
-	if s, ok := intSample("sentinel_rpc_latest_block_height", base, r.SyncInfo.LatestBlockHeight, ts, "status", validator); ok {
+	if s, ok := intSample("sentinel_rpc_latest_block_height", base, r.SyncInfo.LatestBlockHeight, ts, "status", validator, log); ok {
 		lines = append(lines, s)
 	}
 	lines = append(lines, vmSample("sentinel_rpc_catching_up", base, boolToFloat(r.SyncInfo.CatchingUp), ts))
@@ -117,7 +118,7 @@ func appendRPCStatus(lines []vmLine, validator string, ts int64, raw json.RawMes
 		// so consensus-quorum dashboards can join this against the set-wide
 		// sentinel_rpc_validator_set_power on (address).
 		vpLabels := map[string]string{"validator": validator, "address": r.ValidatorInfo.Address}
-		if s, ok := intSample("sentinel_rpc_validator_voting_power", vpLabels, r.ValidatorInfo.VotingPower, ts, "status", validator); ok {
+		if s, ok := intSample("sentinel_rpc_validator_voting_power", vpLabels, r.ValidatorInfo.VotingPower, ts, "status", validator, log); ok {
 			lines = append(lines, s)
 		}
 		// sentinel_validator_online is a presence signal: we emit it only when
@@ -150,12 +151,12 @@ type rpcNetInfo struct {
 	NPeers json.Number `json:"n_peers"`
 }
 
-func appendRPCNetInfo(lines []vmLine, validator string, ts int64, raw json.RawMessage) []vmLine {
-	r, ok := decodeResult[rpcNetInfo](raw, "net_info", validator)
+func appendRPCNetInfo(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	r, ok := decodeResult[rpcNetInfo](raw, "net_info", validator, log)
 	if !ok {
 		return lines
 	}
-	if s, ok := intSample("sentinel_rpc_peers", map[string]string{"validator": validator}, r.NPeers, ts, "net_info", validator); ok {
+	if s, ok := intSample("sentinel_rpc_peers", map[string]string{"validator": validator}, r.NPeers, ts, "net_info", validator, log); ok {
 		lines = append(lines, s)
 	}
 	return lines
@@ -166,16 +167,16 @@ type rpcMempool struct {
 	TotalBytes json.Number `json:"total_bytes"`
 }
 
-func appendRPCMempool(lines []vmLine, validator string, ts int64, raw json.RawMessage) []vmLine {
-	r, ok := decodeResult[rpcMempool](raw, "num_unconfirmed_txs", validator)
+func appendRPCMempool(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	r, ok := decodeResult[rpcMempool](raw, "num_unconfirmed_txs", validator, log)
 	if !ok {
 		return lines
 	}
 	base := map[string]string{"validator": validator}
-	if s, ok := intSample("sentinel_rpc_mempool_txs", base, r.NTxs, ts, "num_unconfirmed_txs", validator); ok {
+	if s, ok := intSample("sentinel_rpc_mempool_txs", base, r.NTxs, ts, "num_unconfirmed_txs", validator, log); ok {
 		lines = append(lines, s)
 	}
-	if s, ok := intSample("sentinel_rpc_mempool_bytes", base, r.TotalBytes, ts, "num_unconfirmed_txs", validator); ok {
+	if s, ok := intSample("sentinel_rpc_mempool_bytes", base, r.TotalBytes, ts, "num_unconfirmed_txs", validator, log); ok {
 		lines = append(lines, s)
 	}
 	return lines
@@ -190,19 +191,19 @@ type rpcConsensus struct {
 	} `json:"round_state"`
 }
 
-func appendRPCConsensus(lines []vmLine, validator string, ts int64, raw json.RawMessage) []vmLine {
-	r, ok := decodeResult[rpcConsensus](raw, "dump_consensus_state", validator)
+func appendRPCConsensus(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	r, ok := decodeResult[rpcConsensus](raw, "dump_consensus_state", validator, log)
 	if !ok {
 		return lines
 	}
 	base := map[string]string{"validator": validator}
-	if s, ok := intSample("sentinel_rpc_consensus_height", base, r.RoundState.Height, ts, "dump_consensus_state", validator); ok {
+	if s, ok := intSample("sentinel_rpc_consensus_height", base, r.RoundState.Height, ts, "dump_consensus_state", validator, log); ok {
 		lines = append(lines, s)
 	}
-	if s, ok := intSample("sentinel_rpc_consensus_round", base, r.RoundState.Round, ts, "dump_consensus_state", validator); ok {
+	if s, ok := intSample("sentinel_rpc_consensus_round", base, r.RoundState.Round, ts, "dump_consensus_state", validator, log); ok {
 		lines = append(lines, s)
 	}
-	if s, ok := intSample("sentinel_rpc_consensus_step", base, r.RoundState.Step, ts, "dump_consensus_state", validator); ok {
+	if s, ok := intSample("sentinel_rpc_consensus_step", base, r.RoundState.Step, ts, "dump_consensus_state", validator, log); ok {
 		lines = append(lines, s)
 	}
 	return lines
@@ -215,8 +216,8 @@ type rpcValidators struct {
 	} `json:"validators"`
 }
 
-func appendRPCValidators(lines []vmLine, validator string, ts int64, raw json.RawMessage) []vmLine {
-	r, ok := decodeResult[rpcValidators](raw, "validators", validator)
+func appendRPCValidators(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	r, ok := decodeResult[rpcValidators](raw, "validators", validator, log)
 	if !ok {
 		return lines
 	}
@@ -233,7 +234,7 @@ func appendRPCValidators(lines []vmLine, validator string, ts int64, raw json.Ra
 	for _, v := range r.Validators {
 		p, err := v.VotingPower.Int64()
 		if err != nil {
-			slog.Default().Debug("rpc: validator voting_power parse failed, dropping aggregate",
+			log.Debug("rpc: validator voting_power parse failed, dropping aggregate",
 				"validator", validator, "err", err)
 			return lines
 		}
@@ -267,12 +268,12 @@ type rpcBlock struct {
 	} `json:"block"`
 }
 
-func appendRPCBlock(lines []vmLine, validator string, ts int64, raw json.RawMessage) []vmLine {
-	r, ok := decodeResult[rpcBlock](raw, "block", validator)
+func appendRPCBlock(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	r, ok := decodeResult[rpcBlock](raw, "block", validator, log)
 	if !ok {
 		return lines
 	}
-	if s, ok := intSample("sentinel_rpc_block_num_txs", map[string]string{"validator": validator}, r.Block.Header.NumTxs, ts, "block", validator); ok {
+	if s, ok := intSample("sentinel_rpc_block_num_txs", map[string]string{"validator": validator}, r.Block.Header.NumTxs, ts, "block", validator, log); ok {
 		lines = append(lines, s)
 	}
 	return lines
@@ -350,8 +351,8 @@ func normalizeAppHash(raw json.RawMessage) string {
 // a label on an *_info gauge (value=1), matching the Prometheus info-metric
 // idiom — the operator dashboards compare these across the fleet and any
 // value drift stands out as a column with a different string.
-func appendRPCGenesis(lines []vmLine, validator string, ts int64, raw json.RawMessage) []vmLine {
-	r, ok := decodeResult[rpcGenesisResult](raw, "genesis", validator)
+func appendRPCGenesis(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	r, ok := decodeResult[rpcGenesisResult](raw, "genesis", validator, log)
 	if !ok {
 		return lines
 	}
