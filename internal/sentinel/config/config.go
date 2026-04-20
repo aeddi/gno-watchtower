@@ -201,7 +201,7 @@ func DefaultConfig() *Config {
 		},
 		OTLP: OTLPConfig{
 			Enabled:    true,
-			ListenAddr: "localhost:4317",
+			ListenAddr: "localhost:4318",
 		},
 		Resources: ResourcesConfig{
 			Enabled:       true,

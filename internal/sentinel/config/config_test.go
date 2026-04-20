@@ -169,14 +169,14 @@ token = "tok"
 
 [otlp]
 enabled     = true
-listen_addr = "localhost:4317"
+listen_addr = "localhost:4318"
 `
 	cfg := mustLoadTOML(t, content)
 	if !cfg.OTLP.Enabled {
 		t.Error("OTLP.Enabled: want true")
 	}
-	if cfg.OTLP.ListenAddr != "localhost:4317" {
-		t.Errorf("OTLP.ListenAddr: got %q, want %q", cfg.OTLP.ListenAddr, "localhost:4317")
+	if cfg.OTLP.ListenAddr != "localhost:4318" {
+		t.Errorf("OTLP.ListenAddr: got %q, want %q", cfg.OTLP.ListenAddr, "localhost:4318")
 	}
 }
 
@@ -363,7 +363,7 @@ func TestDefaultConfig(t *testing.T) {
 	if !cfg.OTLP.Enabled {
 		t.Error("OTLP.Enabled: want true")
 	}
-	if cfg.OTLP.ListenAddr != "localhost:4317" {
+	if cfg.OTLP.ListenAddr != "localhost:4318" {
 		t.Errorf("OTLP.ListenAddr: got %q", cfg.OTLP.ListenAddr)
 	}
 	if !cfg.Resources.Enabled {
