@@ -7,10 +7,9 @@
   "links": [
     {"title": "Validator chain", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Block height, peers, mempool, consensus quorum", "url": "/d/validator-chain/validator-chain?${__url_time_range}&${validator:queryparam}"},
     {"title": "Validator metadata", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Chain ID, moniker, binary, genesis, config keys", "url": "/d/validator-metadata/validator-metadata?${__url_time_range}&${validator:queryparam}"},
-    {"title": "Validator resources", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Host + container CPU/memory/disk/network", "url": "/d/validator-resources/validator-resources?${__url_time_range}&${validator:queryparam}"},
-    {"title": "Node logs", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Per-validator log browser (Loki)", "url": "/d/node-logs/node-logs?${__url_time_range}&${validator:queryparam}"},
-    {"title": "Host resources", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Watchtower host-side infrastructure", "url": "/d/host-resources/host-resources?${__url_time_range}"},
-    {"title": "Container resources", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Watchtower-side container stats", "url": "/d/container-resources/container-resources?${__url_time_range}"}
+    {"title": "Validator resources", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Per-validator host + container resources", "url": "/d/validator-resources/validator-resources?${__url_time_range}&${validator:queryparam}"},
+    {"title": "Validator logs", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Per-validator log browser (Loki)", "url": "/d/validator-logs/validator-logs?${__url_time_range}&${validator:queryparam}"},
+    {"title": "Watchtower resources", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Watchtower host + container resources", "url": "/d/watchtower-resources/watchtower-resources?${__url_time_range}&${validator:queryparam}"}
   ],
   "panels": [
     {"type": "row", "title": "Pipeline health — sentinel side", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "id": 1000, "panels": []},
@@ -47,8 +46,8 @@
   "time": {"from": "now-1h", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Storage & Traffic",
-  "uid": "storage-and-traffic",
+  "title": "Watchtower Pipeline",
+  "uid": "watchtower-pipeline",
   "version": 1,
   "weekStart": ""
 }
