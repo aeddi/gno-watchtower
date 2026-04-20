@@ -176,6 +176,49 @@ func TestAuthenticator_Reload_UpdatesTokens(t *testing.T) {
 	}
 }
 
+func TestAuth_SuccessfulAuthResetsFailures(t *testing.T) {
+	a := auth.New(map[string]config.ValidatorConfig{
+		"val-01": {Token: "good-token"},
+	}, 3, time.Minute)
+
+	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Two failures — one short of the ban threshold.
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+		req.Header.Set("Authorization", "Bearer bad-token")
+		req.RemoteAddr = "1.2.3.4:9999"
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	// One success — must clear the failure counter.
+	reqGood := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+	reqGood.Header.Set("Authorization", "Bearer good-token")
+	reqGood.RemoteAddr = "1.2.3.4:9999"
+	handler.ServeHTTP(httptest.NewRecorder(), reqGood)
+
+	// Two more failures would re-ban if the counter hadn't been reset.
+	// With reset they leave us at failures=2 again, still unbanned.
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+		req.Header.Set("Authorization", "Bearer bad-token")
+		req.RemoteAddr = "1.2.3.4:9999"
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	reqCheck := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+	reqCheck.Header.Set("Authorization", "Bearer good-token")
+	reqCheck.RemoteAddr = "1.2.3.4:9999"
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, reqCheck)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("want 200 (still unbanned after reset), got %d", rr.Code)
+	}
+}
+
 func TestAuth_MissingAuthHeader_Returns401(t *testing.T) {
 	a := makeAuth(t)
 	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

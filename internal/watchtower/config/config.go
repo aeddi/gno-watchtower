@@ -132,10 +132,15 @@ func (c *Config) validate() error {
 	if c.Security.BanDuration.Duration <= 0 {
 		return fmt.Errorf("security.ban_duration must be > 0")
 	}
+	seenTokens := make(map[string]string, len(c.Validators))
 	for name, v := range c.Validators {
 		if v.Token == "" {
 			return fmt.Errorf("validators.%s.token is required", name)
 		}
+		if other, dup := seenTokens[v.Token]; dup {
+			return fmt.Errorf("validators.%s and validators.%s share the same token — each validator must have a unique token", other, name)
+		}
+		seenTokens[v.Token] = name
 	}
 	return nil
 }
