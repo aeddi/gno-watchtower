@@ -11,9 +11,9 @@ import (
 func TestStats_RecordAndSnapshot(t *testing.T) {
 	s := stats.New()
 
-	s.Record("rpc", 100)
-	s.Record("rpc", 200)
-	s.Record("logs", 500)
+	s.Record("rpc", 100, 100) // uncompressed = wire for rpc
+	s.Record("rpc", 200, 200)
+	s.Record("logs", 500, 120) // compression ratio ~4x
 
 	snap, _ := s.Snapshot()
 
@@ -23,29 +23,33 @@ func TestStats_RecordAndSnapshot(t *testing.T) {
 	if snap["rpc"].TotalBytes != 300 {
 		t.Errorf("rpc TotalBytes: got %d, want 300", snap["rpc"].TotalBytes)
 	}
-	if snap["logs"].LastSnapshotBytes != 500 {
-		t.Errorf("logs LastSnapshotBytes: got %d, want 500", snap["logs"].LastSnapshotBytes)
+	if snap["rpc"].TotalWireBytes != 300 {
+		t.Errorf("rpc TotalWireBytes: got %d, want 300", snap["rpc"].TotalWireBytes)
+	}
+	if snap["logs"].TotalBytes != 500 {
+		t.Errorf("logs TotalBytes (uncompressed): got %d, want 500", snap["logs"].TotalBytes)
+	}
+	if snap["logs"].TotalWireBytes != 120 {
+		t.Errorf("logs TotalWireBytes: got %d, want 120", snap["logs"].TotalWireBytes)
 	}
 }
 
-func TestStats_SnapshotResetsMinuteCounter(t *testing.T) {
+func TestStats_SnapshotResetsLastCounters(t *testing.T) {
 	s := stats.New()
-	s.Record("rpc", 400)
+	s.Record("rpc", 400, 400)
 
 	snap1, _ := s.Snapshot()
 	if snap1["rpc"].LastSnapshotBytes != 400 {
 		t.Errorf("first snapshot: got %d, want 400", snap1["rpc"].LastSnapshotBytes)
 	}
 
-	// Record more after first snapshot.
-	s.Record("rpc", 100)
+	s.Record("rpc", 100, 100)
 
 	snap2, _ := s.Snapshot()
-	// Last-minute should only reflect post-snapshot traffic.
 	if snap2["rpc"].LastSnapshotBytes != 100 {
 		t.Errorf("second snapshot LastSnapshotBytes: got %d, want 100", snap2["rpc"].LastSnapshotBytes)
 	}
-	// Total accumulates across snapshots.
+	// Absolute counters keep accumulating across snapshots.
 	if snap2["rpc"].TotalBytes != 500 {
 		t.Errorf("second snapshot TotalBytes: got %d, want 500", snap2["rpc"].TotalBytes)
 	}
@@ -80,20 +84,29 @@ func TestStats_RecordDropAndRetry(t *testing.T) {
 	snap, _ := s.Snapshot()
 
 	if snap["rpc"].LastSnapshotDrops != 2 {
-		t.Errorf("rpc Drops: got %d, want 2", snap["rpc"].LastSnapshotDrops)
+		t.Errorf("rpc LastSnapshotDrops: got %d, want 2", snap["rpc"].LastSnapshotDrops)
+	}
+	if snap["rpc"].TotalDrops != 2 {
+		t.Errorf("rpc TotalDrops: got %d, want 2", snap["rpc"].TotalDrops)
 	}
 	if snap["logs"].LastSnapshotRetries != 1 {
-		t.Errorf("logs Retries: got %d, want 1", snap["logs"].LastSnapshotRetries)
+		t.Errorf("logs LastSnapshotRetries: got %d, want 1", snap["logs"].LastSnapshotRetries)
+	}
+	if snap["logs"].TotalRetries != 1 {
+		t.Errorf("logs TotalRetries: got %d, want 1", snap["logs"].TotalRetries)
 	}
 }
 
-func TestStats_DropRetryResetOnSnapshot(t *testing.T) {
+func TestStats_SnapshotResetsLastDropsRetriesButNotTotals(t *testing.T) {
 	s := stats.New()
 	s.RecordDrop("rpc")
-	s.Snapshot() // resets
+	s.Snapshot() // resets LastSnapshot*
 	s.RecordDrop("rpc")
 	snap, _ := s.Snapshot()
 	if snap["rpc"].LastSnapshotDrops != 1 {
-		t.Errorf("expected 1 drop after reset, got %d", snap["rpc"].LastSnapshotDrops)
+		t.Errorf("LastSnapshotDrops after reset: got %d, want 1", snap["rpc"].LastSnapshotDrops)
+	}
+	if snap["rpc"].TotalDrops != 2 {
+		t.Errorf("TotalDrops across snapshots: got %d, want 2", snap["rpc"].TotalDrops)
 	}
 }

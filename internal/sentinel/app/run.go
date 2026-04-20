@@ -14,6 +14,7 @@ import (
 	"github.com/aeddi/gno-watchtower/internal/sentinel/otlp"
 	"github.com/aeddi/gno-watchtower/internal/sentinel/resources"
 	"github.com/aeddi/gno-watchtower/internal/sentinel/rpc"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/self"
 	"github.com/aeddi/gno-watchtower/internal/sentinel/sender"
 	"github.com/aeddi/gno-watchtower/internal/sentinel/stats"
 	"github.com/aeddi/gno-watchtower/pkg/protocol"
@@ -24,6 +25,7 @@ const (
 	logsBufferSize      = 50
 	resourcesBufferSize = 20
 	metadataBufferSize  = 10
+	selfBufferSize      = 5
 	otlpChannelSize     = 10
 	maxSendAttempts     = 5
 	initialBackoff      = time.Second
@@ -78,7 +80,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 		runHealthServer(ctx, cfg.Health.Enabled, cfg.Health.ListenAddr, log.With("component", "health"))
 	})
 
-	if !cfg.RPC.Enabled && !cfg.Logs.Enabled && !cfg.OTLP.Enabled && !cfg.Resources.Enabled && !cfg.Metadata.Enabled {
+	if !cfg.RPC.Enabled && !cfg.Logs.Enabled && !cfg.OTLP.Enabled && !cfg.Resources.Enabled && !cfg.Metadata.Enabled && !cfg.Self.Enabled {
 		<-ctx.Done()
 		return
 	}
@@ -155,7 +157,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 						senderLog.Error("send otlp payload", "err", err)
 						continue
 					}
-					st.Record("otlp", len(b))
+					st.Record("otlp", len(b), len(b))
 				}
 			}
 		})
@@ -193,6 +195,22 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 		metadataSendCh = t.C
 	}
 
+	// ---- Self-stats collector
+	var selfBuf *sender.Buffer[protocol.MetricsPayload]
+	var selfSendCh <-chan time.Time
+	if cfg.Self.Enabled {
+		selfBuf = sender.NewBuffer[protocol.MetricsPayload](selfBufferSize)
+		selfOut := make(chan protocol.MetricsPayload, selfBufferSize)
+
+		sc := self.NewCollector(cfg.Self, st, selfOut, log)
+		runCollector(ctx, &wg, "self", appLog, sc.Run)
+		wireBuffered(ctx, &wg, selfOut, selfBuf, appLog, "self", st)
+
+		t := time.NewTicker(metricsSendInterval)
+		defer t.Stop()
+		selfSendCh = t.C
+	}
+
 	statsTicker := time.NewTicker(statsInterval)
 	defer statsTicker.Stop()
 
@@ -221,6 +239,9 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 		case <-metadataSendCh:
 			flushMetrics(ctx, s, metadataBuf, "metadata", senderLog, st)
 			continue
+		case <-selfSendCh:
+			flushMetrics(ctx, s, selfBuf, "self", senderLog, st)
+			continue
 		}
 		break
 	}
@@ -241,6 +262,9 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 	if metadataBuf != nil {
 		flushMetrics(drainCtx, s, metadataBuf, "metadata", senderLog, st)
 	}
+	if selfBuf != nil {
+		flushMetrics(drainCtx, s, selfBuf, "self", senderLog, st)
+	}
 }
 
 func flush(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protocol.RPCPayload], log *slog.Logger, st *stats.Stats) {
@@ -260,7 +284,7 @@ func flush(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protocol.RP
 			st.RecordRetry("rpc")
 			continue
 		}
-		st.Record("rpc", len(b))
+		st.Record("rpc", len(b), len(b))
 	}
 }
 
@@ -282,7 +306,7 @@ func flushLogs(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protoco
 			st.RecordRetry("logs")
 			continue
 		}
-		st.Record("logs", len(b))
+		st.Record("logs", len(b), len(compressed))
 	}
 }
 
@@ -303,7 +327,7 @@ func flushMetrics(ctx context.Context, s *sender.Sender, buf *sender.Buffer[prot
 			st.RecordRetry(typ)
 			continue
 		}
-		st.Record(typ, len(b))
+		st.Record(typ, len(b), len(b))
 	}
 }
 
@@ -314,6 +338,7 @@ func logStats(log *slog.Logger, st *stats.Stats) {
 		args = append(args, slog.Group(typ,
 			"last_snapshot_bytes", s.LastSnapshotBytes,
 			"total_bytes", s.TotalBytes,
+			"total_wire_bytes", s.TotalWireBytes,
 			"last_snapshot_drops", s.LastSnapshotDrops,
 			"last_snapshot_retries", s.LastSnapshotRetries,
 		))
