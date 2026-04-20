@@ -237,7 +237,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "1 / clamp_min(rate(sentinel_rpc_latest_block_height{validator=~\"$validator\"}[$__rate_interval]), 1e-9)",
+          "expr": "1 / clamp_min(max by (validator) (rate(sentinel_rpc_latest_block_height{validator=~\"$validator\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "{{validator}}",
           "refId": "A"
         }
@@ -367,7 +367,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "rate(sentinel_rpc_latest_block_height{validator=~\"$validator\"}[$__rate_interval])",
+          "expr": "max by (validator) (rate(sentinel_rpc_latest_block_height{validator=~\"$validator\"}[$__rate_interval]))",
           "legendFormat": "{{validator}}",
           "refId": "A"
         }
@@ -1078,7 +1078,7 @@
             "lineWidth": 1
           },
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
           "thresholds": {
             "mode": "absolute",
@@ -1197,7 +1197,7 @@
       "id": 20,
       "options": {
         "legend": {
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
@@ -1867,7 +1867,7 @@
     },
     {
       "type": "row",
-      "title": "Consensus quorum",
+      "title": "Consensus quorum (fleet-wide)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -2317,7 +2317,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "(sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s]))) - max by (address) (sentinel_rpc_validator_set_power) - (floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3) + 1)",
+          "expr": "scalar(sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s]))) - scalar(floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3 + 1)) - max by (address) (sentinel_rpc_validator_set_power)",
           "format": "table",
           "instant": true,
           "legendFormat": "",
