@@ -4,7 +4,6 @@ package sender
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -27,41 +26,6 @@ func New(serverURL, token string) *Sender {
 		token:     token,
 		client:    &http.Client{Timeout: 30 * time.Second},
 	}
-}
-
-// Send makes a single POST attempt with a JSON body. Returns an error for non-2xx responses.
-func (s *Sender) Send(ctx context.Context, path string, payload any) error {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-	return s.post(ctx, path, body, "application/json", "")
-}
-
-// SendCompressed makes a single POST attempt with a zstd-compressed JSON body.
-// Sets Content-Encoding: zstd on the request.
-func (s *Sender) SendCompressed(ctx context.Context, path string, payload any) error {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-	compressed := ZstdCompress(body)
-	return s.post(ctx, path, compressed, "application/json", "zstd")
-}
-
-// SendWithRetry retries Send up to maxAttempts times with exponential backoff.
-// initialBackoff is the wait before the second attempt; it doubles each retry, capped at 30s.
-func (s *Sender) SendWithRetry(ctx context.Context, path string, payload any, maxAttempts int, initialBackoff time.Duration) error {
-	return retry(ctx, maxAttempts, initialBackoff, func() error {
-		return s.Send(ctx, path, payload)
-	})
-}
-
-// SendCompressedWithRetry retries SendCompressed up to maxAttempts times with exponential backoff.
-func (s *Sender) SendCompressedWithRetry(ctx context.Context, path string, payload any, maxAttempts int, initialBackoff time.Duration) error {
-	return retry(ctx, maxAttempts, initialBackoff, func() error {
-		return s.SendCompressed(ctx, path, payload)
-	})
 }
 
 // SendRaw makes a single POST attempt with raw bytes and a specific Content-Type.
