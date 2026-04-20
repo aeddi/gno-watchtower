@@ -6,7 +6,32 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "title": "Validator metadata",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Chain ID, moniker, binary, genesis, config keys",
+      "url": "/d/validator-metadata/validator-metadata?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Validator resources",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Host + container CPU/memory/disk/network",
+      "url": "/d/validator-resources/validator-resources?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Node logs",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Per-validator log browser (Loki)",
+      "url": "/d/node-logs/node-logs?${__url_time_range}&${validator:queryparam}"
+    }
+  ],
   "panels": [
     {
       "type": "row",
@@ -221,72 +246,6 @@
       "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "description": "This validator's own voting power (from /status validator_info). Red at 0 catches jailing / removal from the active set.",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0,
-          "decimals": 0,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 8,
-        "y": 57
-      },
-      "id": 4,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "textMode": "value_and_name",
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto"
-      },
-      "pluginVersion": "12.4.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "max by (validator) (sentinel_rpc_validator_voting_power{validator=~\"$validator\"})",
-          "legendFormat": "{{validator}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Own voting power",
-      "type": "stat"
-    },
-    {
       "type": "row",
       "title": "Block production",
       "collapsed": false,
@@ -304,7 +263,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[RPC, 3s] \u2014 Block height over time. A flat line = the chain stalled for that validator.",
+      "description": "[RPC, 3s] — Block height over time. A flat line = the chain stalled for that validator.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -363,7 +322,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[RPC, 3s] \u2014 Blocks committed per second per validator (rate of the height counter over 1m).",
+      "description": "[RPC, 3s] — Blocks committed per second per validator (rate of the height counter over 1m).",
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
@@ -421,7 +380,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[OTLP, 60s] \u2014 Average interval between consecutive blocks as observed by each validator. Computed over the rate window so a stalled chain reads as a rising mean. gnoland emits this in seconds.",
+      "description": "[OTLP, 60s] — Average interval between consecutive blocks as observed by each validator. Computed over the rate window so a stalled chain reads as a rising mean. gnoland emits this in seconds.",
       "fieldConfig": {
         "defaults": {
           "unit": "s",
@@ -480,7 +439,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[OTLP, 60s] \u2014 Average block-build duration in ms, reported only by validators that proposed a block within the window. Non-proposers show no data.",
+      "description": "[OTLP, 60s] — Average block-build duration in ms, reported only by validators that proposed a block within the window. Non-proposers show no data.",
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
@@ -539,7 +498,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[OTLP, 60s] \u2014 Average block size in bytes over the rate window.",
+      "description": "[OTLP, 60s] — Average block size in bytes over the rate window.",
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -598,7 +557,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[OTLP, 60s] \u2014 Average gas price of committed blocks (gnoland unit: token amount per gas). Fires only when the chain processes paid transactions; silent on an idle testnet.",
+      "description": "[OTLP, 60s] — Average gas price of committed blocks (gnoland unit: token amount per gas). Fires only when the chain processes paid transactions; silent on an idle testnet.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -657,7 +616,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[RPC, per-block] \u2014 Transactions included in the most recently observed block per validator.",
+      "description": "[RPC, per-block] — Transactions included in the most recently observed block per validator.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -729,7 +688,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[RPC, 3s \u2014 total] \u2014 Connected p2p peer count per validator. Drops usually correlate with missed consensus rounds.",
+      "description": "[RPC, 3s — total] — Connected p2p peer count per validator. Drops usually correlate with missed consensus rounds.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -761,7 +720,7 @@
             "max"
           ],
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "showLegend": true
         },
         "tooltip": {
@@ -788,7 +747,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[OTLP, 60s \u2014 inbound split] \u2014 Number of inbound p2p peers (peers that initiated connection to this validator).",
+      "description": "[OTLP, 60s — inbound split] — Number of inbound p2p peers (peers that initiated connection to this validator).",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -820,7 +779,7 @@
             "max"
           ],
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "showLegend": true
         },
         "tooltip": {
@@ -847,7 +806,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[OTLP, 60s \u2014 outbound split] \u2014 Number of outbound p2p peers (peers this validator connected to).",
+      "description": "[OTLP, 60s — outbound split] — Number of outbound p2p peers (peers this validator connected to).",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -879,7 +838,7 @@
             "max"
           ],
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "showLegend": true
         },
         "tooltip": {
@@ -919,7 +878,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[RPC, 3s always-emit] \u2014 Unconfirmed transactions sitting in the mempool. Growth = backpressure or stuck consensus.",
+      "description": "[RPC, 3s always-emit] — Unconfirmed transactions sitting in the mempool. Growth = backpressure or stuck consensus.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -950,7 +909,7 @@
             "max"
           ],
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "showLegend": true
         },
         "tooltip": {
@@ -977,7 +936,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[RPC, 3s always-emit] \u2014 Total bytes of unconfirmed transactions in the mempool.",
+      "description": "[RPC, 3s always-emit] — Total bytes of unconfirmed transactions in the mempool.",
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -1008,7 +967,7 @@
             "max"
           ],
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "showLegend": true
         },
         "tooltip": {
@@ -1035,7 +994,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[OTLP, 60s] \u2014 Mempool-cache (rejected/duplicate) tx observations per poll window. Only fires when spam or duplicate-tx traffic hits the node; silent otherwise.",
+      "description": "[OTLP, 60s] — Mempool-cache (rejected/duplicate) tx observations per poll window. Only fires when spam or duplicate-tx traffic hits the node; silent otherwise.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -1107,7 +1066,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[RPC, 30s] \u2014 Consensus round at the current height. 0 = happy path. Spikes indicate missed proposals / re-votes.",
+      "description": "[RPC, 30s] — Consensus round at the current height. 0 = happy path. Spikes indicate missed proposals / re-votes.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -1182,7 +1141,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[RPC, 30s] \u2014 Current consensus step (tendermint state machine). Rendered as a state timeline because the step is categorical: 1=propose, 2=prevote, 3=precommit, 4=commit. 'Stuck in prevote' is visually obvious here.",
+      "description": "[RPC, 30s] — Current consensus step (tendermint state machine). Rendered as a state timeline because the step is categorical: 1=propose, 2=prevote, 3=precommit, 4=commit. 'Stuck in prevote' is visually obvious here.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -1239,7 +1198,7 @@
       "options": {
         "legend": {
           "displayMode": "list",
-          "placement": "bottom",
+          "placement": "right",
           "showLegend": true
         },
         "tooltip": {
@@ -1270,7 +1229,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[RPC, per-block] \u2014 Number of validators in the active set as seen by each validator. Should be identical across nodes.",
+      "description": "[RPC, per-block] — Number of validators in the active set as seen by each validator. Should be identical across nodes.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -1328,68 +1287,6 @@
       "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "description": "[RPC, per-block] \u2014 Total voting power across the active set. If it differs between validators, that's a sign of desynced state.",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0,
-          "decimals": 0,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "text",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 16,
-        "y": 57
-      },
-      "id": 22,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "textMode": "value_and_name",
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto"
-      },
-      "pluginVersion": "12.4.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "max by (validator) (sentinel_rpc_validator_set_total_power{validator=~\"$validator\"})",
-          "legendFormat": "{{validator}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Total voting power",
-      "type": "stat"
-    },
-    {
       "type": "row",
       "title": "RPC server performance",
       "collapsed": false,
@@ -1407,7 +1304,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[OTLP, 60s] \u2014 HTTP RPC request throughput observed by gnoland's own server. Includes the sentinel's status/net_info/block polls and any external callers.",
+      "description": "[OTLP, 60s] — HTTP RPC request throughput observed by gnoland's own server. Includes the sentinel's status/net_info/block polls and any external callers.",
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
@@ -1466,7 +1363,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[OTLP, 60s] \u2014 Average HTTP RPC response time in ms, per validator (via histogram sum/count rate).",
+      "description": "[OTLP, 60s] — Average HTTP RPC response time in ms, per validator (via histogram sum/count rate).",
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
@@ -1525,7 +1422,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[OTLP, 60s] \u2014 WebSocket RPC request rate. Silent on an idle cluster; fires when a client holds an open /websocket subscription.",
+      "description": "[OTLP, 60s] — WebSocket RPC request rate. Silent on an idle cluster; fires when a client holds an open /websocket subscription.",
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
@@ -1584,7 +1481,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[OTLP, 60s] \u2014 Average WebSocket RPC response time.",
+      "description": "[OTLP, 60s] — Average WebSocket RPC response time.",
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
@@ -1656,7 +1553,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "[RPC, 3s] \u2014 Snapshot of RPC health per validator: block height, peers, mempool txs, catching_up.",
+      "description": "[RPC, 3s] — Snapshot of RPC health per validator: block height, peers, mempool txs, catching_up.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -1986,7 +1883,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Sum of voting_power across the active validator set (any validator \u2014 online or offline).",
+      "description": "Sum of voting_power across the active validator set (any validator — online or offline).",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -2112,7 +2009,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "floor(total \u00d7 2/3) + 1 \u2014 the tendermint BFT quorum threshold (tm2/pkg/bft/types/vote_set.go:272).",
+      "description": "floor(total × 2/3) + 1 — the tendermint BFT quorum threshold (tm2/pkg/bft/types/vote_set.go:272).",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -2230,11 +2127,11 @@
             "uid": "victoriametrics"
           },
           "expr": "sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s])) - (floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3) + 1)",
-          "legendFormat": "Margin (active \u2212 required)",
+          "legendFormat": "Margin (active − required)",
           "refId": "A"
         }
       ],
-      "title": "Margin (active \u2212 required)",
+      "title": "Margin (active − required)",
       "type": "stat"
     },
     {
@@ -2343,7 +2240,7 @@
               },
               {
                 "id": "description",
-                "value": "active_vp \u2212 own_power \u2212 required. \u2265 0: losing this validator keeps quorum (safe). < 0: SPOF. For an offline validator it tells you what the margin would be if they came back."
+                "value": "active_vp − own_power − required. ≥ 0: losing this validator keeps quorum (safe). < 0: SPOF. For an offline validator it tells you what the margin would be if they came back."
               }
             ]
           },
@@ -2502,14 +2399,14 @@
           "type": "prometheus",
           "uid": "victoriametrics"
         },
-        "definition": "label_values({__name__=~\"sentinel_rpc_latest_block_height|block_interval_hist_count|inbound_peers_gauge\"}, validator)",
+        "definition": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)",
         "includeAll": true,
         "label": "Validator",
         "multi": true,
         "name": "validator",
         "options": [],
         "query": {
-          "query": "label_values({__name__=~\"sentinel_rpc_latest_block_height|block_interval_hist_count|inbound_peers_gauge\"}, validator)",
+          "query": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
