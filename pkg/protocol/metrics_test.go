@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/pkg/protocol"
+	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
 func TestMetricsPayload_RoundTrip(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	pkglogger "github.com/gnolang/val-companion/pkg/logger"
-	"github.com/gnolang/val-companion/pkg/protocol"
+	pkglogger "github.com/aeddi/gno-watchtower/pkg/logger"
+	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
 // lineBufferSize is the capacity of the internal channel between the Source goroutine

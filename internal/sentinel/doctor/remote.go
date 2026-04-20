@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/config"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
 )
 
 // CheckRemoteTokenAndPermissions runs the remote reachable, token valid, and token permissions

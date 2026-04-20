@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/gnolang/val-companion/internal/sentinel/doctor"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/doctor"
 )
 
 func TestCheckOTLP_Green_WhenExportReceived(t *testing.T) {

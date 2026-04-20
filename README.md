@@ -28,15 +28,15 @@ authenticates, and forwards everything to VictoriaMetrics and Loki.
 
 ```
 Validator machine(s)                    Central server
-────────────────────                    ──────────────────────────────────────────────
+────────────────────                    ─────────────────────────────────────────────────
 ┌──────────────────┐                    ┌────────┐  ┌─────────────┐
-│    sentinel      │                    │        │  │ watchtower  │
-│ ──────────────── │   HTTPS POST       │        │─▶│ auth        │──▶ VictoriaMetrics
-│ RPC collector    │───────────────────▶│ Caddy  │  │ rate limit  │──▶ Loki
-│ Log collector    │                    │ (TLS)  │  │ IP ban      │
-│ OTLP relay       │                    │        │  └─────────────┘
-│ Resource monitor │                    └────────┘
-│ Metadata         │                    Grafana ◀── VictoriaMetrics + Loki
+│    sentinel      │                    │        │  │ watchtower  │   ┌─────────────────┐
+│ ──────────────── │     HTTPS POST     │        │  │ ─────────── │──▶│ Loki +          │
+│ RPC collector    │───────────────────▶│ Caddy  │─▶│ auth        │──▶│ VictoriaMetrics │
+│ Log collector    │                    │ (TLS)  │  │ rate limit  │   └─────────────────┘
+│ OTLP relay       │                    │        │  │ IP ban      │       ┌─────────┐  │
+│ Resource monitor │                    └────────┘  └─────────────┘       │ Grafana │◀─┘
+│ Metadata         │                                                      └─────────┘
 └──────────────────┘
 ```
 

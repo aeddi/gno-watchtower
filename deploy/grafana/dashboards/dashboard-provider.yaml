@@ -1,7 +1,7 @@
 apiVersion: 1
 
 providers:
-  - name: val-companion
+  - name: gno-watchtower
     orgId: 1
     folder: Validators
     type: file

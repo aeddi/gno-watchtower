@@ -1,4 +1,4 @@
-module github.com/gnolang/val-companion
+module github.com/aeddi/gno-watchtower
 
 go 1.25.0
 

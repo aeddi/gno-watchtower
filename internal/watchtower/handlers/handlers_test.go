@@ -12,13 +12,13 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/gnolang/val-companion/internal/watchtower/auth"
-	"github.com/gnolang/val-companion/internal/watchtower/config"
-	"github.com/gnolang/val-companion/internal/watchtower/forwarder"
-	"github.com/gnolang/val-companion/internal/watchtower/handlers"
-	"github.com/gnolang/val-companion/internal/watchtower/ratelimit"
-	"github.com/gnolang/val-companion/internal/watchtower/stats"
-	"github.com/gnolang/val-companion/pkg/logger"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/auth"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/forwarder"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/handlers"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/ratelimit"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/stats"
+	"github.com/aeddi/gno-watchtower/pkg/logger"
 )
 
 func makeServer(t *testing.T, vmURL, lokiURL string) *handlers.Server {

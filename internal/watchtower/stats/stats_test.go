@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/watchtower/stats"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/stats"
 )
 
 func TestStats_RecordAndSnapshot(t *testing.T) {

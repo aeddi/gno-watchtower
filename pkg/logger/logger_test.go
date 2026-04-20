@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/gnolang/val-companion/pkg/logger"
+	"github.com/aeddi/gno-watchtower/pkg/logger"
 )
 
 func TestNew_ConsoleDoesNotError(t *testing.T) {

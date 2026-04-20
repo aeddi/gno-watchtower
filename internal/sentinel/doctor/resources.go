@@ -11,8 +11,8 @@ import (
 	gopsutilmem "github.com/shirou/gopsutil/v3/mem"
 	gopsutilnet "github.com/shirou/gopsutil/v3/net"
 
-	"github.com/gnolang/val-companion/internal/sentinel/config"
-	"github.com/gnolang/val-companion/internal/sentinel/resources"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/resources"
 )
 
 // CheckResources verifies that host and/or container resource stats can be read.

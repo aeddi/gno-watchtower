@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/app"
-	"github.com/gnolang/val-companion/internal/sentinel/config"
-	"github.com/gnolang/val-companion/pkg/logger"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/app"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
+	"github.com/aeddi/gno-watchtower/pkg/logger"
 )
 
 func TestRun_PostsRPCDataToServer(t *testing.T) {

@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gnolang/val-companion/internal/sentinel/config"
-	"github.com/gnolang/val-companion/internal/sentinel/metadata"
-	"github.com/gnolang/val-companion/pkg/logger"
-	"github.com/gnolang/val-companion/pkg/protocol"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/metadata"
+	"github.com/aeddi/gno-watchtower/pkg/logger"
+	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
 func TestCollector_BinaryVersionCmd_EmitsVersion(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 
 	toml "github.com/pelletier/go-toml/v2"
 
-	"github.com/gnolang/val-companion/pkg/tomlutil"
+	"github.com/aeddi/gno-watchtower/pkg/tomlutil"
 )
 
 // Duration wraps time.Duration to support TOML string values like "3s", "30s".

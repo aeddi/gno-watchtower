@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/gnolang/val-companion/internal/watchtower/auth"
+	"github.com/aeddi/gno-watchtower/internal/watchtower/auth"
 )
 
 // Limiter enforces a per-validator token-bucket rate limit.

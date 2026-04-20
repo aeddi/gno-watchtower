@@ -12,8 +12,8 @@ import (
 	collectorpb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 
-	"github.com/gnolang/val-companion/internal/sentinel/otlp"
-	"github.com/gnolang/val-companion/pkg/logger"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/otlp"
+	"github.com/aeddi/gno-watchtower/pkg/logger"
 )
 
 func TestRelay_ForwardsExportToChannel(t *testing.T) {

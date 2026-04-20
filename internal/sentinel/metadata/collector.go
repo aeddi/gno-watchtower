@@ -17,9 +17,9 @@ import (
 	"github.com/fsnotify/fsnotify"
 	toml "github.com/pelletier/go-toml/v2"
 
-	"github.com/gnolang/val-companion/internal/sentinel/config"
-	"github.com/gnolang/val-companion/internal/sentinel/delta"
-	"github.com/gnolang/val-companion/pkg/protocol"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
+	"github.com/aeddi/gno-watchtower/internal/sentinel/delta"
+	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
 // ConfigKeys is the list of gnoland config keys collected by the metadata collector.
