@@ -35,7 +35,7 @@
   "panels": [
     {
       "type": "row",
-      "title": "Binary drift — RPC /status.node_info",
+      "title": "Binary drift \u2014 RPC /status.node_info",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -51,7 +51,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of the version label across fleet. 1 = agreement, ≥2 = version drift.",
+      "description": "Distinct values of the version label across fleet. 1 = agreement, \u22652 = version drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -104,7 +104,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (version) (last_over_time(sentinel_node_build_info[5m])))",
+          "expr": "count(count by (version) (max by (validator, version) (last_over_time(sentinel_node_build_info[1m]))))",
           "legendFormat": "distinct values",
           "refId": "A"
         }
@@ -170,7 +170,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (chain_id) (last_over_time(sentinel_node_build_info[5m])))",
+          "expr": "count(count by (chain_id) (max by (validator, chain_id) (last_over_time(sentinel_node_build_info[1m]))))",
           "legendFormat": "distinct values",
           "refId": "A"
         }
@@ -213,13 +213,13 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "last_over_time(sentinel_node_build_info{validator=~\"$validator\"}[5m])",
+          "expr": "max by (validator, chain_id, moniker, version) (last_over_time(sentinel_node_build_info{validator=~\"$validator\"}[1m]))",
           "format": "table",
           "instant": true,
           "refId": "A"
         }
       ],
-      "title": "Build info — one row per validator",
+      "title": "Build info \u2014 one row per validator",
       "type": "table",
       "transformations": [
         {
@@ -245,7 +245,7 @@
     },
     {
       "type": "row",
-      "title": "Chain drift — RPC /genesis",
+      "title": "Chain drift \u2014 RPC /genesis",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -314,7 +314,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (app_hash) (last_over_time(sentinel_genesis_info[5m])))",
+          "expr": "count(count by (app_hash) (max by (validator, app_hash) (last_over_time(sentinel_genesis_info[1m]))))",
           "legendFormat": "distinct values",
           "refId": "A"
         }
@@ -380,7 +380,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (genesis_time) (last_over_time(sentinel_genesis_info[5m])))",
+          "expr": "count(count by (genesis_time) (max by (validator, genesis_time) (last_over_time(sentinel_genesis_info[1m]))))",
           "legendFormat": "distinct values",
           "refId": "A"
         }
@@ -446,7 +446,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (chain_id) (last_over_time(sentinel_genesis_info[5m])))",
+          "expr": "count(count by (chain_id) (max by (validator, chain_id) (last_over_time(sentinel_genesis_info[1m]))))",
           "legendFormat": "distinct values",
           "refId": "A"
         }
@@ -489,13 +489,13 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "last_over_time(sentinel_genesis_info{validator=~\"$validator\"}[1h])",
+          "expr": "max by (validator, chain_id, genesis_time, app_hash) (last_over_time(sentinel_genesis_info{validator=~\"$validator\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "A"
         }
       ],
-      "title": "Genesis info — one row per validator",
+      "title": "Genesis info \u2014 one row per validator",
       "type": "table",
       "transformations": [
         {
@@ -524,7 +524,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Per-validator consensus params from /genesis. Rows: (validator, param, value). Scan each param for value consistency across validators. Prometheus label-valued schema means Grafana shows one row per (validator, param) — use column filters or sorting to group by param.",
+      "description": "Per-validator consensus params from /genesis. Rows: (validator, param, value). Scan each param for value consistency across validators. Prometheus label-valued schema means Grafana shows one row per (validator, param) \u2014 use column filters or sorting to group by param.",
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -554,7 +554,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "last_over_time(sentinel_genesis_consensus_param{validator=~\"$validator\"}[1h])",
+          "expr": "max by (validator, param, value) (last_over_time(sentinel_genesis_consensus_param{validator=~\"$validator\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -583,7 +583,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Genesis validator set as observed by $validator. Should be identical across the fleet — app_hash divergence in the panel above is how you catch a mismatch.",
+      "description": "Genesis validator set as observed by $validator. Should be identical across the fleet \u2014 app_hash divergence in the panel above is how you catch a mismatch.",
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -613,7 +613,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "last_over_time(sentinel_genesis_validator{validator=~\"$validator\"}[1h])",
+          "expr": "max by (validator, address, pub_key, power, name) (last_over_time(sentinel_genesis_validator{validator=~\"$validator\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -646,7 +646,7 @@
     },
     {
       "type": "row",
-      "title": "Config drift — metadata collector",
+      "title": "Config drift \u2014 metadata collector",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -662,7 +662,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of application.prune_strategy across the fleet. 1 = agreement, ≥2 = drift.",
+      "description": "Distinct values of application.prune_strategy across the fleet. 1 = agreement, \u22652 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -715,7 +715,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (value) (last_over_time(sentinel_node_config{key=\"application.prune_strategy\"}[5m])))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"application.prune_strategy\"}[1m]))))",
           "legendFormat": "prune_strategy",
           "refId": "A"
         }
@@ -728,7 +728,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of consensus.peer_gossip_sleep_duration across the fleet. 1 = agreement, ≥2 = drift.",
+      "description": "Distinct values of consensus.peer_gossip_sleep_duration across the fleet. 1 = agreement, \u22652 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -781,7 +781,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (value) (last_over_time(sentinel_node_config{key=\"consensus.peer_gossip_sleep_duration\"}[5m])))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"consensus.peer_gossip_sleep_duration\"}[1m]))))",
           "legendFormat": "peer_gossip_sleep_duration",
           "refId": "A"
         }
@@ -794,7 +794,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of consensus.timeout_commit across the fleet. 1 = agreement, ≥2 = drift.",
+      "description": "Distinct values of consensus.timeout_commit across the fleet. 1 = agreement, \u22652 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -847,7 +847,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (value) (last_over_time(sentinel_node_config{key=\"consensus.timeout_commit\"}[5m])))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"consensus.timeout_commit\"}[1m]))))",
           "legendFormat": "timeout_commit",
           "refId": "A"
         }
@@ -860,7 +860,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of mempool.size across the fleet. 1 = agreement, ≥2 = drift.",
+      "description": "Distinct values of mempool.size across the fleet. 1 = agreement, \u22652 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -913,7 +913,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (value) (last_over_time(sentinel_node_config{key=\"mempool.size\"}[5m])))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"mempool.size\"}[1m]))))",
           "legendFormat": "size",
           "refId": "A"
         }
@@ -926,7 +926,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of p2p.flush_throttle_timeout across the fleet. 1 = agreement, ≥2 = drift.",
+      "description": "Distinct values of p2p.flush_throttle_timeout across the fleet. 1 = agreement, \u22652 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -979,7 +979,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (value) (last_over_time(sentinel_node_config{key=\"p2p.flush_throttle_timeout\"}[5m])))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.flush_throttle_timeout\"}[1m]))))",
           "legendFormat": "flush_throttle_timeout",
           "refId": "A"
         }
@@ -992,7 +992,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of p2p.max_num_outbound_peers across the fleet. 1 = agreement, ≥2 = drift.",
+      "description": "Distinct values of p2p.max_num_outbound_peers across the fleet. 1 = agreement, \u22652 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -1045,7 +1045,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (value) (last_over_time(sentinel_node_config{key=\"p2p.max_num_outbound_peers\"}[5m])))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.max_num_outbound_peers\"}[1m]))))",
           "legendFormat": "max_num_outbound_peers",
           "refId": "A"
         }
@@ -1058,7 +1058,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of p2p.pex across the fleet. 1 = agreement, ≥2 = drift.",
+      "description": "Distinct values of p2p.pex across the fleet. 1 = agreement, \u22652 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -1111,7 +1111,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count(count by (value) (last_over_time(sentinel_node_config{key=\"p2p.pex\"}[5m])))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.pex\"}[1m]))))",
           "legendFormat": "pex",
           "refId": "A"
         }

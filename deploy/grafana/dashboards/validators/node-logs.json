@@ -336,7 +336,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "cps"
         },
         "overrides": [
           {
@@ -415,7 +416,7 @@
             "max"
           ],
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "showLegend": true
         },
         "tooltip": {
@@ -431,7 +432,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum by (level) (count_over_time({validator=~\"$validator\", level=~\"$level\"}[$__auto]))",
+          "expr": "sum by (level) (count_over_time({validator=~\"$validator\", level=~\"$level\", module=~\"$module\"}[$__auto]))",
           "legendFormat": "{{level}}",
           "queryType": "range",
           "refId": "A"

@@ -1,5 +1,7 @@
 {
-  "annotations": {"list": []},
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -7,94 +9,435 @@
   "links": [],
   "panels": [
     {
-      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "CPU cores consumed by each container. Stack sums to total CPU load across the stack.",
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 30, "lineWidth": 1, "stacking": {"mode": "normal"}}, "color": {"mode": "palette-classic"}}, "overrides": []},
-      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 2,
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
-      "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"$container\"}[$__rate_interval]))", "legendFormat": "{{name}}", "refId": "A"}
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"$container\"}[$__rate_interval]))",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
       ],
       "title": "CPU (cores) per container",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Working-set memory (approx resident size). Doesn't include reclaimable cache.",
-      "fieldConfig": {"defaults": {"unit": "bytes", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "stacking": {"mode": "none"}}, "color": {"mode": "palette-classic"}}, "overrides": []},
-      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 9},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
       "id": 2,
-      "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (name) (container_memory_working_set_bytes{name=~\"$container\"})", "legendFormat": "{{name}}", "refId": "A"}
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "max by (name) (container_memory_working_set_bytes{name=~\"$container\"})",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
       ],
       "title": "Memory (working set) per container",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Network throughput in (receive) per container.",
-      "fieldConfig": {"defaults": {"unit": "Bps", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "stacking": {"mode": "normal"}}, "color": {"mode": "palette-classic"}}, "overrides": []},
-      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 18},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
       "id": 3,
-      "options": {"legend": {"calcs": ["last", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (name) (rate(container_network_receive_bytes_total{name=~\"$container\"}[$__rate_interval]))", "legendFormat": "{{name}}", "refId": "A"}
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum by (name) (rate(container_network_receive_bytes_total{name=~\"$container\"}[$__rate_interval]))",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
       ],
       "title": "Network in per container",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Network throughput out (transmit) per container.",
-      "fieldConfig": {"defaults": {"unit": "Bps", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "stacking": {"mode": "normal"}}, "color": {"mode": "palette-classic"}}, "overrides": []},
-      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 18},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
       "id": 4,
-      "options": {"legend": {"calcs": ["last", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (name) (rate(container_network_transmit_bytes_total{name=~\"$container\"}[$__rate_interval]))", "legendFormat": "{{name}}", "refId": "A"}
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum by (name) (rate(container_network_transmit_bytes_total{name=~\"$container\"}[$__rate_interval]))",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
       ],
       "title": "Network out per container",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Snapshot of current usage per container, sorted by memory.",
-      "fieldConfig": {"defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}}, "color": {"mode": "thresholds"}}, "overrides": [{"matcher": {"id": "byName", "options": "memory"}, "properties": [{"id": "unit", "value": "bytes"}, {"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "gradient"}}, {"id": "color", "value": {"mode": "continuous-BlYlRd"}}]}, {"matcher": {"id": "byName", "options": "cpu"}, "properties": [{"id": "unit", "value": "percentunit"}, {"id": "decimals", "value": 3}]}]},
-      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 27},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "memory"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-BlYlRd"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cpu"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
       "id": 5,
-      "options": {"showHeader": true, "sortBy": [{"desc": true, "displayName": "memory"}]},
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "memory"
+          }
+        ]
+      },
       "pluginVersion": "12.4.1",
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"$container\"}[$__rate_interval]))", "legendFormat": "{{name}}", "refId": "A", "format": "table", "instant": true},
-        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (name) (container_memory_working_set_bytes{name=~\"$container\"})", "legendFormat": "{{name}}", "refId": "B", "format": "table", "instant": true}
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"$container\"}[$__rate_interval]))",
+          "legendFormat": "{{name}}",
+          "refId": "A",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "max by (name) (container_memory_working_set_bytes{name=~\"$container\"})",
+          "legendFormat": "{{name}}",
+          "refId": "B",
+          "format": "table",
+          "instant": true
+        }
       ],
       "title": "Containers snapshot (CPU + memory)",
       "type": "table",
       "transformations": [
-        {"id": "joinByField", "options": {"byField": "name", "mode": "outer"}},
-        {"id": "organize", "options": {"excludeByName": {"Time 1": true, "Time 2": true, "job 1": true, "job 2": true, "instance 1": true, "instance 2": true, "id 1": true, "id 2": true, "image 1": true, "image 2": true}, "renameByName": {"Value #A": "cpu", "Value #B": "memory"}, "indexByName": {"name": 0, "cpu": 1, "memory": 2}}},
-        {"id": "filterFieldsByName", "options": {"include": {"names": ["name", "cpu", "memory"]}}}
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "name",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "job 1": true,
+              "job 2": true,
+              "instance 1": true,
+              "instance 2": true,
+              "id 1": true,
+              "id 2": true,
+              "image 1": true,
+              "image 2": true
+            },
+            "renameByName": {
+              "Value #A": "cpu",
+              "Value #B": "memory"
+            },
+            "indexByName": {
+              "name": 0,
+              "cpu": 1,
+              "memory": 2
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "name",
+                "cpu",
+                "memory"
+              ]
+            }
+          }
+        }
       ]
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["container", "infra"],
+  "tags": [
+    "container",
+    "infra"
+  ],
   "templating": {
     "list": [
       {
-        "current": {"selected": true, "text": ["All"], "value": ["$__all"]},
-        "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoriametrics"
+        },
         "definition": "label_values(container_memory_usage_bytes{name!=\"\"}, name)",
         "includeAll": true,
         "label": "Container",
         "multi": true,
         "name": "container",
         "options": [],
-        "query": {"query": "label_values(container_memory_usage_bytes{name!=\"\"}, name)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
-        "refresh": 2,
+        "query": {
+          "query": "label_values(container_memory_usage_bytes{name!=\"\"}, name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
@@ -102,7 +445,10 @@
       }
     ]
   },
-  "time": {"from": "now-1h", "to": "now"},
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "Container Resources",
