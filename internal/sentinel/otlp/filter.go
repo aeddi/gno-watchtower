@@ -12,7 +12,7 @@ import (
 //
 // See docs/data-collected.md for the rationale behind each entry.
 // Package-private and never mutated after init — safe for concurrent reads
-// from the gRPC handler goroutines.
+// from the HTTP handler goroutines.
 var deniedMetricNames = map[string]struct{}{
 	"block_txs_hist":       {}, // superseded by sentinel_rpc_block_num_txs
 	"validator_count_hist": {}, // superseded by sentinel_rpc_validator_set_size
@@ -21,9 +21,9 @@ var deniedMetricNames = map[string]struct{}{
 }
 
 // filterDenied strips every Metric whose name is in deniedMetricNames from req
-// in place. In-place mutation is safe because grpc-go deserializes a fresh
-// ExportMetricsServiceRequest per unary call, so the sentinel is the sole
-// owner of this message for the duration of Export. ResourceMetrics and
+// in place. In-place mutation is safe because proto.Unmarshal produces a fresh
+// ExportMetricsServiceRequest per HTTP call, so the sentinel is the sole
+// owner of this message for the duration of handleMetrics. ResourceMetrics and
 // ScopeMetrics entries whose Metrics slice goes empty are left in the request —
 // the OTLP exporter tolerates them and removal would cost allocations for no gain.
 func filterDenied(req *collectorpb.ExportMetricsServiceRequest) {

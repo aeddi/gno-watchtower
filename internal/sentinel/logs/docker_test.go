@@ -1,22 +1,20 @@
-package logs_test
+package logs
 
 import (
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/aeddi/gno-watchtower/internal/sentinel/logs"
 )
 
 func TestNewDockerSource_ReturnsNonNil(t *testing.T) {
-	s := logs.NewDockerSource("gnoland", 0)
+	s := NewDockerSource("gnoland", 0)
 	if s == nil {
 		t.Fatal("expected non-nil DockerSource")
 	}
 }
 
 func TestBuildLogsOptions_ZeroLookbackFollowsFromNow(t *testing.T) {
-	opts := logs.BuildLogsOptions(0, time.Unix(1_700_000_000, 0))
+	opts := buildLogsOptions(0, time.Unix(1_700_000_000, 0))
 	if opts.Tail != "0" {
 		t.Errorf("Tail = %q, want %q (follow new only)", opts.Tail, "0")
 	}
@@ -27,7 +25,7 @@ func TestBuildLogsOptions_ZeroLookbackFollowsFromNow(t *testing.T) {
 
 func TestBuildLogsOptions_LookbackSetsSince(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
-	opts := logs.BuildLogsOptions(60*time.Second, now)
+	opts := buildLogsOptions(60*time.Second, now)
 	want := strconv.FormatInt(now.Add(-60*time.Second).Unix(), 10)
 	if opts.Since != want {
 		t.Errorf("Since = %q, want %q (= now - 60s epoch)", opts.Since, want)

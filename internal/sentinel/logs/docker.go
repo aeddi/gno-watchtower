@@ -29,9 +29,10 @@ func NewDockerSource(containerName string, resumeLookback time.Duration) *Docker
 	return &DockerSource{containerName: containerName, resumeLookback: resumeLookback}
 }
 
-// BuildLogsOptions returns the Docker ContainerLogs options for the given lookback.
+// buildLogsOptions returns the Docker ContainerLogs options for the given lookback.
 // lookback > 0 uses Since; lookback == 0 uses Tail:"0" (follow-only).
-func BuildLogsOptions(lookback time.Duration, now time.Time) container.LogsOptions {
+// Package-private — used by Tail below and exercised directly in docker_test.go.
+func buildLogsOptions(lookback time.Duration, now time.Time) container.LogsOptions {
 	opts := container.LogsOptions{Follow: true, ShowStdout: true, ShowStderr: true}
 	if lookback > 0 {
 		opts.Since = strconv.FormatInt(now.Add(-lookback).Unix(), 10)
@@ -53,7 +54,7 @@ func (s *DockerSource) Tail(ctx context.Context, out chan<- LogLine) error {
 	}
 	defer cli.Close()
 
-	logStream, err := cli.ContainerLogs(ctx, s.containerName, BuildLogsOptions(s.resumeLookback, time.Now()))
+	logStream, err := cli.ContainerLogs(ctx, s.containerName, buildLogsOptions(s.resumeLookback, time.Now()))
 	if err != nil {
 		return fmt.Errorf("container logs %q: %w", s.containerName, err)
 	}

@@ -104,6 +104,7 @@ func runCmd(args []string) {
 	// SIGHUP: reload config and update auth tokens.
 	sighupCh := make(chan os.Signal, 1)
 	signal.Notify(sighupCh, syscall.SIGHUP)
+	defer signal.Stop(sighupCh)
 	go func() {
 		for {
 			select {

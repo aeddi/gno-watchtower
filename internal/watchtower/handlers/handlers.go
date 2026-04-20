@@ -88,11 +88,16 @@ func (s *Server) RunStatsLogger(ctx context.Context, ticker *time.Ticker) {
 	}
 }
 
+// payloadForwarder receives the full validator context alongside the body so
+// per-endpoint handlers (e.g. /logs needs min_level) can look up config
+// without re-parsing the request context.
+type payloadForwarder func(ctx context.Context, validator string, vcfg config.ValidatorConfig, body []byte) error
+
 func (s *Server) handlePayload(
 	w http.ResponseWriter,
 	r *http.Request,
 	perm string,
-	forward func(context.Context, string, []byte) error,
+	forward payloadForwarder,
 ) {
 	validator, vcfg, _ := auth.ValidatorFromContext(r.Context())
 	if !slices.Contains(vcfg.Permissions, perm) {
@@ -106,7 +111,7 @@ func (s *Server) handlePayload(
 		return
 	}
 	s.log.Info("received", "validator", validator, "type", perm, "bytes", len(body))
-	if err := forward(r.Context(), validator, body); err != nil {
+	if err := forward(r.Context(), validator, vcfg, body); err != nil {
 		s.log.Error("forward "+perm, "err", err)
 		http.Error(w, "forward failed", http.StatusBadGateway)
 		return
@@ -116,23 +121,27 @@ func (s *Server) handlePayload(
 }
 
 func (s *Server) handleRPC(w http.ResponseWriter, r *http.Request) {
-	s.handlePayload(w, r, "rpc", s.fwd.ForwardRPC)
+	s.handlePayload(w, r, "rpc", func(ctx context.Context, validator string, _ config.ValidatorConfig, body []byte) error {
+		return s.fwd.ForwardRPC(ctx, validator, body)
+	})
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
-	s.handlePayload(w, r, "metrics", s.fwd.ForwardMetrics)
+	s.handlePayload(w, r, "metrics", func(ctx context.Context, validator string, _ config.ValidatorConfig, body []byte) error {
+		return s.fwd.ForwardMetrics(ctx, validator, body)
+	})
 }
 
 func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
-	_, vcfg, _ := auth.ValidatorFromContext(r.Context())
-	minLevel := vcfg.LogsMinLevel
-	s.handlePayload(w, r, "logs", func(ctx context.Context, validator string, body []byte) error {
-		return s.fwd.ForwardLogs(ctx, validator, body, minLevel)
+	s.handlePayload(w, r, "logs", func(ctx context.Context, validator string, vcfg config.ValidatorConfig, body []byte) error {
+		return s.fwd.ForwardLogs(ctx, validator, body, vcfg.LogsMinLevel)
 	})
 }
 
 func (s *Server) handleOTLP(w http.ResponseWriter, r *http.Request) {
-	s.handlePayload(w, r, "otlp", s.fwd.ForwardOTLP)
+	s.handlePayload(w, r, "otlp", func(ctx context.Context, validator string, _ config.ValidatorConfig, body []byte) error {
+		return s.fwd.ForwardOTLP(ctx, validator, body)
+	})
 }
 
 func (s *Server) handleAuthCheck(w http.ResponseWriter, r *http.Request) {

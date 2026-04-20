@@ -79,14 +79,12 @@ func EnsureJSON(raw []byte, now time.Time) json.RawMessage {
 		return wrapAsSentinelRaw(raw, now)
 	}
 	// Fast path: all 4 mandatory fields present → no reserialization.
-	if _, ok1 := obj["ts"]; ok1 {
-		if _, ok2 := obj["level"]; ok2 {
-			if _, ok3 := obj["msg"]; ok3 {
-				if _, ok4 := obj["module"]; ok4 {
-					return json.RawMessage(raw)
-				}
-			}
-		}
+	_, okTS := obj["ts"]
+	_, okLevel := obj["level"]
+	_, okMsg := obj["msg"]
+	_, okModule := obj["module"]
+	if okTS && okLevel && okMsg && okModule {
+		return json.RawMessage(raw)
 	}
 	// Fill missing mandatory fields while preserving original extras.
 	if _, ok := obj["ts"]; !ok {
