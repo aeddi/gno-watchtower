@@ -30,6 +30,14 @@
       "targetBlank": false,
       "tooltip": "Per-validator log browser (Loki)",
       "url": "/d/node-logs/node-logs?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Storage & Traffic",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Pipeline throughput, storage, retention",
+      "url": "/d/storage-and-traffic/storage-and-traffic?${__url_time_range}"
     }
   ],
   "panels": [
