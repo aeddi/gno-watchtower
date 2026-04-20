@@ -1,0 +1,67 @@
+# .goreleaser.yml — binary release config.
+#
+# Triggered by .github/workflows/release.yml on tag push. Produces
+# sentinel_<version>_<os>_<arch>.tar.gz + watchtower_<version>_<os>_<arch>.tar.gz
+# for linux and darwin, amd64 and arm64, and attaches them to the GitHub
+# Release together with a checksums.txt.
+#
+# Docker images are built separately via docker/build-push-action so we can
+# use buildx multi-arch cleanly — goreleaser's Docker support doesn't merge
+# manifest lists the way we want.
+#
+# Local dry-run:
+#   goreleaser release --snapshot --clean --skip=publish
+version: 2
+
+project_name: gno-watchtower
+
+builds:
+  - id: sentinel
+    main: ./cmd/sentinel
+    binary: sentinel
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version={{.Version}}
+
+  - id: watchtower
+    main: ./cmd/watchtower
+    binary: watchtower
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version={{.Version}}
+
+archives:
+  - id: sentinel
+    ids: [sentinel]
+    name_template: "sentinel_{{.Version}}_{{.Os}}_{{.Arch}}"
+    formats: [tar.gz]
+    files:
+      - README.md
+  - id: watchtower
+    ids: [watchtower]
+    name_template: "watchtower_{{.Version}}_{{.Os}}_{{.Arch}}"
+    formats: [tar.gz]
+    files:
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+# release-please owns the release notes (generated from Conventional Commits).
+# goreleaser just attaches the built binaries to the existing release.
+release:
+  github:
+    owner: aeddi
+    name: gno-watchtower
+  mode: keep-existing
+  prerelease: auto
