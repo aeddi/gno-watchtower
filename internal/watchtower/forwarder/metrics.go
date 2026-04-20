@@ -43,7 +43,42 @@ func extractMetrics(validator string, payload protocol.MetricsPayload) []vmLine 
 			lines = appendContainer(lines, validator, ts, raw, log)
 		case "config":
 			lines = appendNodeConfig(lines, validator, ts, raw, log)
+		case "self_stats":
+			lines = appendSelfStats(lines, validator, ts, raw, log)
 		}
+	}
+	return lines
+}
+
+// selfTypeStats mirrors internal/sentinel/self.TypeStats. Duplicated here
+// because the watchtower must not import the sentinel's internal packages.
+type selfTypeStats struct {
+	UncompressedBytes int64 `json:"uncompressed_bytes"`
+	WireBytes         int64 `json:"wire_bytes"`
+	Drops             int64 `json:"drops"`
+	Retries           int64 `json:"retries"`
+}
+
+// appendSelfStats expands the sentinel's per-type counters into Prometheus
+// counter series. The "encoding" label separates uncompressed (payload as
+// JSON-marshaled) from wire (post-zstd for logs, identical for other types),
+// letting the dashboard show compression ratio as `wire / uncompressed`.
+func appendSelfStats(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	var byType map[string]selfTypeStats
+	if err := json.Unmarshal(raw, &byType); err != nil {
+		log.Debug("metrics: self_stats unmarshal failed", "validator", validator, "err", err)
+		return lines
+	}
+	for typ, s := range byType {
+		uncompLabels := map[string]string{"validator": validator, "type": typ, "encoding": "uncompressed"}
+		wireLabels := map[string]string{"validator": validator, "type": typ, "encoding": "wire"}
+		dropLabels := map[string]string{"validator": validator, "type": typ}
+		lines = append(lines,
+			vmSample("sentinel_self_bytes_sent_total", uncompLabels, float64(s.UncompressedBytes), ts),
+			vmSample("sentinel_self_bytes_sent_total", wireLabels, float64(s.WireBytes), ts),
+			vmSample("sentinel_self_drops_total", dropLabels, float64(s.Drops), ts),
+			vmSample("sentinel_self_retries_total", dropLabels, float64(s.Retries), ts),
+		)
 	}
 	return lines
 }

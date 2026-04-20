@@ -293,6 +293,44 @@ func TestExtractMetrics_UnknownKey_Ignored(t *testing.T) {
 	}
 }
 
+func TestExtractMetrics_SelfStats_EmitsCounterSeries(t *testing.T) {
+	const selfJSON = `{
+		"rpc":  {"uncompressed_bytes": 1000, "wire_bytes": 1000, "drops": 0, "retries": 2},
+		"logs": {"uncompressed_bytes": 5000, "wire_bytes": 1200, "drops": 3, "retries": 1}
+	}`
+	lines := extractMetrics("node-1", payload(map[string]string{"self_stats": selfJSON}))
+
+	// 4 series per type × 2 types = 8 lines.
+	if len(lines) != 8 {
+		t.Fatalf("self_stats: got %d lines, want 8", len(lines))
+	}
+
+	// Per-type sanity checks.
+	rpcUncomp := findLine(t, lines, map[string]string{"__name__": "sentinel_self_bytes_sent_total", "type": "rpc", "encoding": "uncompressed"})
+	if rpcUncomp == nil || rpcUncomp.Values[0] != 1000 {
+		t.Errorf("rpc uncompressed bytes missing or wrong: %v", rpcUncomp)
+	}
+	logsWire := findLine(t, lines, map[string]string{"__name__": "sentinel_self_bytes_sent_total", "type": "logs", "encoding": "wire"})
+	if logsWire == nil || logsWire.Values[0] != 1200 {
+		t.Errorf("logs wire bytes missing or wrong: %v", logsWire)
+	}
+	logsDrops := findLine(t, lines, map[string]string{"__name__": "sentinel_self_drops_total", "type": "logs"})
+	if logsDrops == nil || logsDrops.Values[0] != 3 {
+		t.Errorf("logs drops missing or wrong: %v", logsDrops)
+	}
+	rpcRetries := findLine(t, lines, map[string]string{"__name__": "sentinel_self_retries_total", "type": "rpc"})
+	if rpcRetries == nil || rpcRetries.Values[0] != 2 {
+		t.Errorf("rpc retries missing or wrong: %v", rpcRetries)
+	}
+}
+
+func TestExtractMetrics_SelfStats_MalformedDroppedSilently(t *testing.T) {
+	lines := extractMetrics("node-1", payload(map[string]string{"self_stats": `not json`}))
+	if len(lines) != 0 {
+		t.Errorf("malformed self_stats produced %d lines, want 0", len(lines))
+	}
+}
+
 func TestExtractMetrics_MalformedContainer_SkipsBlock(t *testing.T) {
 	lines := extractMetrics("node-1", payload(map[string]string{
 		"cpu":       hostCPUJSON,
