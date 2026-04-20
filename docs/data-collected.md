@@ -53,8 +53,6 @@ Column key for **Preferred**:
 - **RPC** — sentinel's RPC extractor; OTLP equivalent (if any) is denied at the
   sentinel filter.
 - **OTLP** — only gnoland emits it; no RPC equivalent.
-- **RPC primary, OTLP cross-check** — both flow to VM; used by
-  `.ignore/tests/otlp.sh` consistency assertions to catch pipeline drift.
 
 ### Node sync & validator identity
 
@@ -246,17 +244,24 @@ same dashboard slot.
 
 ## Consequences for dashboards
 
-`deploy/grafana/dashboards/validators/` hosts five dashboards:
+`deploy/grafana/dashboards/` hosts six dashboards across two subdirectories:
+
+`validators/` — per-validator operational boards:
 
 - **`validator-chain.json`** — primary operational board. Merges RPC and OTLP
   signals: height, catching_up, peers, mempool, consensus state,
-  blocks-behind-tip, block-build time, RPC server latency, gas price.
+  blocks-behind-tip, block-build time, RPC server latency, gas price, plus a
+  fleet-wide consensus-quorum row.
 - **`validator-metadata.json`** — fleet drift board. Build info, genesis
   (consensus params + validator set), config keys. Consistency stats flag
   divergence as red cells.
 - **`validator-resources.json`** — per-validator host + container resources
   (sentinel-sourced — the only pipeline that can see remote validators' hosts).
-- **`host-resources.json` / `container-resources.json`** — watchtower-side
-  (cAdvisor + node-exporter). Useful in the dev cluster where validators are
-  co-located; in production only covers the watchtower host.
 - **`node-logs.json`** — Loki log viewer with module/level filters.
+
+`watchtower/` — watchtower-host-side infrastructure boards:
+
+- **`host-resources.json`** — watchtower host stats via node-exporter.
+- **`container-resources.json`** — containers on the watchtower host via
+  cAdvisor. Useful in the dev cluster where validators are co-located; in
+  production only covers the watchtower's own containers.
