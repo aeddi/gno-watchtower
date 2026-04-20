@@ -22,12 +22,12 @@
     {
       "datasource": {"type": "prometheus", "uid": "victoriametrics"},
       "description": "Working-set memory (approx resident size). Doesn't include reclaimable cache.",
-      "fieldConfig": {"defaults": {"unit": "bytes", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 30, "lineWidth": 1, "stacking": {"mode": "normal"}}, "color": {"mode": "palette-classic"}}, "overrides": []},
+      "fieldConfig": {"defaults": {"unit": "bytes", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "stacking": {"mode": "none"}}, "color": {"mode": "palette-classic"}}, "overrides": []},
       "gridPos": {"h": 9, "w": 24, "x": 0, "y": 9},
       "id": 2,
       "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "container_memory_working_set_bytes{name=~\"$container\"}", "legendFormat": "{{name}}", "refId": "A"}
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (name) (container_memory_working_set_bytes{name=~\"$container\"})", "legendFormat": "{{name}}", "refId": "A"}
       ],
       "title": "Memory (working set) per container",
       "type": "timeseries"
@@ -68,7 +68,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"$container\"}[$__rate_interval]))", "legendFormat": "{{name}}", "refId": "A", "format": "table", "instant": true},
-        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "container_memory_working_set_bytes{name=~\"$container\"}", "legendFormat": "{{name}}", "refId": "B", "format": "table", "instant": true}
+        {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (name) (container_memory_working_set_bytes{name=~\"$container\"})", "legendFormat": "{{name}}", "refId": "B", "format": "table", "instant": true}
       ],
       "title": "Containers snapshot (CPU + memory)",
       "type": "table",

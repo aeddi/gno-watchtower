@@ -51,7 +51,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "victoriametrics"},
       "description": "Disk IO on the root device. Helps spot storage saturation (e.g. compactor overload, log rotation storms).",
-      "fieldConfig": {"defaults": {"unit": "Bps", "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2}, "color": {"mode": "palette-classic"}}, "overrides": []},
+      "fieldConfig": {"defaults": {"unit": "Bps", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2}, "color": {"mode": "palette-classic"}}, "overrides": []},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
       "id": 4,
       "options": {"legend": {"calcs": ["last", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
@@ -65,7 +65,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "victoriametrics"},
       "description": "Throughput on physical NICs (loopback + docker bridges excluded).",
-      "fieldConfig": {"defaults": {"unit": "Bps", "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2}, "color": {"mode": "palette-classic"}}, "overrides": []},
+      "fieldConfig": {"defaults": {"unit": "Bps", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2}, "color": {"mode": "palette-classic"}}, "overrides": []},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
       "id": 5,
       "options": {"legend": {"calcs": ["last", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}},
@@ -79,7 +79,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "victoriametrics"},
       "description": "Percentage of root-filesystem space used. Sustained >80% is a problem for Loki/VM.",
-      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]}}, "overrides": []},
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "decimals": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]}}, "overrides": []},
       "gridPos": {"h": 4, "w": 6, "x": 12, "y": 16},
       "id": 6,
       "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
