@@ -1,0 +1,98 @@
+# Tag-triggered release: build binaries (goreleaser) and Docker image (buildx).
+#
+# Fires on tag pushes matching v*.*.* — which happen automatically when a
+# release-please PR merges (see release-please.yml). The goreleaser and
+# docker jobs run in parallel: goreleaser attaches cross-platform binary
+# archives to the GitHub Release, docker pushes a multi-arch sentinel
+# image to ghcr.io/aeddi/gno-watchtower/sentinel.
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+# Deny by default; jobs opt in to the narrowest useful scope.
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write   # attach archives + checksums to the Release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # goreleaser needs full history for changelog
+          # persist-credentials stays default (true) — goreleaser uses the
+          # checkout token to push release assets.
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read      # read Dockerfile + source for build
+      packages: write     # push to ghcr.io
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # don't need git write access
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Compute image tags + labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/aeddi/gno-watchtower/sentinel
+          # Semver stripping: v0.2.0 → :0.2.0, :0.2, :latest, :sha-abcd123
+          # Retain the v-prefixed form too so `docker pull …:v0.2.0` works.
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+          labels: |
+            org.opencontainers.image.title=gno-watchtower sentinel
+            org.opencontainers.image.description=Sentinel sidecar for gno-watchtower monitoring.
+            org.opencontainers.image.licenses=MIT
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: sentinel.Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,50 @@
+# Conventional Commit → versioned release via release-please.
+#
+# On every push to main, release-please scans commits since the last tag. If
+# any are release-worthy (feat:, fix:, BREAKING CHANGE, etc.), it opens or
+# updates a single "chore(main): release <version>" PR that bumps the
+# version, updates CHANGELOG.md, and computes release notes.
+#
+# Merging that PR tags the new version and publishes a GitHub Release. On
+# the tag push, release.yml fires and builds + attaches binaries and the
+# Docker image.
+#
+# IMPORTANT: release-please must use a PAT or GitHub App token — NOT the
+# default GITHUB_TOKEN. Tags pushed with GITHUB_TOKEN don't trigger other
+# workflows (GitHub's loop-prevention policy), so release.yml would never
+# fire. Create a fine-grained PAT with `contents: write` + `pull-requests:
+# write` on this repo, store as secret RELEASE_PLEASE_TOKEN.
+#
+# First run will propose v0.1.0. See the README "Versioning" section.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+# Deny by default; the job below opts in to just what it needs.
+permissions: {}
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write        # release-please commits CHANGELOG + pushes tags
+      pull-requests: write   # release-please opens / updates the Release PR
+    steps:
+      - name: Run release-please
+        uses: googleapis/release-please-action@v4
+        with:
+          # Fall back to default GITHUB_TOKEN when RELEASE_PLEASE_TOKEN is
+          # absent so the workflow doesn't error on first setup — but note
+          # that in that mode, tag pushes won't trigger release.yml and
+          # binaries won't be built until RELEASE_PLEASE_TOKEN is added.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          release-type: go
+          package-name: gno-watchtower
+          target-branch: main

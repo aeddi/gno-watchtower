@@ -1,0 +1,21 @@
+# Dependabot keeps third-party GitHub Actions + Go module dependencies up
+# to date. Actions are tracked by major-version tag in the workflow files;
+# Dependabot opens a PR when a new minor/patch is available and includes
+# release notes so we can review before merging.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go-dependencies:
+        patterns: ['*']
