@@ -83,34 +83,6 @@ func TestCollector_ConfigPath_EmitsConfigValues(t *testing.T) {
 	}
 }
 
-func TestCollector_ConflictDetection_SkipsConfig(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte(sampleConfigTOML), 0644); err != nil {
-		t.Fatal(err)
-	}
-	cfg := config.MetadataConfig{
-		Enabled:       true,
-		CheckInterval: config.Duration{Duration: 10 * time.Millisecond},
-		ConfigPath:    path,
-		ConfigGetCmd:  "echo foo", // CONFLICT: both set
-	}
-	out := make(chan protocol.MetricsPayload, 5)
-	c := metadata.NewCollector(cfg, out, logger.Noop())
-
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-	go c.Run(ctx)
-
-	select {
-	case p := <-out:
-		if _, ok := p.Data["config"]; ok {
-			t.Error("config must not be collected when path and cmd both set")
-		}
-	case <-time.After(150 * time.Millisecond):
-		// No payload is the correct outcome — both sources conflict, nothing to emit.
-	}
-}
-
 func TestReadConfigKey(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte(sampleConfigTOML), 0644); err != nil {

@@ -227,6 +227,34 @@ config_path    = "/etc/gnoland/config.toml"
 	}
 }
 
+func TestLoad_MetadataConfigPathAndCmdConflict(t *testing.T) {
+	const content = `
+[server]
+url   = "https://example.com"
+token = "tok"
+
+[metadata]
+enabled        = true
+check_interval = "10m"
+config_path    = "/etc/gnoland/config.toml"
+config_get_cmd = "gnoland config get %s"
+`
+	f, err := os.CreateTemp("", "sentinel-config-*.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	_, err = config.Load(f.Name())
+	if err == nil {
+		t.Fatal("expected error: metadata.config_path and metadata.config_get_cmd both set")
+	}
+}
+
 func TestLoad_EnabledCollectorRequiresServerURL(t *testing.T) {
 	const content = `
 [server]

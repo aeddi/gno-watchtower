@@ -100,7 +100,7 @@ type Config struct {
 	Logs      LogsConfig      `toml:"logs" comment:"Log collector"`
 	OTLP      OTLPConfig      `toml:"otlp" comment:"OpenTelemetry relay"`
 	Resources ResourcesConfig `toml:"resources" comment:"System resource monitor"`
-	Metadata  MetadataConfig  `toml:"metadata" comment:"Binary, genesis, and config metadata collector"`
+	Metadata  MetadataConfig  `toml:"metadata" comment:"Config metadata collector"`
 	Health    HealthConfig    `toml:"health" comment:"Sentinel health endpoint"`
 }
 
@@ -235,6 +235,9 @@ func (c *Config) validate() error {
 	}
 	if c.Health.Enabled && c.Health.ListenAddr == "" {
 		return fmt.Errorf("health.listen_addr is required when health is enabled")
+	}
+	if c.Metadata.Enabled && c.Metadata.ConfigPath != "" && c.Metadata.ConfigGetCmd != "" {
+		return fmt.Errorf("metadata: set exactly one of config_path or config_get_cmd, not both")
 	}
 	return nil
 }

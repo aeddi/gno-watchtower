@@ -124,10 +124,6 @@ func (c *Collector) collectAndSend(ctx context.Context) {
 }
 
 func (c *Collector) collectConfig(data map[string]json.RawMessage) {
-	if c.cfg.ConfigPath != "" && c.cfg.ConfigGetCmd != "" {
-		c.log.Error("metadata conflict: config_path and config_get_cmd both set — skipping config keys")
-		return
-	}
 	if c.cfg.ConfigPath == "" && c.cfg.ConfigGetCmd == "" {
 		return
 	}
