@@ -80,6 +80,3 @@ func (c *Client) Validators(ctx context.Context, height int64) (json.RawMessage,
 func (c *Client) Block(ctx context.Context, height int64) (json.RawMessage, error) {
 	return c.get(ctx, fmt.Sprintf("/block?height=%d", height))
 }
-func (c *Client) BlockResults(ctx context.Context, height int64) (json.RawMessage, error) {
-	return c.get(ctx, fmt.Sprintf("/block_results?height=%d", height))
-}

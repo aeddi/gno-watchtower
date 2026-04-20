@@ -19,7 +19,7 @@ type statusResult struct {
 
 // Collector polls gnoland RPC endpoints and emits RPCPayloads to out.
 // Unchanged responses (by hash) are omitted from the payload (delta).
-// /block and /block_results are always emitted when a new block is detected.
+// /block is always emitted when a new block is detected.
 type Collector struct {
 	client       *Client
 	delta        *delta.Delta
@@ -122,12 +122,6 @@ func (c *Collector) collect(ctx context.Context) error {
 			changed = append(changed, "block")
 		} else {
 			c.log.Warn("endpoint error", "endpoint", "block", "err", err)
-		}
-		if raw, err := c.client.BlockResults(ctx, currentHeight); err == nil {
-			payload.Data["block_results"] = raw
-			changed = append(changed, "block_results")
-		} else {
-			c.log.Warn("endpoint error", "endpoint", "block_results", "err", err)
 		}
 	}
 

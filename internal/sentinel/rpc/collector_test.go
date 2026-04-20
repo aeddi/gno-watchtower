@@ -50,7 +50,7 @@ func buildMockNode(t *testing.T) *httptest.Server {
 			respond(map[string]any{"round_state": map[string]any{}})
 		case "/validators":
 			respond(map[string]any{"validators": []any{}})
-		case "/block", "/block_results":
+		case "/block":
 			respond(map[string]any{"block_id": "abc"})
 		default:
 			http.NotFound(w, r)
@@ -104,9 +104,9 @@ func TestCollector_DeltaSkipsUnchangedEndpoints(t *testing.T) {
 			Result  any    `json:"result"`
 		}
 		result := map[string]any{
-			"sync_info": map[string]any{"latest_block_height": "5", "catching_up": false},
-			"n_peers":   "3",
-			"n_txs":     "0",
+			"sync_info":   map[string]any{"latest_block_height": "5", "catching_up": false},
+			"n_peers":     "3",
+			"n_txs":       "0",
 			"round_state": map[string]any{},
 		}
 		b, _ := json.Marshal(env{JSONRPC: "2.0", Result: result})
