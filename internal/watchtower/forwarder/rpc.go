@@ -97,6 +97,7 @@ type rpcStatus struct {
 		CatchingUp        bool        `json:"catching_up"`
 	} `json:"sync_info"`
 	ValidatorInfo *struct {
+		Address     string      `json:"address"`
 		VotingPower json.Number `json:"voting_power"`
 	} `json:"validator_info"`
 }
@@ -112,8 +113,22 @@ func appendRPCStatus(lines []vmLine, validator string, ts int64, raw json.RawMes
 	}
 	lines = append(lines, vmSample("sentinel_rpc_catching_up", base, boolToFloat(r.SyncInfo.CatchingUp), ts))
 	if r.ValidatorInfo != nil {
-		if s, ok := intSample("sentinel_rpc_validator_voting_power", base, r.ValidatorInfo.VotingPower, ts, "status", validator); ok {
+		// Own voting power carries the validator's on-chain address as a label
+		// so consensus-quorum dashboards can join this against the set-wide
+		// sentinel_rpc_validator_set_power on (address).
+		vpLabels := map[string]string{"validator": validator, "address": r.ValidatorInfo.Address}
+		if s, ok := intSample("sentinel_rpc_validator_voting_power", vpLabels, r.ValidatorInfo.VotingPower, ts, "status", validator); ok {
 			lines = append(lines, s)
+		}
+		// sentinel_validator_online is a presence signal: we emit it only when
+		// the sentinel is reporting AND the node is caught up. Offline /
+		// catching-up nodes produce no sample, and the series ages out of the
+		// VM staleness window — "missing" == "not online". The consensus-
+		// quorum dashboard subtracts the offline nodes' power from total to
+		// compute the live active voting power.
+		if r.ValidatorInfo.Address != "" && !r.SyncInfo.CatchingUp {
+			lines = append(lines, vmSample("sentinel_validator_online",
+				map[string]string{"address": r.ValidatorInfo.Address}, 1, ts))
 		}
 	}
 
@@ -195,6 +210,7 @@ func appendRPCConsensus(lines []vmLine, validator string, ts int64, raw json.Raw
 
 type rpcValidators struct {
 	Validators []struct {
+		Address     string      `json:"address"`
 		VotingPower json.Number `json:"voting_power"`
 	} `json:"validators"`
 }
@@ -206,6 +222,13 @@ func appendRPCValidators(lines []vmLine, validator string, ts int64, raw json.Ra
 	}
 	// Aggregate must be all-or-nothing: a silently-skipped entry would emit a
 	// total_power that disagrees with set_size, which is worse than no sample.
+	// Collect per-member powers alongside the aggregate so we can emit both
+	// in lockstep if every entry parses.
+	type member struct {
+		address string
+		power   int64
+	}
+	members := make([]member, 0, len(r.Validators))
 	var total int64
 	for _, v := range r.Validators {
 		p, err := v.VotingPower.Int64()
@@ -214,13 +237,26 @@ func appendRPCValidators(lines []vmLine, validator string, ts int64, raw json.Ra
 				"validator", validator, "err", err)
 			return lines
 		}
+		members = append(members, member{address: v.Address, power: p})
 		total += p
 	}
 	base := map[string]string{"validator": validator}
-	return append(lines,
+	lines = append(lines,
 		vmSample("sentinel_rpc_validator_set_size", base, float64(len(r.Validators)), ts),
 		vmSample("sentinel_rpc_validator_set_total_power", base, float64(total), ts),
 	)
+	// Per-member gauge: one series per validator-in-set per reporter. The
+	// dashboard dedupes across reporters via `max by (address)` and joins on
+	// sentinel_validator_online{address} to compute active voting power.
+	for _, m := range members {
+		if m.address == "" {
+			continue
+		}
+		lines = append(lines, vmSample("sentinel_rpc_validator_set_power",
+			map[string]string{"validator": validator, "address": m.address},
+			float64(m.power), ts))
+	}
+	return lines
 }
 
 type rpcBlock struct {

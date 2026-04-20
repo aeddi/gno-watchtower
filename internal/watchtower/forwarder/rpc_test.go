@@ -59,6 +59,7 @@ func TestExtractRPC_Status(t *testing.T) {
 		"sentinel_rpc_catching_up",
 		"sentinel_rpc_latest_block_height",
 		"sentinel_rpc_validator_voting_power",
+		"sentinel_validator_online",
 	}
 	if got := metricNames(t, lines); !slices.Equal(got, want) {
 		t.Fatalf("status metric names = %v, want %v", got, want)
@@ -137,7 +138,11 @@ func TestExtractRPC_ConsensusState(t *testing.T) {
 
 func TestExtractRPC_Validators(t *testing.T) {
 	lines := extractRPC("node-1", rpcPayload(map[string]string{"validators": validatorsJSON}))
+	// 1 set_size + 1 set_total_power + 3 set_power (one per validator) = 5.
 	want := []string{
+		"sentinel_rpc_validator_set_power",
+		"sentinel_rpc_validator_set_power",
+		"sentinel_rpc_validator_set_power",
 		"sentinel_rpc_validator_set_size",
 		"sentinel_rpc_validator_set_total_power",
 	}
@@ -151,6 +156,14 @@ func TestExtractRPC_Validators(t *testing.T) {
 	p := findLine(t, lines, map[string]string{"__name__": "sentinel_rpc_validator_set_total_power"})
 	if p == nil || p.Values[0] != 8 {
 		t.Errorf("total voting power = %v, want 8 (1+2+5)", p)
+	}
+	// Per-member set_power: check g1b has power=2.
+	pb := findLine(t, lines, map[string]string{"__name__": "sentinel_rpc_validator_set_power", "address": "g1b"})
+	if pb == nil || pb.Values[0] != 2 {
+		t.Errorf("set_power{address=g1b} = %v, want 2", pb)
+	}
+	if pb != nil && pb.Metric["validator"] != "node-1" {
+		t.Errorf("set_power reporter label = %q, want node-1", pb.Metric["validator"])
 	}
 }
 
@@ -173,11 +186,18 @@ func TestExtractRPC_MultipleKeys(t *testing.T) {
 		"validators":           validatorsJSON,
 		"block":                blockJSON,
 	}))
-	// status: 3 rpc + 1 build_info = 4; net_info 1; mempool 2; consensus 3; validators 2; block 1 = 13.
-	if len(lines) != 13 {
-		t.Errorf("got %d lines, want 13", len(lines))
+	// status 5 (height + catching_up + voting_power + build_info + online) +
+	// net_info 1 + mempool 2 + consensus 3 + validators 5 (size + total + 3× set_power) +
+	// block 1 = 17.
+	if len(lines) != 17 {
+		t.Errorf("got %d lines, want 17", len(lines))
 	}
 	for _, l := range lines {
+		// sentinel_validator_online is keyed purely by address (presence
+		// signal for consensus-quorum joins) — no validator label.
+		if l.Metric["__name__"] == "sentinel_validator_online" {
+			continue
+		}
 		if l.Metric["validator"] != "node-1" {
 			t.Errorf("%s: validator = %q, want node-1", l.Metric["__name__"], l.Metric["validator"])
 		}
@@ -197,6 +217,45 @@ func TestExtractRPC_MalformedJSON_SkipsKey(t *testing.T) {
 	}
 	if len(lines) == 0 {
 		t.Error("no lines emitted; status should still parse")
+	}
+}
+
+func TestExtractRPC_Status_OnlineEmittedWhenCaughtUp(t *testing.T) {
+	// When catching_up=false AND validator_info.address is present, the
+	// forwarder emits sentinel_validator_online{address} 1 — the dashboard's
+	// "who's live right now" presence signal.
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"status": statusJSON}))
+	online := findLine(t, lines, map[string]string{"__name__": "sentinel_validator_online", "address": "g1self"})
+	if online == nil {
+		t.Fatal("sentinel_validator_online not emitted")
+	}
+	if online.Values[0] != 1 {
+		t.Errorf("online value = %v, want 1", online.Values[0])
+	}
+	if _, ok := online.Metric["validator"]; ok {
+		t.Errorf("online should not carry a validator label (it's an address-keyed presence signal); got %v", online.Metric)
+	}
+}
+
+func TestExtractRPC_Status_OnlineNotEmittedWhenCatchingUp(t *testing.T) {
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"status": statusCatchingUpJSON}))
+	for _, l := range lines {
+		if l.Metric["__name__"] == "sentinel_validator_online" {
+			t.Fatalf("sentinel_validator_online must NOT be emitted while catching up (got %v)", l.Metric)
+		}
+	}
+}
+
+func TestExtractRPC_Status_VotingPowerCarriesAddress(t *testing.T) {
+	// The voting_power metric's address label lets consensus-quorum dashboards
+	// join against sentinel_rpc_validator_set_power via on(address).
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"status": statusJSON}))
+	vp := findLine(t, lines, map[string]string{"__name__": "sentinel_rpc_validator_voting_power", "address": "g1self"})
+	if vp == nil {
+		t.Fatal("voting_power with address label not emitted")
+	}
+	if vp.Metric["validator"] != "node-1" {
+		t.Errorf("voting_power.validator = %q, want node-1", vp.Metric["validator"])
 	}
 }
 
