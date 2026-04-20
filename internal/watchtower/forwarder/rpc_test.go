@@ -336,6 +336,9 @@ func TestExtractRPC_Genesis(t *testing.T) {
 }
 
 func TestExtractRPC_UnknownKey_Ignored(t *testing.T) {
+	// "block_results" is a deliberate canary: a Tendermint RPC endpoint the
+	// sentinel does NOT poll. If this test ever starts producing lines, the
+	// switch in extractRPC has grown a case it shouldn't have.
 	lines := extractRPC("node-1", rpcPayload(map[string]string{"block_results": `{"result":{}}`}))
 	if len(lines) != 0 {
 		t.Errorf("unknown key produced %d lines, want 0", len(lines))
