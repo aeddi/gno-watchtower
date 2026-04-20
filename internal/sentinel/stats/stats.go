@@ -7,11 +7,13 @@ import (
 )
 
 // TypeSnapshot holds the stats for one collector type at the time of a snapshot.
+// All per-snapshot fields (those named LastSnapshot*) are reset to zero after
+// each Snapshot call; TotalBytes is the cumulative count since Stats creation.
 type TypeSnapshot struct {
-	LastMinuteBytes int64
-	TotalBytes      int64
-	Drops           int64
-	Retries         int64
+	LastSnapshotBytes   int64
+	TotalBytes          int64
+	LastSnapshotDrops   int64
+	LastSnapshotRetries int64
 }
 
 // Stats accumulates bytes-sent counters per collector type for periodic logging.
@@ -22,10 +24,10 @@ type Stats struct {
 }
 
 type entry struct {
-	total   int64
-	minute  int64
-	drops   int64
-	retries int64
+	total      int64
+	lastBytes  int64
+	drops      int64
+	retries    int64
 }
 
 // New creates a new Stats accumulator. The start time is set to now.
@@ -51,7 +53,7 @@ func (s *Stats) Record(collectorType string, bytes int) {
 	defer s.mu.Unlock()
 	e := s.getOrCreate(collectorType)
 	e.total += int64(bytes)
-	e.minute += int64(bytes)
+	e.lastBytes += int64(bytes)
 }
 
 // RecordDrop increments the drop counter for the given collector type.
@@ -76,12 +78,12 @@ func (s *Stats) Snapshot() (map[string]TypeSnapshot, time.Duration) {
 	snap := make(map[string]TypeSnapshot, len(s.data))
 	for k, e := range s.data {
 		snap[k] = TypeSnapshot{
-			LastMinuteBytes: e.minute,
-			TotalBytes:      e.total,
-			Drops:           e.drops,
-			Retries:         e.retries,
+			LastSnapshotBytes:   e.lastBytes,
+			TotalBytes:          e.total,
+			LastSnapshotDrops:   e.drops,
+			LastSnapshotRetries: e.retries,
 		}
-		e.minute = 0
+		e.lastBytes = 0
 		e.drops = 0
 		e.retries = 0
 	}

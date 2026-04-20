@@ -312,10 +312,10 @@ func logStats(log *slog.Logger, st *stats.Stats) {
 	args := []any{"uptime", uptime.Round(time.Second)}
 	for typ, s := range snap {
 		args = append(args, slog.Group(typ,
-			"last_min_bytes", s.LastMinuteBytes,
+			"last_snapshot_bytes", s.LastSnapshotBytes,
 			"total_bytes", s.TotalBytes,
-			"drops", s.Drops,
-			"retries", s.Retries,
+			"last_snapshot_drops", s.LastSnapshotDrops,
+			"last_snapshot_retries", s.LastSnapshotRetries,
 		))
 	}
 	log.Info("stats", args...)

@@ -17,14 +17,14 @@ func TestStats_RecordAndSnapshot(t *testing.T) {
 
 	snap, _ := s.Snapshot()
 
-	if snap["rpc"].LastMinuteBytes != 300 {
-		t.Errorf("rpc LastMinuteBytes: got %d, want 300", snap["rpc"].LastMinuteBytes)
+	if snap["rpc"].LastSnapshotBytes != 300 {
+		t.Errorf("rpc LastSnapshotBytes: got %d, want 300", snap["rpc"].LastSnapshotBytes)
 	}
 	if snap["rpc"].TotalBytes != 300 {
 		t.Errorf("rpc TotalBytes: got %d, want 300", snap["rpc"].TotalBytes)
 	}
-	if snap["logs"].LastMinuteBytes != 500 {
-		t.Errorf("logs LastMinuteBytes: got %d, want 500", snap["logs"].LastMinuteBytes)
+	if snap["logs"].LastSnapshotBytes != 500 {
+		t.Errorf("logs LastSnapshotBytes: got %d, want 500", snap["logs"].LastSnapshotBytes)
 	}
 }
 
@@ -33,8 +33,8 @@ func TestStats_SnapshotResetsMinuteCounter(t *testing.T) {
 	s.Record("rpc", 400)
 
 	snap1, _ := s.Snapshot()
-	if snap1["rpc"].LastMinuteBytes != 400 {
-		t.Errorf("first snapshot: got %d, want 400", snap1["rpc"].LastMinuteBytes)
+	if snap1["rpc"].LastSnapshotBytes != 400 {
+		t.Errorf("first snapshot: got %d, want 400", snap1["rpc"].LastSnapshotBytes)
 	}
 
 	// Record more after first snapshot.
@@ -42,8 +42,8 @@ func TestStats_SnapshotResetsMinuteCounter(t *testing.T) {
 
 	snap2, _ := s.Snapshot()
 	// Last-minute should only reflect post-snapshot traffic.
-	if snap2["rpc"].LastMinuteBytes != 100 {
-		t.Errorf("second snapshot LastMinuteBytes: got %d, want 100", snap2["rpc"].LastMinuteBytes)
+	if snap2["rpc"].LastSnapshotBytes != 100 {
+		t.Errorf("second snapshot LastSnapshotBytes: got %d, want 100", snap2["rpc"].LastSnapshotBytes)
 	}
 	// Total accumulates across snapshots.
 	if snap2["rpc"].TotalBytes != 500 {
@@ -79,11 +79,11 @@ func TestStats_RecordDropAndRetry(t *testing.T) {
 
 	snap, _ := s.Snapshot()
 
-	if snap["rpc"].Drops != 2 {
-		t.Errorf("rpc Drops: got %d, want 2", snap["rpc"].Drops)
+	if snap["rpc"].LastSnapshotDrops != 2 {
+		t.Errorf("rpc Drops: got %d, want 2", snap["rpc"].LastSnapshotDrops)
 	}
-	if snap["logs"].Retries != 1 {
-		t.Errorf("logs Retries: got %d, want 1", snap["logs"].Retries)
+	if snap["logs"].LastSnapshotRetries != 1 {
+		t.Errorf("logs Retries: got %d, want 1", snap["logs"].LastSnapshotRetries)
 	}
 }
 
@@ -93,7 +93,7 @@ func TestStats_DropRetryResetOnSnapshot(t *testing.T) {
 	s.Snapshot() // resets
 	s.RecordDrop("rpc")
 	snap, _ := s.Snapshot()
-	if snap["rpc"].Drops != 1 {
-		t.Errorf("expected 1 drop after reset, got %d", snap["rpc"].Drops)
+	if snap["rpc"].LastSnapshotDrops != 1 {
+		t.Errorf("expected 1 drop after reset, got %d", snap["rpc"].LastSnapshotDrops)
 	}
 }
