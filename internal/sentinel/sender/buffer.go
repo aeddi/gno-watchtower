@@ -26,6 +26,11 @@ func (b *Buffer[T]) Push(item T) (dropped bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if len(b.items) >= b.maxSize {
+		// Zero the dropped slot before resliceing so the GC can reclaim any
+		// heap references held by the evicted element (log payloads can be
+		// large; without this they stay reachable via the backing array).
+		var zero T
+		b.items[0] = zero
 		b.items = b.items[1:]
 		dropped = true
 	}

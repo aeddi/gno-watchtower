@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
@@ -140,15 +141,17 @@ func retry(ctx context.Context, maxAttempts int, initialBackoff time.Duration, f
 }
 
 // zstdEncoder is a reusable stateless encoder; EncodeAll is safe for concurrent use.
-var zstdEncoder = func() *zstd.Encoder {
+// Built lazily on first use via sync.OnceValue so package initialisation stays
+// free of the zstd library's setup cost for callers that never compress.
+var zstdEncoder = sync.OnceValue(func() *zstd.Encoder {
 	enc, err := zstd.NewWriter(nil)
 	if err != nil {
 		panic("init zstd encoder: " + err.Error())
 	}
 	return enc
-}()
+})
 
 // ZstdCompress returns the zstd-compressed form of data.
 func ZstdCompress(data []byte) []byte {
-	return zstdEncoder.EncodeAll(data, make([]byte, 0, len(data)))
+	return zstdEncoder().EncodeAll(data, make([]byte, 0, len(data)))
 }
