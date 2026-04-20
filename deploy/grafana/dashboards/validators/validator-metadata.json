@@ -8,18 +8,34 @@
   "id": null,
   "links": [
     {
-      "title": "RPC vs OTLP guide",
-      "url": "/docs/data-collected.md",
+      "title": "Validator chain",
       "type": "link",
-      "icon": "doc",
-      "targetBlank": true,
-      "tooltip": "Signal-sourcing rationale for every metric on this dashboard"
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Block height, peers, mempool, consensus quorum",
+      "url": "/d/validator-chain/validator-chain?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Validator resources",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Host + container CPU/memory/disk/network",
+      "url": "/d/validator-resources/validator-resources?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Node logs",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Per-validator log browser (Loki)",
+      "url": "/d/node-logs/node-logs?${__url_time_range}&${validator:queryparam}"
     }
   ],
   "panels": [
     {
       "type": "row",
-      "title": "Binary drift \u2014 RPC /status.node_info",
+      "title": "Binary drift — RPC /status.node_info",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -35,7 +51,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of the version label across fleet. 1 = agreement, \u22652 = version drift.",
+      "description": "Distinct values of the version label across fleet. 1 = agreement, ≥2 = version drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -203,7 +219,7 @@
           "refId": "A"
         }
       ],
-      "title": "Build info \u2014 one row per validator",
+      "title": "Build info — one row per validator",
       "type": "table",
       "transformations": [
         {
@@ -229,7 +245,7 @@
     },
     {
       "type": "row",
-      "title": "Chain drift \u2014 RPC /genesis",
+      "title": "Chain drift — RPC /genesis",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -479,7 +495,7 @@
           "refId": "A"
         }
       ],
-      "title": "Genesis info \u2014 one row per validator",
+      "title": "Genesis info — one row per validator",
       "type": "table",
       "transformations": [
         {
@@ -508,7 +524,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Per-validator consensus params from /genesis. Rows: (validator, param, value). Scan each param for value consistency across validators. Prometheus label-valued schema means Grafana shows one row per (validator, param) \u2014 use column filters or sorting to group by param.",
+      "description": "Per-validator consensus params from /genesis. Rows: (validator, param, value). Scan each param for value consistency across validators. Prometheus label-valued schema means Grafana shows one row per (validator, param) — use column filters or sorting to group by param.",
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -567,7 +583,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Genesis validator set as observed by $validator. Should be identical across the fleet \u2014 app_hash divergence in the panel above is how you catch a mismatch.",
+      "description": "Genesis validator set as observed by $validator. Should be identical across the fleet — app_hash divergence in the panel above is how you catch a mismatch.",
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -630,7 +646,7 @@
     },
     {
       "type": "row",
-      "title": "Config drift \u2014 metadata collector",
+      "title": "Config drift — metadata collector",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -646,7 +662,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of application.prune_strategy across the fleet. 1 = agreement, \u22652 = drift.",
+      "description": "Distinct values of application.prune_strategy across the fleet. 1 = agreement, ≥2 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -712,7 +728,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of consensus.peer_gossip_sleep_duration across the fleet. 1 = agreement, \u22652 = drift.",
+      "description": "Distinct values of consensus.peer_gossip_sleep_duration across the fleet. 1 = agreement, ≥2 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -778,7 +794,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of consensus.timeout_commit across the fleet. 1 = agreement, \u22652 = drift.",
+      "description": "Distinct values of consensus.timeout_commit across the fleet. 1 = agreement, ≥2 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -844,7 +860,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of mempool.size across the fleet. 1 = agreement, \u22652 = drift.",
+      "description": "Distinct values of mempool.size across the fleet. 1 = agreement, ≥2 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -910,7 +926,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of p2p.flush_throttle_timeout across the fleet. 1 = agreement, \u22652 = drift.",
+      "description": "Distinct values of p2p.flush_throttle_timeout across the fleet. 1 = agreement, ≥2 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -976,7 +992,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of p2p.max_num_outbound_peers across the fleet. 1 = agreement, \u22652 = drift.",
+      "description": "Distinct values of p2p.max_num_outbound_peers across the fleet. 1 = agreement, ≥2 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -1042,7 +1058,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distinct values of p2p.pex across the fleet. 1 = agreement, \u22652 = drift.",
+      "description": "Distinct values of p2p.pex across the fleet. 1 = agreement, ≥2 = drift.",
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -1185,14 +1201,14 @@
           "type": "prometheus",
           "uid": "victoriametrics"
         },
-        "definition": "label_values({__name__=~\"sentinel_node_build_info|sentinel_genesis_info|sentinel_node_config\"}, validator)",
+        "definition": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)",
         "includeAll": true,
         "label": "Validator",
         "multi": true,
         "name": "validator",
         "options": [],
         "query": {
-          "query": "label_values({__name__=~\"sentinel_node_build_info|sentinel_genesis_info|sentinel_node_config\"}, validator)",
+          "query": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,

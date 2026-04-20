@@ -6,7 +6,32 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "title": "Validator chain",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Block height, peers, mempool, consensus quorum",
+      "url": "/d/validator-chain/validator-chain?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Validator metadata",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Chain ID, moniker, binary, genesis, config keys",
+      "url": "/d/validator-metadata/validator-metadata?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Validator resources",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Host + container CPU/memory/disk/network",
+      "url": "/d/validator-resources/validator-resources?${__url_time_range}&${validator:queryparam}"
+    }
+  ],
   "panels": [
     {
       "datasource": {
@@ -490,7 +515,7 @@
           "stream": "",
           "expr": "label_values(validator)"
         },
-        "refresh": 2,
+        "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
@@ -523,7 +548,7 @@
           "stream": "",
           "expr": "label_values(level)"
         },
-        "refresh": 2,
+        "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
@@ -556,7 +581,7 @@
           "stream": "",
           "expr": "label_values(module)"
         },
-        "refresh": 2,
+        "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
