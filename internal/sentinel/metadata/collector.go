@@ -21,7 +21,7 @@ import (
 
 // ConfigKeys is the list of gnoland config keys collected by the metadata
 // collector. Every key here is one we cannot get from /status or /genesis; see
-// docs/rpc-vs-otlp.md for the source-picking rationale.
+// docs/data-collected.md for the source-picking rationale.
 var ConfigKeys = []string{
 	"application.prune_strategy",
 	"consensus.peer_gossip_sleep_duration",

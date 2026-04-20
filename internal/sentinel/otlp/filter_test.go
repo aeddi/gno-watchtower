@@ -101,7 +101,7 @@ func TestFilterDenied_AllDeniedClearsScopeButKeepsShape(t *testing.T) {
 
 func TestDeniedMetricNames_ExpectedSet(t *testing.T) {
 	// Guard against accidental additions/removals to the deny list without
-	// a corresponding docs/rpc-vs-otlp.md update.
+	// a corresponding docs/data-collected.md update.
 	want := map[string]struct{}{
 		"block_txs_hist":       {},
 		"validator_count_hist": {},

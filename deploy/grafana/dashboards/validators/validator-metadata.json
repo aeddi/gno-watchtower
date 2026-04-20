@@ -9,7 +9,7 @@
   "links": [
     {
       "title": "RPC vs OTLP guide",
-      "url": "/docs/rpc-vs-otlp.md",
+      "url": "/docs/data-collected.md",
       "type": "link",
       "icon": "doc",
       "targetBlank": true,

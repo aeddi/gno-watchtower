@@ -10,7 +10,7 @@ import (
 // the filter at the sentinel saves bandwidth on the sentinel→watchtower link
 // and prevents the two pipelines from fighting for the same dashboard slot.
 //
-// See docs/rpc-vs-otlp.md for the rationale behind each entry.
+// See docs/data-collected.md for the rationale behind each entry.
 // Package-private and never mutated after init — safe for concurrent reads
 // from the gRPC handler goroutines.
 var deniedMetricNames = map[string]struct{}{
