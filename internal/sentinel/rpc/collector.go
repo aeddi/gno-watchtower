@@ -171,10 +171,12 @@ func (c *Collector) collect(ctx context.Context) error {
 func (c *Collector) parseHeight(raw json.RawMessage) int64 {
 	var s statusResult
 	if err := json.Unmarshal(raw, &s); err != nil {
+		c.log.Debug("parse status height: unmarshal failed", "err", err)
 		return 0
 	}
 	h, err := s.SyncInfo.LatestBlockHeight.Int64()
 	if err != nil {
+		c.log.Debug("parse status height: int64 conversion failed", "raw", string(s.SyncInfo.LatestBlockHeight), "err", err)
 		return 0
 	}
 	return h
