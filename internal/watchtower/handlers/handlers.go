@@ -12,6 +12,7 @@ import (
 	"github.com/aeddi/gno-watchtower/internal/watchtower/auth"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/forwarder"
+	wtmetrics "github.com/aeddi/gno-watchtower/internal/watchtower/metrics"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/ratelimit"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/stats"
 )
@@ -28,12 +29,13 @@ type AuthCheckResponse struct {
 
 // Server holds all dependencies and exposes the HTTP handler.
 type Server struct {
-	cfg   *config.Config
-	auth  *auth.Authenticator
-	rl    *ratelimit.Limiter
-	fwd   *forwarder.Forwarder
-	stats *stats.Stats
-	log   *slog.Logger
+	cfg     *config.Config
+	auth    *auth.Authenticator
+	rl      *ratelimit.Limiter
+	fwd     *forwarder.Forwarder
+	stats   *stats.Stats
+	metrics *wtmetrics.Metrics
+	log     *slog.Logger
 }
 
 // NewServer creates a Server.
@@ -43,13 +45,24 @@ func NewServer(
 	rl *ratelimit.Limiter,
 	fwd *forwarder.Forwarder,
 	st *stats.Stats,
+	m *wtmetrics.Metrics,
 	log *slog.Logger,
 ) *Server {
-	return &Server{cfg: cfg, auth: a, rl: rl, fwd: fwd, stats: st, log: log.With("component", "watchtower")}
+	return &Server{
+		cfg:     cfg,
+		auth:    a,
+		rl:      rl,
+		fwd:     fwd,
+		stats:   st,
+		metrics: m,
+		log:     log.With("component", "watchtower"),
+	}
 }
 
 // Handler returns the http.Handler with the full middleware chain.
-// GET /health is unauthenticated (used by Docker healthcheck).
+// GET /health and GET /metrics are unauthenticated: /health is hit by the
+// Docker healthcheck and /metrics is scraped by VictoriaMetrics over the
+// Docker-internal network (not reachable past Caddy).
 func (s *Server) Handler() http.Handler {
 	inner := http.NewServeMux()
 	inner.HandleFunc("POST /rpc", s.handleRPC)
@@ -62,6 +75,7 @@ func (s *Server) Handler() http.Handler {
 	outer.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+	outer.Handle("GET /metrics", s.metrics.Handler())
 	outer.Handle("/", s.auth.Middleware(s.rl.Middleware(inner)))
 	return outer
 }
@@ -117,6 +131,7 @@ func (s *Server) handlePayload(
 		return
 	}
 	s.stats.Record(validator, perm, len(body))
+	s.metrics.RecordReceived(validator, perm, len(body))
 	w.WriteHeader(http.StatusOK)
 }
 

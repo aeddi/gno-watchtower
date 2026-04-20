@@ -7,9 +7,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/forwarder"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/handlers"
+	wtmetrics "github.com/aeddi/gno-watchtower/internal/watchtower/metrics"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/ratelimit"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/stats"
 	pkglogger "github.com/aeddi/gno-watchtower/pkg/logger"
@@ -125,7 +128,12 @@ func runCmd(args []string) {
 	rl := ratelimit.New(cfg.Security.RateLimitRPS, cfg.Security.RateLimitBurst)
 	fwd := forwarder.New(cfg.VictoriaMetrics.URL, cfg.Loki.URL)
 	st := stats.New()
-	srv := handlers.NewServer(cfg, a, rl, fwd, st, logger)
+
+	m := wtmetrics.New()
+	m.SetRetention(wtmetrics.BackendLoki, parseLokiRetention(os.Getenv("LOGS_RETENTION"), logger), logger)
+	m.SetRetention(wtmetrics.BackendVM, parseVMRetention(os.Getenv("METRICS_RETENTION"), logger), logger)
+
+	srv := handlers.NewServer(cfg, a, rl, fwd, st, m, logger)
 
 	statsTicker := time.NewTicker(statsInterval)
 	defer statsTicker.Stop()
@@ -149,6 +157,56 @@ func runCmd(args []string) {
 	if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("server: %v", err)
 	}
+}
+
+// parseLokiRetention converts the Loki retention_period format (Go duration
+// like "2160h") into a time.Duration. Empty input returns 0 which the
+// retention gauge reports unset.
+func parseLokiRetention(s string, log *slog.Logger) time.Duration {
+	if s == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		log.Warn("parse LOGS_RETENTION failed — gauge will report 0", "raw", s, "err", err)
+		return 0
+	}
+	return d
+}
+
+// parseVMRetention converts VictoriaMetrics' -retentionPeriod flag format
+// (bare integer = months, or e.g. "1y", "30d", "720h") into a time.Duration.
+// We don't link VM's parser — it'd pull the whole VM module — so we handle the
+// common suffixes with a month = 30d approximation good enough for dashboards.
+func parseVMRetention(s string, log *slog.Logger) time.Duration {
+	if s == "" {
+		return 0
+	}
+	// Bare integer → months.
+	if n, err := strconv.Atoi(s); err == nil && n > 0 {
+		return time.Duration(n) * 30 * 24 * time.Hour
+	}
+	// Suffixed: VM accepts d/w/y in addition to Go's h/m/s. Translate to hours
+	// before handing off to time.ParseDuration.
+	switch last := s[len(s)-1]; last {
+	case 'd', 'w', 'y':
+		n, err := strconv.Atoi(s[:len(s)-1])
+		if err != nil || n <= 0 {
+			log.Warn("parse METRICS_RETENTION failed — gauge will report 0", "raw", s, "err", err)
+			return 0
+		}
+		mult := map[byte]time.Duration{
+			'd': 24 * time.Hour,
+			'w': 7 * 24 * time.Hour,
+			'y': 365 * 24 * time.Hour,
+		}[last]
+		return time.Duration(n) * mult
+	}
+	if d, err := time.ParseDuration(s); err == nil {
+		return d
+	}
+	log.Warn("parse METRICS_RETENTION failed — gauge will report 0", "raw", s)
+	return 0
 }
 
 func usage() {
