@@ -31,8 +31,8 @@ func Run(ctx context.Context, cfg *config.Config, configPath string, w io.Writer
 	remoteResults, authResp := CheckRemoteTokenAndPermissions(ctx, cfg)
 	emit(remoteResults...)
 
-	// ---- Metadata checks
-	emit(metadataChecks(cfg, authResp)...)
+	// ---- Metadata check
+	emit(metadataCheck(ctx, cfg, authResp))
 
 	// ---- Logs check
 	emit(logsCheck(ctx, cfg, authResp))
@@ -56,27 +56,15 @@ func Run(ctx context.Context, cfg *config.Config, configPath string, w io.Writer
 	return 0
 }
 
-var metadataCheckNames = []string{"Metadata config", "Metadata conflicts"}
-
-func metadataAllSame(status Status, detail string) []CheckResult {
-	results := make([]CheckResult, len(metadataCheckNames))
-	for i, name := range metadataCheckNames {
-		results[i] = CheckResult{Name: name, Status: status, Detail: detail}
-	}
-	return results
-}
-
-func metadataChecks(cfg *config.Config, ar *AuthResponse) []CheckResult {
+func metadataCheck(ctx context.Context, cfg *config.Config, ar *AuthResponse) CheckResult {
+	const name = "Metadata config"
 	if !cfg.Metadata.Enabled {
-		return metadataAllSame(StatusOrange, "disabled in config")
+		return CheckResult{Name: name, Status: StatusOrange, Detail: "disabled in config"}
 	}
 	if ar != nil && !slices.Contains(ar.Permissions, "metrics") {
-		return metadataAllSame(StatusGrey, "metrics permission not granted")
+		return CheckResult{Name: name, Status: StatusGrey, Detail: "metrics permission not granted"}
 	}
-	return []CheckResult{
-		CheckMetadataConfig(cfg.Metadata),
-		CheckMetadataConflicts(cfg.Metadata),
-	}
+	return CheckMetadataConfig(ctx, cfg.Metadata)
 }
 
 func logsCheck(ctx context.Context, cfg *config.Config, ar *AuthResponse) CheckResult {

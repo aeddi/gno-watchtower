@@ -48,7 +48,7 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 			afterKey: "container_name",
 			comment:  "Alternative: use journald as log source",
 			key:      "journald_unit",
-			value:    PlaceholderJournaldUnit,
+			value:    placeholderJournaldUnit,
 		})
 	} else if cfg.Logs.Source == LogSourceJournald {
 		alts = append(alts, alternative{
@@ -56,7 +56,7 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 			afterKey: "journald_unit",
 			comment:  "Alternative: use docker as log source",
 			key:      "container_name",
-			value:    PlaceholderContainerName,
+			value:    placeholderContainerName,
 		})
 	}
 
@@ -66,7 +66,7 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 			afterKey: "config_get_cmd",
 			comment:  "Alternative: read config file directly",
 			key:      "config_path",
-			value:    PlaceholderConfigPath,
+			value:    placeholderConfigPath,
 		})
 	} else {
 		alts = append(alts, alternative{

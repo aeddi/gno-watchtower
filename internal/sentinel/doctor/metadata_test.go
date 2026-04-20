@@ -1,6 +1,7 @@
 package doctor_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,7 +19,7 @@ func TestCheckMetadataConfig_Path_Green(t *testing.T) {
 	}
 
 	cfg := config.MetadataConfig{ConfigPath: cfgPath}
-	r := doctor.CheckMetadataConfig(cfg)
+	r := doctor.CheckMetadataConfig(context.Background(), cfg)
 	if r.Status != doctor.StatusGreen {
 		t.Errorf("want GREEN, got %s: %s", r.Status, r.Detail)
 	}
@@ -26,29 +27,8 @@ func TestCheckMetadataConfig_Path_Green(t *testing.T) {
 
 func TestCheckMetadataConfig_NotConfigured_Orange(t *testing.T) {
 	cfg := config.MetadataConfig{}
-	r := doctor.CheckMetadataConfig(cfg)
+	r := doctor.CheckMetadataConfig(context.Background(), cfg)
 	if r.Status != doctor.StatusOrange {
 		t.Errorf("want ORANGE, got %s", r.Status)
-	}
-}
-
-func TestCheckMetadataConflicts_PathAndCmd_Red(t *testing.T) {
-	cfg := config.MetadataConfig{
-		ConfigPath:   "/etc/gnoland/config.toml",
-		ConfigGetCmd: "gnoland config get %s",
-	}
-	r := doctor.CheckMetadataConflicts(cfg)
-	if r.Status != doctor.StatusRed {
-		t.Errorf("want RED on conflict, got %s: %s", r.Status, r.Detail)
-	}
-}
-
-func TestCheckMetadataConflicts_NoConflict_Green(t *testing.T) {
-	cfg := config.MetadataConfig{
-		ConfigPath: "/etc/gnoland/config.toml",
-	}
-	r := doctor.CheckMetadataConflicts(cfg)
-	if r.Status != doctor.StatusGreen {
-		t.Errorf("want GREEN, got %s: %s", r.Status, r.Detail)
 	}
 }

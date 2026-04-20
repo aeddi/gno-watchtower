@@ -116,18 +116,24 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 	writeEmptyProtoResponse(w, &collectortracespb.ExportTraceServiceResponse{})
 }
 
+// maxOTLPBodyBytes bounds how much we'll buffer from a single OTLP export. The
+// listener is localhost-only but a misconfigured gnoland could still push a
+// malformed or huge payload; cap at the same 50 MiB ceiling the watchtower
+// uses for its /otlp endpoint (see watchtower/handlers maxBodyBytes).
+const maxOTLPBodyBytes = 50 << 20
+
 // readBody returns the request body, decompressing gzip if signalled by
 // Content-Encoding. The OTel HTTP exporter opts into gzip by default.
 func readBody(req *http.Request) ([]byte, error) {
 	defer req.Body.Close()
-	reader := io.Reader(req.Body)
+	var reader io.Reader = io.LimitReader(req.Body, maxOTLPBodyBytes)
 	if req.Header.Get("Content-Encoding") == "gzip" {
-		gr, err := gzip.NewReader(req.Body)
+		gr, err := gzip.NewReader(reader)
 		if err != nil {
 			return nil, fmt.Errorf("gzip reader: %w", err)
 		}
 		defer gr.Close()
-		reader = gr
+		reader = io.LimitReader(gr, maxOTLPBodyBytes)
 	}
 	return io.ReadAll(reader)
 }

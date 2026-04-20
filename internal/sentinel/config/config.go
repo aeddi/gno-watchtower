@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -12,14 +13,17 @@ import (
 	"github.com/aeddi/gno-watchtower/pkg/tomlutil"
 )
 
+// Valid log levels, in rank order.
+var validLogLevels = []string{"debug", "info", "warn", "error"}
+
 // Duration wraps time.Duration to support TOML string values like "3s", "30s".
 type Duration = tomlutil.Duration
 
-// Byte size multipliers.
+// Byte size multipliers (package-private — ByteSize.UnmarshalText consumes these).
 const (
-	KB = 1024
-	MB = 1024 * KB
-	GB = 1024 * MB
+	kb = 1024
+	mb = 1024 * kb
+	gb = 1024 * mb
 )
 
 // Log source values.
@@ -45,9 +49,9 @@ func (b *ByteSize) UnmarshalText(text []byte) error {
 		suffix string
 		mult   int64
 	}{
-		{"GB", GB},
-		{"MB", MB},
-		{"KB", KB},
+		{"GB", gb},
+		{"MB", mb},
+		{"KB", kb},
 	} {
 		if strings.HasSuffix(s, m.suffix) {
 			n, err := strconv.ParseInt(strings.TrimSuffix(s, m.suffix), 10, 64)
@@ -69,24 +73,25 @@ func (b *ByteSize) UnmarshalText(text []byte) error {
 func (b ByteSize) MarshalText() ([]byte, error) {
 	v := int64(b)
 	switch {
-	case v > 0 && v%GB == 0:
-		return fmt.Appendf(nil, "%dGB", v/GB), nil
-	case v > 0 && v%MB == 0:
-		return fmt.Appendf(nil, "%dMB", v/MB), nil
-	case v > 0 && v%KB == 0:
-		return fmt.Appendf(nil, "%dKB", v/KB), nil
+	case v > 0 && v%gb == 0:
+		return fmt.Appendf(nil, "%dGB", v/gb), nil
+	case v > 0 && v%mb == 0:
+		return fmt.Appendf(nil, "%dMB", v/mb), nil
+	case v > 0 && v%kb == 0:
+		return fmt.Appendf(nil, "%dKB", v/kb), nil
 	default:
 		return strconv.AppendInt(nil, v, 10), nil
 	}
 }
 
 // Placeholder values used in generated configs for fields that need user input.
+// Package-private — external code uses IsPlaceholder to detect them.
 const (
-	PlaceholderServerURL     = "<watchtower-server-url>"
-	PlaceholderServerToken   = "<watchtower-auth-token>"
-	PlaceholderContainerName = "<gnoland-container-name>"
-	PlaceholderConfigPath    = "<path-to-gnoland-config>"
-	PlaceholderJournaldUnit  = "<gnoland-systemd-unit>"
+	placeholderServerURL     = "<watchtower-server-url>"
+	placeholderServerToken   = "<watchtower-auth-token>"
+	placeholderContainerName = "<gnoland-container-name>"
+	placeholderConfigPath    = "<path-to-gnoland-config>"
+	placeholderJournaldUnit  = "<gnoland-systemd-unit>"
 )
 
 // IsPlaceholder reports whether s is an unresolved placeholder value.
@@ -181,8 +186,8 @@ func Load(path string) (*Config, error) {
 func DefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			URL:   PlaceholderServerURL,
-			Token: PlaceholderServerToken,
+			URL:   placeholderServerURL,
+			Token: placeholderServerToken,
 		},
 		RPC: RPCConfig{
 			Enabled:                    true,
@@ -193,8 +198,8 @@ func DefaultConfig() *Config {
 		Logs: LogsConfig{
 			Enabled:        true,
 			Source:         LogSourceDocker,
-			ContainerName:  PlaceholderContainerName,
-			BatchSize:      ByteSize(MB),
+			ContainerName:  placeholderContainerName,
+			BatchSize:      ByteSize(mb),
 			BatchTimeout:   Duration{Duration: 5 * time.Second},
 			MinLevel:       "info",
 			ResumeLookback: Duration{Duration: 60 * time.Second},
@@ -207,14 +212,15 @@ func DefaultConfig() *Config {
 			Enabled:       true,
 			PollInterval:  Duration{Duration: 10 * time.Second},
 			Source:        ResSourceHost,
-			ContainerName: PlaceholderContainerName,
+			ContainerName: placeholderContainerName,
 		},
 		Metadata: MetadataConfig{
 			Enabled:       true,
 			CheckInterval: Duration{Duration: 10 * time.Minute},
-			ConfigPath:    PlaceholderConfigPath,
+			ConfigPath:    placeholderConfigPath,
 		},
 		Health: HealthConfig{
+			Enabled:    true,
 			ListenAddr: "127.0.0.1:8081",
 		},
 	}
@@ -238,6 +244,21 @@ func (c *Config) validate() error {
 	}
 	if c.Metadata.Enabled && c.Metadata.ConfigPath != "" && c.Metadata.ConfigGetCmd != "" {
 		return fmt.Errorf("metadata: set exactly one of config_path or config_get_cmd, not both")
+	}
+	if c.Logs.Enabled {
+		validLogSources := []string{LogSourceDocker, LogSourceJournald}
+		if !slices.Contains(validLogSources, c.Logs.Source) {
+			return fmt.Errorf("logs.source %q: must be one of %v", c.Logs.Source, validLogSources)
+		}
+		if !slices.Contains(validLogLevels, c.Logs.MinLevel) {
+			return fmt.Errorf("logs.min_level %q: must be one of %v", c.Logs.MinLevel, validLogLevels)
+		}
+	}
+	if c.Resources.Enabled {
+		validResSources := []string{ResSourceHost, ResSourceDocker, ResSourceBoth}
+		if !slices.Contains(validResSources, c.Resources.Source) {
+			return fmt.Errorf("resources.source %q: must be one of %v", c.Resources.Source, validResSources)
+		}
 	}
 	return nil
 }

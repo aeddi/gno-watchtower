@@ -163,13 +163,10 @@ func TestCollector_ReconnectsAfterSourceTailReturns(t *testing.T) {
 	// Regression: collector.Run used to start Tail in a fire-and-forget goroutine;
 	// when the source container restarted and Tail returned, sentinel silently
 	// stopped forwarding until its OWN restart. We want Tail to be re-invoked.
-	origBackoff := logs.ReconnectBackoff
-	logs.ReconnectBackoff = 20 * time.Millisecond
-	defer func() { logs.ReconnectBackoff = origBackoff }()
-
 	src := &reconnectingSource{}
 	out := make(chan protocol.LogPayload, 4)
 	c := logs.NewCollector(src, "info", 1024*1024, 10*time.Millisecond, out, logger.Noop())
+	c.SetReconnectBackoff(20 * time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()

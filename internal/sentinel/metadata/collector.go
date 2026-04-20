@@ -113,7 +113,7 @@ func (c *Collector) collectAndSend(ctx context.Context) {
 		CollectedAt: time.Now().UTC(),
 		Data:        make(map[string]json.RawMessage),
 	}
-	c.collectConfig(payload.Data)
+	c.collectConfig(ctx, payload.Data)
 	if len(payload.Data) == 0 {
 		return
 	}
@@ -123,7 +123,7 @@ func (c *Collector) collectAndSend(ctx context.Context) {
 	}
 }
 
-func (c *Collector) collectConfig(data map[string]json.RawMessage) {
+func (c *Collector) collectConfig(ctx context.Context, data map[string]json.RawMessage) {
 	if c.cfg.ConfigPath == "" && c.cfg.ConfigGetCmd == "" {
 		return
 	}
@@ -135,7 +135,7 @@ func (c *Collector) collectConfig(data map[string]json.RawMessage) {
 			val, err = ReadConfigKey(c.cfg.ConfigPath, key)
 		} else {
 			cmd := strings.ReplaceAll(c.cfg.ConfigGetCmd, "%s", key)
-			val, err = RunCmd(cmd)
+			val, err = RunCmd(ctx, cmd)
 		}
 		if err != nil {
 			c.log.Warn("config key error", "key", key, "err", err)
@@ -156,9 +156,10 @@ func (c *Collector) collectConfig(data map[string]json.RawMessage) {
 	}
 }
 
-// RunCmd runs cmd via sh -c and returns the trimmed stdout.
-func RunCmd(cmd string) (string, error) {
-	out, err := exec.Command("sh", "-c", cmd).Output()
+// RunCmd runs cmd via sh -c and returns the trimmed stdout. The command is
+// killed if ctx is cancelled before it completes.
+func RunCmd(ctx context.Context, cmd string) (string, error) {
+	out, err := exec.CommandContext(ctx, "sh", "-c", cmd).Output()
 	if err != nil {
 		return "", fmt.Errorf("run %q: %w", cmd, err)
 	}

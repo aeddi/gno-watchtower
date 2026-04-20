@@ -14,16 +14,22 @@ import (
 // and the collection loop.
 const lineBufferSize = 256
 
+// defaultReconnectBackoff is how long the Tail goroutine sleeps before
+// reconnecting after the source returns. Field on Collector (not package var)
+// so tests can inject a shorter value without touching global state.
+const defaultReconnectBackoff = 2 * time.Second
+
 // Collector reads from a Source, filters by min_level, accumulates log lines by level,
 // and flushes protocol.LogPayload values when either batchSize bytes accumulate or
 // batchTimeout elapses. One payload per level per flush.
 type Collector struct {
-	source       Source
-	minLevel     int   // numeric rank; lines with rank < minLevel are dropped
-	batchSize    int64 // flush when accumulated bytes reach this threshold
-	batchTimeout time.Duration
-	out          chan<- protocol.LogPayload
-	log          *slog.Logger
+	source           Source
+	minLevel         int   // numeric rank; lines with rank < minLevel are dropped
+	batchSize        int64 // flush when accumulated bytes reach this threshold
+	batchTimeout     time.Duration
+	reconnectBackoff time.Duration
+	out              chan<- protocol.LogPayload
+	log              *slog.Logger
 }
 
 // NewCollector creates a Collector.
@@ -31,19 +37,20 @@ type Collector struct {
 // batchSize is in bytes.
 func NewCollector(source Source, minLevel string, batchSize int64, batchTimeout time.Duration, out chan<- protocol.LogPayload, log *slog.Logger) *Collector {
 	return &Collector{
-		source:       source,
-		minLevel:     pkglogger.LevelRank(minLevel),
-		batchSize:    batchSize,
-		batchTimeout: batchTimeout,
-		out:          out,
-		log:          log.With("component", "log_collector"),
+		source:           source,
+		minLevel:         pkglogger.LevelRank(minLevel),
+		batchSize:        batchSize,
+		batchTimeout:     batchTimeout,
+		reconnectBackoff: defaultReconnectBackoff,
+		out:              out,
+		log:              log.With("component", "log_collector"),
 	}
 }
 
-// ReconnectBackoff is how long the Tail goroutine sleeps before reconnecting
-// after the source returns (e.g. because the source container restarted).
-// Exposed as a var (not a const) so tests can set it shorter.
-var ReconnectBackoff = 2 * time.Second
+// SetReconnectBackoff overrides the default reconnect delay. Intended for tests.
+func (c *Collector) SetReconnectBackoff(d time.Duration) {
+	c.reconnectBackoff = d
+}
 
 // Run starts the collection loop. It blocks until ctx is cancelled.
 func (c *Collector) Run(ctx context.Context) error {
@@ -55,11 +62,13 @@ func (c *Collector) Run(ctx context.Context) error {
 		// disconnect until the entire sentinel process restarts.
 		for ctx.Err() == nil {
 			if err := c.source.Tail(ctx, lineCh); err != nil && ctx.Err() == nil {
-				c.log.Error("source error, reconnecting", "err", err, "backoff", ReconnectBackoff)
+				c.log.Error("source error, reconnecting", "err", err, "backoff", c.reconnectBackoff)
 			}
+			timer := time.NewTimer(c.reconnectBackoff)
 			select {
-			case <-time.After(ReconnectBackoff):
+			case <-timer.C:
 			case <-ctx.Done():
+				timer.Stop()
 				return
 			}
 		}
