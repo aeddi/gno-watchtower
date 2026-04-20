@@ -78,7 +78,7 @@ func appendHostCPU(lines []vmLine, validator string, ts int64, raw json.RawMessa
 		return lines
 	}
 	if len(percents) == 0 {
-		log.Debug("metrics: cpu empty slice", "validator", validator)
+		log.Debug("metrics: cpu shape drift (empty percents slice)", "validator", validator)
 		return lines
 	}
 	return append(lines, vmLine{
