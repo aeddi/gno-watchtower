@@ -20,15 +20,23 @@ type statusResult struct {
 // Collector polls gnoland RPC endpoints and emits RPCPayloads to out.
 // Unchanged responses (by hash) are omitted from the payload (delta).
 // /block is always emitted when a new block is detected.
+// /genesis is static per chain and fetched once at first successful poll.
+//
+// All fields (notably lastHeight, lastDump, genesisSent, genesisFailed) are
+// read and written exclusively from collect(), which is itself called from a
+// single goroutine driven by Run's ticker. No synchronisation needed; future
+// readers must preserve this invariant.
 type Collector struct {
-	client       *Client
-	delta        *delta.Delta
-	pollInterval time.Duration
-	dumpInterval time.Duration
-	out          chan<- protocol.RPCPayload
-	lastHeight   int64
-	lastDump     time.Time
-	log          *slog.Logger
+	client        *Client
+	delta         *delta.Delta
+	pollInterval  time.Duration
+	dumpInterval  time.Duration
+	out           chan<- protocol.RPCPayload
+	lastHeight    int64
+	lastDump      time.Time
+	genesisSent   bool
+	genesisFailed int // # of consecutive failures; throttles log level
+	log           *slog.Logger
 }
 
 func NewCollector(client *Client, pollInterval, dumpInterval time.Duration, out chan<- protocol.RPCPayload, log *slog.Logger) *Collector {
@@ -122,6 +130,25 @@ func (c *Collector) collect(ctx context.Context) error {
 			changed = append(changed, "block")
 		} else {
 			c.log.Warn("endpoint error", "endpoint", "block", "err", err)
+		}
+	}
+
+	// /genesis is static per chain — fetch once and never again. Transient
+	// failures retry each tick; to avoid log spam when a node persistently
+	// can't reach /genesis, we emit Warn once then drop to Debug.
+	if !c.genesisSent {
+		raw, err := c.client.Genesis(ctx)
+		switch {
+		case err == nil:
+			payload.Data["genesis"] = raw
+			changed = append(changed, "genesis")
+			c.genesisSent = true
+		case c.genesisFailed == 0:
+			c.log.Warn("endpoint error", "endpoint", "genesis", "err", err)
+			c.genesisFailed++
+		default:
+			c.log.Debug("endpoint error", "endpoint", "genesis", "err", err, "attempt", c.genesisFailed+1)
+			c.genesisFailed++
 		}
 	}
 

@@ -60,14 +60,8 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 		})
 	}
 
-	// ---- Metadata path/cmd alternatives
+	// ---- Metadata config path/cmd alternative
 	if env.Docker != nil {
-		alts = append(alts, alternative{
-			afterKey: "binary_version_cmd",
-			comment:  "Alternative: use binary path directly (runs <path> version)",
-			key:      "binary_path",
-			value:    PlaceholderBinaryPath,
-		})
 		alts = append(alts, alternative{
 			afterKey: "config_get_cmd",
 			comment:  "Alternative: read config file directly",
@@ -75,12 +69,6 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 			value:    PlaceholderConfigPath,
 		})
 	} else {
-		alts = append(alts, alternative{
-			afterKey: "binary_path",
-			comment:  "Alternative: run a command to get the version (e.g. via docker exec)",
-			key:      "binary_version_cmd",
-			value:    "docker exec <container> gnoland version",
-		})
 		alts = append(alts, alternative{
 			afterKey: "config_path",
 			comment:  "Alternative: run a command to get config values (e.g. via docker exec)",

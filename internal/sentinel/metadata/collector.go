@@ -3,11 +3,8 @@ package metadata
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -22,22 +19,25 @@ import (
 	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
-// ConfigKeys is the list of gnoland config keys collected by the metadata collector.
+// ConfigKeys is the list of gnoland config keys collected by the metadata
+// collector. Every key here is one we cannot get from /status or /genesis; see
+// docs/rpc-vs-otlp.md for the source-picking rationale.
 var ConfigKeys = []string{
-	"moniker",
-	"db_backend",
-	"p2p.laddr",
-	"p2p.persistent_peers",
-	"rpc.laddr",
-	"telemetry.metrics_enabled",
-	"telemetry.exporter_endpoint",
+	"application.prune_strategy",
+	"consensus.peer_gossip_sleep_duration",
+	"consensus.timeout_commit",
+	"mempool.size",
+	"p2p.flush_throttle_timeout",
+	"p2p.max_num_outbound_peers",
+	"p2p.pex",
 }
 
-// Collector gathers binary version, genesis checksum, and gnoland config key values.
-// Binary version is obtained by running a command (polled on check_interval).
-// Genesis uses a file path (direct sha256 + fsnotify change watch).
-// Config uses either a file path or a shell command. Setting both for the same
-// item is an error — the item is skipped and an error is logged.
+// Collector gathers gnoland config key values. Binary version and genesis info
+// are available from /status and /genesis RPC endpoints — the RPC forwarder
+// handles those — so the metadata collector's only job is the config keys that
+// aren't exposed via RPC (see ConfigKeys for the list).
+//
+// Config uses either a file path or a shell command. Setting both is an error.
 type Collector struct {
 	cfg   config.MetadataConfig
 	delta *delta.Delta
@@ -55,8 +55,8 @@ func NewCollector(cfg config.MetadataConfig, out chan<- protocol.MetricsPayload,
 	}
 }
 
-// Run performs an initial collection, then watches file paths for changes and
-// polls on check_interval for cmd-mode items. Blocks until ctx is cancelled.
+// Run performs an initial collection, then watches the config file for changes
+// (file mode) and polls on check_interval (cmd mode). Blocks until ctx is cancelled.
 func (c *Collector) Run(ctx context.Context) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -100,16 +100,12 @@ func (c *Collector) Run(ctx context.Context) error {
 	}
 }
 
-// watchedPaths returns the file paths being watched (path-mode items only, conflict-free).
+// watchedPaths returns the config file path being watched (file-mode only).
 func (c *Collector) watchedPaths() []string {
-	var paths []string
-	if c.cfg.GenesisPath != "" {
-		paths = append(paths, c.cfg.GenesisPath)
-	}
 	if c.cfg.ConfigPath != "" && c.cfg.ConfigGetCmd == "" {
-		paths = append(paths, c.cfg.ConfigPath)
+		return []string{c.cfg.ConfigPath}
 	}
-	return paths
+	return nil
 }
 
 func (c *Collector) collectAndSend(ctx context.Context) {
@@ -117,8 +113,6 @@ func (c *Collector) collectAndSend(ctx context.Context) {
 		CollectedAt: time.Now().UTC(),
 		Data:        make(map[string]json.RawMessage),
 	}
-	c.collectBinary(payload.Data)
-	c.collectGenesis(payload.Data)
 	c.collectConfig(payload.Data)
 	if len(payload.Data) == 0 {
 		return
@@ -126,58 +120,6 @@ func (c *Collector) collectAndSend(ctx context.Context) {
 	select {
 	case c.out <- payload:
 	case <-ctx.Done():
-	}
-}
-
-func (c *Collector) collectBinary(data map[string]json.RawMessage) {
-	if c.cfg.BinaryPath != "" && c.cfg.BinaryVersionCmd != "" {
-		c.log.Error("metadata conflict: binary_path and binary_version_cmd both set — skipping binary version")
-		return
-	}
-
-	var version string
-	var err error
-	switch {
-	case c.cfg.BinaryPath != "":
-		version, err = RunBinaryVersion(c.cfg.BinaryPath)
-	case c.cfg.BinaryVersionCmd != "":
-		version, err = RunCmd(c.cfg.BinaryVersionCmd)
-	default:
-		return
-	}
-
-	// TODO: Remove this fallback once gnoland implements the version subcommand.
-	if err != nil {
-		c.log.Warn("binary version error, using placeholder", "err", err)
-		version = "version not implemented yet"
-	}
-
-	b, err := json.Marshal(version)
-	if err != nil {
-		c.log.Warn("binary version marshal error", "err", err)
-		return
-	}
-	if c.delta.Changed("binary_version", b) {
-		data["binary_version"] = b
-	}
-}
-
-func (c *Collector) collectGenesis(data map[string]json.RawMessage) {
-	if c.cfg.GenesisPath == "" {
-		return
-	}
-	checksum, err := SHA256File(c.cfg.GenesisPath)
-	if err != nil {
-		c.log.Warn("genesis checksum error", "err", err)
-		return
-	}
-	b, err := json.Marshal(checksum)
-	if err != nil {
-		c.log.Warn("genesis checksum marshal error", "err", err)
-		return
-	}
-	if c.delta.Changed("genesis_checksum", b) {
-		data["genesis_checksum"] = b
 	}
 }
 
@@ -216,29 +158,6 @@ func (c *Collector) collectConfig(data map[string]json.RawMessage) {
 	if c.delta.Changed("config", b) {
 		data["config"] = b
 	}
-}
-
-// SHA256File returns the hex-encoded SHA-256 checksum of the file at path.
-func SHA256File(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", fmt.Errorf("open %s: %w", path, err)
-	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", fmt.Errorf("hash %s: %w", path, err)
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// RunBinaryVersion runs "<binaryPath> version" and returns the trimmed stdout.
-func RunBinaryVersion(binaryPath string) (string, error) {
-	out, err := exec.Command(binaryPath, "version").Output()
-	if err != nil {
-		return "", fmt.Errorf("run %s version: %w", binaryPath, err)
-	}
-	return strings.TrimSpace(string(out)), nil
 }
 
 // RunCmd runs cmd via sh -c and returns the trimmed stdout.

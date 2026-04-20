@@ -58,8 +58,8 @@ func TestParseLevel(t *testing.T) {
 		{`{"level":"warn","msg":"x"}`, "warn"},
 		{`{"level":"error","msg":"x"}`, "error"},
 		{`{"level":"unknown","msg":"x"}`, "info"}, // unknown → info
-		{`{"msg":"no level"}`, "info"},             // missing → info
-		{`not json`, "info"},                       // invalid JSON → info
+		{`{"msg":"no level"}`, "info"},            // missing → info
+		{`not json`, "info"},                      // invalid JSON → info
 	}
 	for _, tt := range tests {
 		got := logs.ParseLevel(json.RawMessage(tt.input))

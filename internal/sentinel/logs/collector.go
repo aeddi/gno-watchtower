@@ -19,8 +19,8 @@ const lineBufferSize = 256
 // batchTimeout elapses. One payload per level per flush.
 type Collector struct {
 	source       Source
-	minLevel     int           // numeric rank; lines with rank < minLevel are dropped
-	batchSize    int64         // flush when accumulated bytes reach this threshold
+	minLevel     int   // numeric rank; lines with rank < minLevel are dropped
+	batchSize    int64 // flush when accumulated bytes reach this threshold
 	batchTimeout time.Duration
 	out          chan<- protocol.LogPayload
 	log          *slog.Logger

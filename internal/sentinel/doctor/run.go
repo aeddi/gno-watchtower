@@ -56,7 +56,7 @@ func Run(ctx context.Context, cfg *config.Config, configPath string, w io.Writer
 	return 0
 }
 
-var metadataCheckNames = []string{"Metadata binary", "Metadata genesis", "Metadata config", "Metadata conflicts"}
+var metadataCheckNames = []string{"Metadata config", "Metadata conflicts"}
 
 func metadataAllSame(status Status, detail string) []CheckResult {
 	results := make([]CheckResult, len(metadataCheckNames))
@@ -74,8 +74,6 @@ func metadataChecks(cfg *config.Config, ar *AuthResponse) []CheckResult {
 		return metadataAllSame(StatusGrey, "metrics permission not granted")
 	}
 	return []CheckResult{
-		CheckMetadataBinary(cfg.Metadata),
-		CheckMetadataGenesis(cfg.Metadata),
 		CheckMetadataConfig(cfg.Metadata),
 		CheckMetadataConflicts(cfg.Metadata),
 	}

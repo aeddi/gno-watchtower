@@ -85,9 +85,7 @@ const (
 	PlaceholderServerURL     = "<watchtower-server-url>"
 	PlaceholderServerToken   = "<watchtower-auth-token>"
 	PlaceholderContainerName = "<gnoland-container-name>"
-	PlaceholderBinaryPath    = "<path-to-gnoland>"
 	PlaceholderConfigPath    = "<path-to-gnoland-config>"
-	PlaceholderGenesisPath   = "<path-to-genesis-json>"
 	PlaceholderJournaldUnit  = "<gnoland-systemd-unit>"
 )
 
@@ -145,18 +143,16 @@ type ResourcesConfig struct {
 }
 
 // MetadataConfig holds metadata collector settings.
-// For binary and config: set exactly one of _path or _cmd — setting both is an error.
+// For config: set exactly one of config_path or config_get_cmd — setting both
+// is an error. The binary version is obtained from /status.node_info.version
+// (RPC pipeline), and genesis info from /genesis — neither needs to be
+// collected out-of-band anymore.
 type MetadataConfig struct {
 	Enabled       bool     `toml:"enabled"`
 	CheckInterval Duration `toml:"check_interval"`
 
-	BinaryPath       string `toml:"binary_path,omitempty" comment:"runs <path> version to get the binary version"`
-	BinaryVersionCmd string `toml:"binary_version_cmd,omitempty"`
-
 	ConfigPath   string `toml:"config_path,omitempty"`
 	ConfigGetCmd string `toml:"config_get_cmd,omitempty" comment:"use %s as placeholder for the config key name"`
-
-	GenesisPath string `toml:"genesis_path"`
 }
 
 // HealthConfig holds the sentinel health endpoint settings.
@@ -216,9 +212,7 @@ func DefaultConfig() *Config {
 		Metadata: MetadataConfig{
 			Enabled:       true,
 			CheckInterval: Duration{Duration: 10 * time.Minute},
-			BinaryPath:    PlaceholderBinaryPath,
 			ConfigPath:    PlaceholderConfigPath,
-			GenesisPath:   PlaceholderGenesisPath,
 		},
 		Health: HealthConfig{
 			ListenAddr: "127.0.0.1:8081",
