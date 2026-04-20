@@ -61,8 +61,11 @@ type metricsServer struct {
 	log *slog.Logger
 }
 
-// Export receives an OTLP export request, marshals it to bytes, and sends to out (non-blocking).
+// Export receives an OTLP export request, drops metrics that are better
+// served by the RPC collector (see deniedMetricNames), marshals the remainder,
+// and sends to out (non-blocking).
 func (m *metricsServer) Export(_ context.Context, req *collectorpb.ExportMetricsServiceRequest) (*collectorpb.ExportMetricsServiceResponse, error) {
+	filterDenied(req)
 	b, err := proto.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal otlp request: %w", err)
