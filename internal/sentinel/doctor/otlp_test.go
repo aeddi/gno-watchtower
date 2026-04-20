@@ -1,14 +1,12 @@
 package doctor_test
 
 import (
+	"bytes"
 	"context"
 	"net"
+	"net/http"
 	"testing"
 	"time"
-
-	collectorpb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/aeddi/gno-watchtower/internal/sentinel/doctor"
 )
@@ -25,15 +23,18 @@ func TestCheckOTLP_Green_WhenExportReceived(t *testing.T) {
 	// Send an export after a short delay so the check server is ready.
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+addr+"/v1/metrics", bytes.NewReader(nil))
 		if err != nil {
 			return
 		}
-		defer conn.Close()
-		client := collectorpb.NewMetricsServiceClient(conn)
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		client.Export(ctx, &collectorpb.ExportMetricsServiceRequest{}) //nolint:errcheck
+		req.Header.Set("Content-Type", "application/x-protobuf")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return
+		}
+		resp.Body.Close()
 	}()
 
 	r := doctor.CheckOTLP(context.Background(), addr)
