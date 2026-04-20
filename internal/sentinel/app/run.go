@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
@@ -31,18 +32,20 @@ const (
 	metricsSendInterval = time.Second
 )
 
-// runCollector starts a collector goroutine. Transient errors are logged; ctx cancellation exits cleanly.
-func runCollector(ctx context.Context, name string, log *slog.Logger, run func(context.Context) error) {
-	go func() {
+// runCollector starts a collector goroutine tracked by wg. Transient errors
+// are logged; ctx cancellation exits cleanly.
+func runCollector(ctx context.Context, wg *sync.WaitGroup, name string, log *slog.Logger, run func(context.Context) error) {
+	wg.Go(func() {
 		if err := run(ctx); err != nil && ctx.Err() == nil {
 			log.Error(name+" collector stopped", "err", err)
 		}
-	}()
+	})
 }
 
-// wireBuffered launches a goroutine that drains outCh into buf until ctx is done.
-func wireBuffered[T any](ctx context.Context, outCh <-chan T, buf *sender.Buffer[T], log *slog.Logger, name string, st *stats.Stats) {
-	go func() {
+// wireBuffered launches a goroutine (tracked by wg) that drains outCh into buf
+// until ctx is done.
+func wireBuffered[T any](ctx context.Context, wg *sync.WaitGroup, outCh <-chan T, buf *sender.Buffer[T], log *slog.Logger, name string, st *stats.Stats) {
+	wg.Go(func() {
 		for {
 			select {
 			case <-ctx.Done():
@@ -54,17 +57,26 @@ func wireBuffered[T any](ctx context.Context, outCh <-chan T, buf *sender.Buffer
 				}
 			}
 		}
-	}()
+	})
 }
 
 // Run starts all enabled collectors and drains their output to the sender.
-// It blocks until ctx is cancelled.
+// It blocks until ctx is cancelled, then waits for every spawned goroutine
+// (collectors, wireBuffered loops, health server, OTLP relay + sender) to
+// finish before returning. This ordering guarantees no in-flight request
+// outlives Run: main() can exit immediately after it returns.
 func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 	appLog := log.With("component", "app")
-	go runHealthServer(ctx, cfg.Health.Enabled, cfg.Health.ListenAddr, log.With("component", "health"))
 	senderLog := log.With("component", "sender")
 	st := stats.New()
 	s := sender.New(cfg.Server.URL, cfg.Server.Token)
+
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	wg.Go(func() {
+		runHealthServer(ctx, cfg.Health.Enabled, cfg.Health.ListenAddr, log.With("component", "health"))
+	})
 
 	if !cfg.RPC.Enabled && !cfg.Logs.Enabled && !cfg.OTLP.Enabled && !cfg.Resources.Enabled && !cfg.Metadata.Enabled {
 		<-ctx.Done()
@@ -86,8 +98,8 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 			rpcOut,
 			log,
 		)
-		runCollector(ctx, "rpc", appLog, collector.Run)
-		wireBuffered(ctx, rpcOut, rpcBuf, appLog, "rpc", st)
+		runCollector(ctx, &wg, "rpc", appLog, collector.Run)
+		wireBuffered(ctx, &wg, rpcOut, rpcBuf, appLog, "rpc", st)
 
 		t := time.NewTicker(cfg.RPC.PollInterval.Duration)
 		defer t.Stop()
@@ -113,8 +125,8 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 				logsOut,
 				log,
 			)
-			runCollector(ctx, "log", appLog, lc.Run)
-			wireBuffered(ctx, logsOut, logBuf, appLog, "log", st)
+			runCollector(ctx, &wg, "log", appLog, lc.Run)
+			wireBuffered(ctx, &wg, logsOut, logBuf, appLog, "log", st)
 
 			t := time.NewTicker(logSendInterval)
 			defer t.Stop()
@@ -127,12 +139,12 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 	if cfg.OTLP.Enabled {
 		otlpOut := make(chan []byte, otlpChannelSize)
 		relay := otlp.NewRelay(cfg.OTLP.ListenAddr, otlpOut, log)
-		go func() {
+		wg.Go(func() {
 			if err := relay.Run(ctx); err != nil && ctx.Err() == nil {
 				appLog.Error("otlp relay stopped", "err", err)
 			}
-		}()
-		go func() {
+		})
+		wg.Go(func() {
 			for {
 				select {
 				case <-ctx.Done():
@@ -146,7 +158,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 					st.Record("otlp", len(b))
 				}
 			}
-		}()
+		})
 	}
 
 	// ---- Resource collector
@@ -157,8 +169,8 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 		resourcesOut := make(chan protocol.MetricsPayload, resourcesBufferSize)
 
 		rc := resources.NewCollector(cfg.Resources, resourcesOut, log)
-		runCollector(ctx, "resources", appLog, rc.Run)
-		wireBuffered(ctx, resourcesOut, resourcesBuf, appLog, "resources", st)
+		runCollector(ctx, &wg, "resources", appLog, rc.Run)
+		wireBuffered(ctx, &wg, resourcesOut, resourcesBuf, appLog, "resources", st)
 
 		t := time.NewTicker(metricsSendInterval)
 		defer t.Stop()
@@ -173,8 +185,8 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 		metadataOut := make(chan protocol.MetricsPayload, metadataBufferSize)
 
 		mc := metadata.NewCollector(cfg.Metadata, metadataOut, log)
-		runCollector(ctx, "metadata", appLog, mc.Run)
-		wireBuffered(ctx, metadataOut, metadataBuf, appLog, "metadata", st)
+		runCollector(ctx, &wg, "metadata", appLog, mc.Run)
+		wireBuffered(ctx, &wg, metadataOut, metadataBuf, appLog, "metadata", st)
 
 		t := time.NewTicker(metricsSendInterval)
 		defer t.Stop()
@@ -191,21 +203,23 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 		case <-statsTicker.C:
 			logStats(appLog, st)
 			continue
+		// Flushes run synchronously: if the watchtower is slow and a flush
+		// runs past the next tick, the extra Ticker.Tick just gets coalesced
+		// by the runtime (Tick drops to avoid piling up) and the collector's
+		// buffer absorbs the latency. Spawning a goroutine per tick would
+		// accumulate in-flight senders with no bound and race each other's
+		// buf.Drain() calls.
 		case <-rpcSendCh:
-			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
-			go flush(ctx, s, rpcBuf, senderLog, st)
+			flush(ctx, s, rpcBuf, senderLog, st)
 			continue
 		case <-logSendCh:
-			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
-			go flushLogs(ctx, s, logBuf, senderLog, st)
+			flushLogs(ctx, s, logBuf, senderLog, st)
 			continue
 		case <-resourcesSendCh:
-			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
-			go flushMetrics(ctx, s, resourcesBuf, "resources", senderLog, st)
+			flushMetrics(ctx, s, resourcesBuf, "resources", senderLog, st)
 			continue
 		case <-metadataSendCh:
-			// Run flush in a goroutine so the ticker loop isn't blocked by retries.
-			go flushMetrics(ctx, s, metadataBuf, "metadata", senderLog, st)
+			flushMetrics(ctx, s, metadataBuf, "metadata", senderLog, st)
 			continue
 		}
 		break
