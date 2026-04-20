@@ -106,6 +106,7 @@ type Config struct {
 	OTLP      OTLPConfig      `toml:"otlp" comment:"OpenTelemetry relay"`
 	Resources ResourcesConfig `toml:"resources" comment:"System resource monitor"`
 	Metadata  MetadataConfig  `toml:"metadata" comment:"Config metadata collector"`
+	Self      SelfConfig      `toml:"self" comment:"Sentinel self-stats collector (pipeline health: bytes sent, drops, retries)"`
 	Health    HealthConfig    `toml:"health" comment:"Sentinel health endpoint"`
 }
 
@@ -158,6 +159,14 @@ type MetadataConfig struct {
 
 	ConfigPath   string `toml:"config_path,omitempty"`
 	ConfigGetCmd string `toml:"config_get_cmd,omitempty" comment:"use %s as placeholder for the config key name"`
+}
+
+// SelfConfig holds the sentinel self-stats collector settings. The collector
+// reports absolute counters (bytes sent, drops, retries) per data type so the
+// watchtower can export them as Prometheus counters for pipeline dashboards.
+type SelfConfig struct {
+	Enabled       bool     `toml:"enabled"`
+	ReportInterval Duration `toml:"report_interval"`
 }
 
 // HealthConfig holds the sentinel health endpoint settings.
@@ -219,6 +228,10 @@ func DefaultConfig() *Config {
 			CheckInterval: Duration{Duration: 10 * time.Minute},
 			ConfigPath:    placeholderConfigPath,
 		},
+		Self: SelfConfig{
+			Enabled:        true,
+			ReportInterval: Duration{Duration: 30 * time.Second},
+		},
 		Health: HealthConfig{
 			Enabled:    true,
 			ListenAddr: "127.0.0.1:8081",
@@ -227,7 +240,7 @@ func DefaultConfig() *Config {
 }
 
 func (c *Config) anyCollectorEnabled() bool {
-	return c.RPC.Enabled || c.Logs.Enabled || c.OTLP.Enabled || c.Resources.Enabled || c.Metadata.Enabled
+	return c.RPC.Enabled || c.Logs.Enabled || c.OTLP.Enabled || c.Resources.Enabled || c.Metadata.Enabled || c.Self.Enabled
 }
 
 func (c *Config) validate() error {
