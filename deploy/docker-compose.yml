@@ -25,6 +25,11 @@ services:
     command: ["run", "/etc/watchtower/config.toml"]
     volumes:
       - ./watchtower.toml:/etc/watchtower/config.toml:ro
+    environment:
+      # Surface retention windows via /metrics so dashboards can show
+      # "used / limit" panels without reparsing config.env at query time.
+      LOGS_RETENTION: "${LOGS_RETENTION}"
+      METRICS_RETENTION: "${METRICS_RETENTION}"
     networks:
       - monitoring
     restart: unless-stopped

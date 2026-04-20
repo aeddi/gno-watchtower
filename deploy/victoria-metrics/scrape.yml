@@ -3,8 +3,11 @@
 # the watchtower forwarder.
 #
 # What each target gives us:
-#   node      — host CPU/mem/disk/net/load (node_exporter, :9100)
-#   cadvisor  — per-container CPU/mem/net breakdown (cadvisor, :8080)
+#   node        — host CPU/mem/disk/net/load (node_exporter, :9100)
+#   cadvisor    — per-container CPU/mem/net breakdown (cadvisor, :8080)
+#   watchtower  — traffic counters + retention config (internal :8080/metrics)
+#   loki        — ingester chunk counts + per-tenant ingest stats (:3100/metrics)
+#   vm          — self-scrape: rows ingested, data size, series count (:8428/metrics)
 scrape_configs:
   - job_name: node
     scrape_interval: 15s
@@ -25,3 +28,21 @@ scrape_configs:
       - source_labels: [__name__]
         regex: "container_(cpu_usage_seconds_total|memory_usage_bytes|memory_working_set_bytes|network_receive_bytes_total|network_transmit_bytes_total|fs_reads_bytes_total|fs_writes_bytes_total|last_seen|spec_memory_limit_bytes)"
         action: keep
+
+  - job_name: watchtower
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - watchtower:8080
+
+  - job_name: loki
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - loki:3100
+
+  - job_name: vm
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - victoria-metrics:8428
