@@ -36,15 +36,24 @@ jobs:
     permissions:
       contents: write # release-please commits CHANGELOG + pushes tags
       pull-requests: write # release-please opens / updates the Release PR
+    env:
+      RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
     steps:
+      # Fail loudly when the required PAT is missing. The default
+      # GITHUB_TOKEN technically works for opening the release PR, but tag
+      # pushes made with it DO NOT trigger release.yml (GitHub's workflow
+      # loop-prevention policy) — so releases would silently ship without
+      # binaries. Better to block the workflow until the operator configures
+      # the token than to discover this after a silent tag.
+      - name: Require RELEASE_PLEASE_TOKEN
+        if: env.RELEASE_PLEASE_TOKEN == ''
+        run: |
+          echo "::error title=Missing RELEASE_PLEASE_TOKEN::Configure a fine-grained PAT or GitHub App token with contents:write + pull-requests:write and store it as secret RELEASE_PLEASE_TOKEN. See the README 'Versioning' section."
+          exit 1
       - name: Run release-please
         uses: googleapis/release-please-action@v4
         with:
-          # Fall back to default GITHUB_TOKEN when RELEASE_PLEASE_TOKEN is
-          # absent so the workflow doesn't error on first setup — but note
-          # that in that mode, tag pushes won't trigger release.yml and
-          # binaries won't be built until RELEASE_PLEASE_TOKEN is added.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ env.RELEASE_PLEASE_TOKEN }}
           release-type: go
           package-name: gno-watchtower
           target-branch: main

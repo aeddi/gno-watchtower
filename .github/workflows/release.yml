@@ -30,8 +30,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # goreleaser needs full history for changelog
-          # persist-credentials stays default (true) — goreleaser uses the
-          # checkout token to push release assets.
+          # goreleaser authenticates to the GitHub API via $GITHUB_TOKEN
+          # (see the env: block below), not via git credential helpers —
+          # no reason to keep the persisted token on disk.
+          persist-credentials: false
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -52,6 +54,8 @@ jobs:
     permissions:
       contents: read # read Dockerfile + source for build
       packages: write # push to ghcr.io
+      id-token: write # required for Sigstore provenance attestation
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -109,5 +113,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ github.ref_name }}
-          cache-from: type=gha,scope=${{ matrix.image.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
+          cache-from: type=gha,scope=release-${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=release-${{ matrix.image.name }}
+          # Attach build provenance + SBOM so released images can be verified
+          # via `gh attestation verify` / cosign against this workflow.
+          provenance: mode=max
+          sbom: true
