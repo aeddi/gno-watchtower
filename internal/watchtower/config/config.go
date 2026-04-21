@@ -42,7 +42,7 @@ type ServerConfig struct {
 
 type SecurityConfig struct {
 	RateLimitRPS   float64  `toml:"rate_limit_rps"`
-	RateLimitBurst int      `toml:"rate_limit_burst" comment:"must be >= 4 (sentinel sends rpc + metrics + logs + otlp concurrently), default 10"`
+	RateLimitBurst int      `toml:"rate_limit_burst" comment:"must be >= 4 (sentinel sends rpc + metrics + logs + otlp concurrently), default 200"`
 	BanThreshold   int      `toml:"ban_threshold" comment:"failed auth attempts before banning"`
 	BanDuration    Duration `toml:"ban_duration"`
 }
@@ -66,7 +66,7 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("load config %s: %w", path, err)
 	}
 	if cfg.Security.RateLimitBurst == 0 {
-		cfg.Security.RateLimitBurst = 10
+		cfg.Security.RateLimitBurst = 200
 	}
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
@@ -81,8 +81,12 @@ func DefaultConfig() *Config {
 			ListenAddr: "0.0.0.0:8080",
 		},
 		Security: SecurityConfig{
-			RateLimitRPS:   10,
-			RateLimitBurst: 10,
+			// Sized generously for debug-mode gnoland: the sentinel emits 4
+			// concurrent data streams (rpc + metrics + logs + otlp), each at
+			// 1-3 req/s typical; sub-min bursts add another order of magnitude.
+			// A 429 is logged as watchtower_rate_limited_total{validator}.
+			RateLimitRPS:   100,
+			RateLimitBurst: 200,
 			BanThreshold:   5,
 			BanDuration:    Duration{Duration: 15 * time.Minute},
 		},

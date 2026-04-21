@@ -27,10 +27,12 @@ const (
 // than mutate the default one (parallel tests otherwise collide on global
 // register/unregister).
 type Metrics struct {
-	registry         *prometheus.Registry
-	receivedBytes    *prometheus.CounterVec
-	receivedPayloads *prometheus.CounterVec
-	retention        *prometheus.GaugeVec
+	registry          *prometheus.Registry
+	receivedBytes     *prometheus.CounterVec
+	receivedPayloads  *prometheus.CounterVec
+	rateLimited       *prometheus.CounterVec
+	logsBelowMinLevel *prometheus.CounterVec
+	retention         *prometheus.GaugeVec
 }
 
 // New builds a fresh Metrics with all collectors registered on a private
@@ -47,12 +49,20 @@ func New() *Metrics {
 			Name: "watchtower_received_payloads_total",
 			Help: "Total payloads received from sentinels, broken down by validator and data type.",
 		}, []string{"validator", "type"}),
+		rateLimited: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "watchtower_rate_limited_total",
+			Help: "Requests rejected with HTTP 429 by the per-validator rate limiter.",
+		}, []string{"validator"}),
+		logsBelowMinLevel: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "watchtower_logs_below_min_level_total",
+			Help: "Log payloads dropped because their level was below the validator's configured logs_min_level.",
+		}, []string{"validator"}),
 		retention: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "watchtower_config_retention_seconds",
 			Help: "Configured retention window per storage backend, in seconds.",
 		}, []string{"backend"}),
 	}
-	reg.MustRegister(m.receivedBytes, m.receivedPayloads, m.retention)
+	reg.MustRegister(m.receivedBytes, m.receivedPayloads, m.rateLimited, m.logsBelowMinLevel, m.retention)
 	// Register Go + process metrics so we also get go_goroutines, process_cpu_seconds_total, etc.
 	reg.MustRegister(
 		prometheus.NewGoCollector(),
@@ -66,6 +76,21 @@ func New() *Metrics {
 func (m *Metrics) RecordReceived(validator, dataType string, bytes int) {
 	m.receivedBytes.WithLabelValues(validator, dataType).Add(float64(bytes))
 	m.receivedPayloads.WithLabelValues(validator, dataType).Inc()
+}
+
+// RecordRateLimited bumps the counter for a validator whose request was
+// rejected with HTTP 429 by the per-validator rate limiter. Called from the
+// rate-limit middleware; cheap enough to call in the hot path.
+func (m *Metrics) RecordRateLimited(validator string) {
+	m.rateLimited.WithLabelValues(validator).Inc()
+}
+
+// RecordLogsBelowMinLevel bumps the counter for a validator whose log
+// payload was dropped by the server-side logs_min_level filter. This is an
+// intentional filter, not an error — the counter exists so operators can
+// see at a glance that an aggressive min_level is eating traffic.
+func (m *Metrics) RecordLogsBelowMinLevel(validator string) {
+	m.logsBelowMinLevel.WithLabelValues(validator).Inc()
 }
 
 // SetRetention publishes the retention window for a backend as a gauge.

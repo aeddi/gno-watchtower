@@ -102,7 +102,7 @@ func TestLoad_MissingFile_ReturnsError(t *testing.T) {
 }
 
 func TestLoad_RateLimitBurstDefault(t *testing.T) {
-	// TOML with no rate_limit_burst — Load must default it to 10.
+	// TOML with no rate_limit_burst — Load must default it to 200.
 	const content = `
 [server]
 listen_addr = "127.0.0.1:8080"
@@ -126,8 +126,8 @@ url = "http://loki:3100"
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Security.RateLimitBurst != 10 {
-		t.Errorf("RateLimitBurst default: got %d, want 10", cfg.Security.RateLimitBurst)
+	if cfg.Security.RateLimitBurst != 200 {
+		t.Errorf("RateLimitBurst default: got %d, want 200", cfg.Security.RateLimitBurst)
 	}
 }
 

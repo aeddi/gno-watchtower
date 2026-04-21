@@ -25,17 +25,22 @@ import (
 
 // Forwarder sends payloads to VictoriaMetrics and Loki.
 type Forwarder struct {
-	vmURL   string
-	lokiURL string
-	client  *http.Client
+	vmURL               string
+	lokiURL             string
+	client              *http.Client
+	onLogsBelowMinLevel func(validator string)
 }
 
-// New creates a Forwarder.
-func New(vmURL, lokiURL string) *Forwarder {
+// New creates a Forwarder. onLogsBelowMinLevel (may be nil) is invoked when
+// a log payload is dropped because its level falls below the validator's
+// configured logs_min_level — wire this to metrics.Metrics.RecordLogsBelowMinLevel
+// so filtered traffic surfaces as watchtower_logs_below_min_level_total{validator}.
+func New(vmURL, lokiURL string, onLogsBelowMinLevel func(validator string)) *Forwarder {
 	return &Forwarder{
-		vmURL:   vmURL,
-		lokiURL: lokiURL,
-		client:  &http.Client{Timeout: 30 * time.Second},
+		vmURL:               vmURL,
+		lokiURL:             lokiURL,
+		client:              &http.Client{Timeout: 30 * time.Second},
+		onLogsBelowMinLevel: onLogsBelowMinLevel,
 	}
 }
 
@@ -98,6 +103,9 @@ func (f *Forwarder) ForwardLogs(ctx context.Context, validator string, body []by
 		return fmt.Errorf("unmarshal log payload: %w", err)
 	}
 	if minLevel != "" && logger.LevelRank(payload.Level) < logger.LevelRank(minLevel) {
+		if f.onLogsBelowMinLevel != nil {
+			f.onLogsBelowMinLevel(validator)
+		}
 		return nil
 	}
 	push, err := toLokiPush(validator, payload)

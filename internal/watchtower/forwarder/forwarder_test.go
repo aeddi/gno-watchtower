@@ -41,7 +41,7 @@ func TestForwardRPC_PostsSentinelMetricsToVM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
+	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100", nil)
 	if err := f.ForwardRPC(context.Background(), "val-01", body); err != nil {
 		t.Fatalf("ForwardRPC: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestForwardRPC_EmptyPayloadNoPost(t *testing.T) {
 		called = true
 	}))
 	defer vmSrv.Close()
-	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
+	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100", nil)
 	body := []byte(`{"collected_at":"2026-04-19T12:00:00Z","data":{}}`)
 	if err := f.ForwardRPC(context.Background(), "val-01", body); err != nil {
 		t.Fatalf("ForwardRPC: %v", err)
@@ -86,12 +86,17 @@ func TestForwardLogs_DropsWhenPayloadLevelBelowMinLevel(t *testing.T) {
 	body, _ := json.Marshal(payload)
 	compressed, _ := zstdCompress(body)
 
-	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL)
+	var droppedFor string
+	onDrop := func(validator string) { droppedFor = validator }
+	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL, onDrop)
 	if err := f.ForwardLogs(context.Background(), "val-01", compressed, "warn"); err != nil {
 		t.Fatalf("ForwardLogs: %v", err)
 	}
 	if called {
 		t.Error("Loki was called but payload should have been dropped (debug < warn)")
+	}
+	if droppedFor != "val-01" {
+		t.Errorf("onDrop callback: got %q, want \"val-01\"", droppedFor)
 	}
 }
 
@@ -109,7 +114,7 @@ func TestForwardLogs_ForwardsWhenPayloadLevelAtOrAboveMinLevel(t *testing.T) {
 	body, _ := json.Marshal(payload)
 	compressed, _ := zstdCompress(body)
 
-	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL)
+	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL, nil)
 	if err := f.ForwardLogs(context.Background(), "val-01", compressed, "warn"); err != nil {
 		t.Fatalf("ForwardLogs: %v", err)
 	}
@@ -135,7 +140,7 @@ func TestForwardLogs_UsesGnoFloatEpochTimestamp(t *testing.T) {
 	body, _ := json.Marshal(payload)
 	compressed, _ := zstdCompress(body)
 
-	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL)
+	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL, nil)
 	if err := f.ForwardLogs(context.Background(), "val-01", compressed, ""); err != nil {
 		t.Fatalf("ForwardLogs: %v", err)
 	}
@@ -180,7 +185,7 @@ func TestForwardLogs_EmptyMinLevelMeansNoFilter(t *testing.T) {
 	body, _ := json.Marshal(payload)
 	compressed, _ := zstdCompress(body)
 
-	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL)
+	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL, nil)
 	if err := f.ForwardLogs(context.Background(), "val-01", compressed, ""); err != nil {
 		t.Fatalf("ForwardLogs: %v", err)
 	}
@@ -206,7 +211,7 @@ func TestForwardMetrics_PostsSentinelMetricsToVM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
+	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100", nil)
 	if err := f.ForwardMetrics(context.Background(), "val-01", body); err != nil {
 		t.Fatalf("ForwardMetrics: %v", err)
 	}
@@ -241,7 +246,7 @@ func TestForwardMetrics_EmptyPayloadNoPost(t *testing.T) {
 	}))
 	defer vmSrv.Close()
 
-	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
+	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100", nil)
 	body := []byte(`{"collected_at":"2026-04-19T12:00:00Z","data":{}}`)
 	if err := f.ForwardMetrics(context.Background(), "val-01", body); err != nil {
 		t.Fatalf("ForwardMetrics: %v", err)
@@ -270,7 +275,7 @@ func TestForwardLogs_DecompressesAndPushesToLoki(t *testing.T) {
 	body, _ := json.Marshal(payload)
 	compressed, _ := zstdCompress(body)
 
-	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL)
+	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL, nil)
 	if err := f.ForwardLogs(context.Background(), "val-01", compressed, ""); err != nil {
 		t.Fatalf("ForwardLogs: %v", err)
 	}
@@ -320,7 +325,7 @@ func TestForwardLogs_SplitsByModule(t *testing.T) {
 	body, _ := json.Marshal(payload)
 	compressed, _ := zstdCompress(body)
 
-	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL)
+	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL, nil)
 	if err := f.ForwardLogs(context.Background(), "val-01", compressed, ""); err != nil {
 		t.Fatalf("ForwardLogs: %v", err)
 	}
@@ -371,7 +376,7 @@ func TestForwardLogs_MissingModuleFallsBackToUnknown(t *testing.T) {
 	body, _ := json.Marshal(payload)
 	compressed, _ := zstdCompress(body)
 
-	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL)
+	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL, nil)
 	if err := f.ForwardLogs(context.Background(), "val-01", compressed, ""); err != nil {
 		t.Fatalf("ForwardLogs: %v", err)
 	}
@@ -406,7 +411,7 @@ func TestForwardOTLP_InjectsValidatorAndPostsToVM(t *testing.T) {
 	}
 	body, _ := proto.Marshal(req)
 
-	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
+	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100", nil)
 	if err := f.ForwardOTLP(context.Background(), "val-01", body); err != nil {
 		t.Fatalf("ForwardOTLP: %v", err)
 	}
@@ -435,7 +440,7 @@ func TestForwardOTLP_InjectsValidatorAndPostsToVM(t *testing.T) {
 }
 
 func TestForwardLogs_InvalidCompression_ReturnsError(t *testing.T) {
-	f := forwarder.New("http://vm:8428", "http://loki:3100")
+	f := forwarder.New("http://vm:8428", "http://loki:3100", nil)
 	err := f.ForwardLogs(context.Background(), "val-01", []byte("not zstd compressed"), "")
 	if err == nil {
 		t.Error("expected error for invalid zstd data")
@@ -457,7 +462,7 @@ func TestForwardRPC_NonOKIncludesBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100")
+	f := forwarder.New(vmSrv.URL, "http://loki-unused:3100", nil)
 	err = f.ForwardRPC(context.Background(), "val-01", body)
 	if err == nil {
 		t.Fatal("expected error for 400 response")

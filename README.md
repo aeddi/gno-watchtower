@@ -226,9 +226,10 @@ Run from `deploy/`:
     listen_addr = "0.0.0.0:8080"
 
     [security]
-    rate_limit_rps   = 10
+    # Per-validator rate limits; 429s surface as watchtower_rate_limited_total{validator}.
+    rate_limit_rps   = 100
     # rate_limit_burst must be >= number of concurrent sentinel data types (rpc + metrics + logs + otlp = 4)
-    rate_limit_burst = 10
+    rate_limit_burst = 200
     ban_threshold    = 5
     ban_duration     = "15m"
 

@@ -15,15 +15,21 @@ import (
 type Limiter struct {
 	rps      rate.Limit
 	burst    int
+	onLimit  func(validator string)
 	mu       sync.Mutex
 	limiters map[string]*rate.Limiter
 }
 
-// New creates a Limiter with the given requests-per-second rate and burst size.
-func New(rps float64, burst int) *Limiter {
+// New creates a Limiter with the given requests-per-second rate and burst
+// size. onLimit (may be nil) is invoked with the validator name whenever a
+// request is rejected with HTTP 429 — wire this to
+// metrics.Metrics.RecordRateLimited so drops surface as
+// watchtower_rate_limited_total{validator}.
+func New(rps float64, burst int, onLimit func(validator string)) *Limiter {
 	return &Limiter{
 		rps:      rate.Limit(rps),
 		burst:    burst,
+		onLimit:  onLimit,
 		limiters: make(map[string]*rate.Limiter),
 	}
 }
@@ -39,6 +45,9 @@ func (l *Limiter) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		if !l.allow(name) {
+			if l.onLimit != nil {
+				l.onLimit(name)
+			}
 			w.Header().Set("Retry-After", "1")
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return

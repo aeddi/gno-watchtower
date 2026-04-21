@@ -141,13 +141,13 @@ func runCmd(args []string) {
 		}
 	}()
 
-	rl := ratelimit.New(cfg.Security.RateLimitRPS, cfg.Security.RateLimitBurst)
-	fwd := forwarder.New(cfg.VictoriaMetrics.URL, cfg.Loki.URL)
-	st := stats.New()
-
 	m := wtmetrics.New()
 	m.SetRetention(wtmetrics.BackendLoki, parseLokiRetention(os.Getenv("LOGS_RETENTION"), logger), logger)
 	m.SetRetention(wtmetrics.BackendVM, parseVMRetention(os.Getenv("METRICS_RETENTION"), logger), logger)
+
+	rl := ratelimit.New(cfg.Security.RateLimitRPS, cfg.Security.RateLimitBurst, m.RecordRateLimited)
+	fwd := forwarder.New(cfg.VictoriaMetrics.URL, cfg.Loki.URL, m.RecordLogsBelowMinLevel)
+	st := stats.New()
 
 	srv := handlers.NewServer(cfg, a, rl, fwd, st, m, logger)
 
