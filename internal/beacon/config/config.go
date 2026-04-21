@@ -68,8 +68,9 @@ type RPCConfig struct {
 // ConfigGetCmd must be set when augmentation of config keys is wanted.
 // Leaving both empty disables config augmentation (peers + info still work).
 type MetadataConfig struct {
-	ConfigPath   string `toml:"config_path,omitempty"`
-	ConfigGetCmd string `toml:"config_get_cmd,omitempty" comment:"use %s as placeholder for the config key name"`
+	ConfigPath    string   `toml:"config_path,omitempty"`
+	ConfigGetCmd  string   `toml:"config_get_cmd,omitempty" comment:"use %s as placeholder for the config key name"`
+	ForceInterval Duration `toml:"force_interval,omitempty" comment:"augment sentry_* keys at least this often even when net_info is absent (0 = 12h default)"`
 }
 
 // DefaultConfig returns a Config with sensible defaults and placeholders.

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aeddi/gno-watchtower/internal/beacon/config"
 	"github.com/aeddi/gno-watchtower/pkg/logger"
@@ -231,5 +232,49 @@ func TestTransform_PreservesTopLevelFields(t *testing.T) {
 	}
 	if !strings.Contains(string(out), `"collected_at"`) {
 		t.Errorf("collected_at should be preserved, got %s", out)
+	}
+}
+
+func TestTransform_ForceInterval_AugmentsWithoutNetInfo(t *testing.T) {
+	srv := newFakeGnoland(t, nil)
+	defer srv.Close()
+
+	cfg := &config.Config{
+		RPC:      config.RPCConfig{RPCURL: srv.URL},
+		Metadata: config.MetadataConfig{ForceInterval: config.Duration{Duration: 50 * time.Millisecond}},
+	}
+	a := New(cfg, nil, logger.Noop())
+
+	// Payload WITHOUT net_info — without force, augmenter skips.
+	body := []byte(`{"data":{"block":{"height":"10"}}}`)
+
+	// Immediate first tick — fresh augmenter, force interval hasn't elapsed → pass through.
+	if out := a.Transform(context.Background(), "/rpc", body); out != nil {
+		t.Fatalf("tick before force interval should pass through, got %q", out)
+	}
+
+	// Wait past the force interval, then try again — should now force-augment.
+	time.Sleep(80 * time.Millisecond)
+
+	out := a.Transform(context.Background(), "/rpc", body)
+	if out == nil {
+		t.Fatal("tick after force interval should force-augment even without net_info")
+	}
+	var env struct {
+		Data map[string]json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(out, &env); err != nil {
+		t.Fatalf("output not valid JSON: %v", err)
+	}
+	if _, ok := env.Data["sentry_status"]; !ok {
+		t.Error("sentry_status missing from force-augmented payload")
+	}
+	if _, ok := env.Data["sentry_net_info"]; !ok {
+		t.Error("sentry_net_info missing from force-augmented payload")
+	}
+
+	// Immediate follow-up tick — timer just reset, should pass through again.
+	if out := a.Transform(context.Background(), "/rpc", body); out != nil {
+		t.Errorf("tick right after force-augment should pass through (timer reset), got %q", out)
 	}
 }

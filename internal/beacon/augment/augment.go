@@ -27,13 +27,24 @@ import (
 // sentry RPC never stalls the sentinel ingest path longer than one tick.
 const augmentDeadline = 2 * time.Second
 
+// defaultForceInterval triggers sentry_* re-emission even when no /net_info
+// tick arrives for a long time. Without this, the watchtower sees sentry_config
+// exactly once per sentinel lifetime — dashboards with short lookback windows
+// then age out to "no data".
+const defaultForceInterval = 12 * time.Hour
+
 // Augmenter holds references to the sentry's RPC client and metadata config
 // for per-request fetching.
+//
+// mu guards lastAugmentAt — concurrent /rpc handler goroutines may race on it.
 type Augmenter struct {
-	rpc      *rpc.Client
-	metaCfg  config.MetadataConfig
-	metaKeys []string
-	log      *slog.Logger
+	rpc           *rpc.Client
+	metaCfg       config.MetadataConfig
+	metaKeys      []string
+	forceInterval time.Duration
+	mu            sync.Mutex
+	lastAugmentAt time.Time
+	log           *slog.Logger
 }
 
 // New builds an Augmenter from the beacon's config.
@@ -42,11 +53,17 @@ func New(cfg *config.Config, metadataKeys []string, log *slog.Logger) *Augmenter
 	if metadataKeys == nil {
 		metadataKeys = metadata.ConfigKeys
 	}
+	fi := cfg.Metadata.ForceInterval.Duration
+	if fi <= 0 {
+		fi = defaultForceInterval
+	}
 	return &Augmenter{
-		rpc:      rpc.NewClient(cfg.RPC.RPCURL),
-		metaCfg:  cfg.Metadata,
-		metaKeys: metadataKeys,
-		log:      log.With("component", "beacon_augmenter"),
+		rpc:           rpc.NewClient(cfg.RPC.RPCURL),
+		metaCfg:       cfg.Metadata,
+		metaKeys:      metadataKeys,
+		forceInterval: fi,
+		lastAugmentAt: time.Now(),
+		log:           log.With("component", "beacon_augmenter"),
 	}
 }
 
@@ -87,10 +104,20 @@ func (a *Augmenter) augmentRPC(ctx context.Context, body []byte) ([]byte, error)
 	if err := json.Unmarshal(dataRaw, &data); err != nil {
 		return nil, err
 	}
-	if _, hasNetInfo := data["net_info"]; !hasNetInfo {
-		// Only augment on ticks that carry /net_info — no value in re-
-		// fetching the sentry for every block/validators/etc push.
-		return nil, nil
+	_, hasNetInfo := data["net_info"]
+	if !hasNetInfo {
+		// Normally we only augment on /net_info ticks — no value in re-fetching
+		// the sentry for every block/validators/etc push. But sentry_config +
+		// sentry_status are static enough that dashboards expect them to always
+		// be present; if /net_info stops flowing (stable peer count) the series
+		// would age out. Force-augment when we haven't seen a /net_info tick
+		// within forceInterval.
+		a.mu.Lock()
+		stale := time.Since(a.lastAugmentAt) >= a.forceInterval
+		a.mu.Unlock()
+		if !stale {
+			return nil, nil
+		}
 	}
 
 	// Bound the whole augment step; a stalled sentry RPC must not hold up
@@ -143,6 +170,9 @@ func (a *Augmenter) augmentRPC(ctx context.Context, body []byte) ([]byte, error)
 		// All fetches failed — pass through the original body unchanged.
 		return nil, nil
 	}
+	a.mu.Lock()
+	a.lastAugmentAt = time.Now()
+	a.mu.Unlock()
 	reencoded, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
