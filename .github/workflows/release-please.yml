@@ -9,11 +9,17 @@
 # the tag push, release.yml fires and builds + attaches binaries and the
 # Docker image.
 #
-# IMPORTANT: release-please must use a PAT or GitHub App token — NOT the
-# default GITHUB_TOKEN. Tags pushed with GITHUB_TOKEN don't trigger other
-# workflows (GitHub's loop-prevention policy), so release.yml would never
-# fire. Create a fine-grained PAT with `contents: write` + `pull-requests:
-# write` on this repo, store as secret RELEASE_PLEASE_TOKEN.
+# IMPORTANT: release-please authenticates via a dedicated GitHub App (NOT
+# the default GITHUB_TOKEN). Two reasons:
+#   1. Tags pushed with GITHUB_TOKEN don't trigger other workflows (GitHub's
+#      loop-prevention policy), so release.yml would never fire.
+#   2. Commits authored via a GitHub App token are auto-signed by GitHub's
+#      web-flow key, so `required_signatures` branch rulesets accept them.
+#      A fine-grained PAT produces unsigned commits and would be rejected.
+#
+# Setup: create a GitHub App with `contents: write` + `pull-requests: write`
+# on this repo, install it, then store the App ID as RELEASE_PLEASE_APP_ID
+# and the private key (.pem contents) as RELEASE_PLEASE_APP_PRIVATE_KEY.
 #
 # First run will propose v0.1.0. See the README "Versioning" section.
 name: release-please
@@ -37,23 +43,29 @@ jobs:
       contents: write # release-please commits CHANGELOG + pushes tags
       pull-requests: write # release-please opens / updates the Release PR
     env:
-      RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+      RELEASE_PLEASE_APP_ID: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+      RELEASE_PLEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
     steps:
-      # Fail loudly when the required PAT is missing. The default
-      # GITHUB_TOKEN technically works for opening the release PR, but tag
-      # pushes made with it DO NOT trigger release.yml (GitHub's workflow
-      # loop-prevention policy) — so releases would silently ship without
-      # binaries. Better to block the workflow until the operator configures
-      # the token than to discover this after a silent tag.
-      - name: Require RELEASE_PLEASE_TOKEN
-        if: env.RELEASE_PLEASE_TOKEN == ''
+      # Fail loudly when the App credentials are missing. Without them the
+      # action would fall back to GITHUB_TOKEN, silently producing unsigned
+      # commits that `required_signatures` rejects — and tags that don't
+      # cascade into release.yml. Better to block here than discover after
+      # a silent non-release.
+      - name: Require GitHub App credentials
+        if: env.RELEASE_PLEASE_APP_ID == '' || env.RELEASE_PLEASE_APP_PRIVATE_KEY == ''
         run: |
-          echo "::error title=Missing RELEASE_PLEASE_TOKEN::Configure a fine-grained PAT or GitHub App token with contents:write + pull-requests:write and store it as secret RELEASE_PLEASE_TOKEN. See the README 'Versioning' section."
+          echo "::error title=Missing GitHub App credentials::Configure secrets RELEASE_PLEASE_APP_ID and RELEASE_PLEASE_APP_PRIVATE_KEY (GitHub App with contents:write + pull-requests:write, installed on this repo). See the README 'Versioning' section."
           exit 1
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ env.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ env.RELEASE_PLEASE_APP_PRIVATE_KEY }}
       - name: Run release-please
         uses: googleapis/release-please-action@v4
         with:
-          token: ${{ env.RELEASE_PLEASE_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           release-type: go
           package-name: gno-watchtower
           target-branch: main
