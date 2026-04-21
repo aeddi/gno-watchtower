@@ -375,3 +375,75 @@ func TestExtractRPC_Status_MissingValidatorInfo(t *testing.T) {
 		t.Errorf("block height still emitted, got %v", h)
 	}
 }
+
+// ---- sentry_* extractors (beacon-injected keys)
+
+const sentryStatusJSON = `{
+	"node_info":{"moniker":"sentry-a","network":"test-chain","version":"master.99999+feedbee"},
+	"sync_info":{"latest_block_height":"4500","catching_up":false}
+}`
+
+const sentryNetInfoJSON = `{"n_peers":"25"}`
+
+const sentryConfigJSON = `{"p2p.pex":"true","p2p.max_num_outbound_peers":"20"}`
+
+func TestExtractRPC_SentryStatus(t *testing.T) {
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"sentry_status": sentryStatusJSON}))
+	info := findLine(t, lines, map[string]string{"__name__": "sentinel_sentry_info"})
+	if info == nil {
+		t.Fatal("sentinel_sentry_info not emitted")
+	}
+	if info.Metric["validator"] != "node-1" {
+		t.Errorf("validator label = %q, want node-1", info.Metric["validator"])
+	}
+	if info.Metric["sentry_moniker"] != "sentry-a" {
+		t.Errorf("sentry_moniker = %q, want sentry-a", info.Metric["sentry_moniker"])
+	}
+	if info.Metric["sentry_chain"] != "test-chain" {
+		t.Errorf("sentry_chain = %q", info.Metric["sentry_chain"])
+	}
+	if info.Metric["sentry_version"] != "master.99999+feedbee" {
+		t.Errorf("sentry_version = %q", info.Metric["sentry_version"])
+	}
+	if info.Values[0] != 1 {
+		t.Errorf("info value = %v, want 1", info.Values[0])
+	}
+}
+
+func TestExtractRPC_SentryNetInfo(t *testing.T) {
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"sentry_net_info": sentryNetInfoJSON}))
+	if got := metricNames(t, lines); !slices.Equal(got, []string{"sentinel_rpc_peers_via_sentry"}) {
+		t.Fatalf("sentry_net_info metric names = %v", got)
+	}
+	p := findLine(t, lines, map[string]string{"__name__": "sentinel_rpc_peers_via_sentry"})
+	if p == nil || p.Values[0] != 25 {
+		t.Errorf("peers_via_sentry = %v, want 25", p)
+	}
+	if p != nil && p.Metric["validator"] != "node-1" {
+		t.Errorf("peers_via_sentry.validator = %q", p.Metric["validator"])
+	}
+}
+
+func TestExtractRPC_SentryConfig(t *testing.T) {
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"sentry_config": sentryConfigJSON}))
+	if len(lines) != 2 {
+		t.Fatalf("sentry_config emitted %d lines, want 2", len(lines))
+	}
+	pex := findLine(t, lines, map[string]string{"__name__": "sentinel_sentry_config", "key": "p2p.pex"})
+	if pex == nil {
+		t.Fatal("sentry_config{key=p2p.pex} not found")
+	}
+	if pex.Metric["value"] != "true" {
+		t.Errorf("p2p.pex value = %q, want true", pex.Metric["value"])
+	}
+	if pex.Metric["validator"] != "node-1" {
+		t.Errorf("sentry_config.validator = %q", pex.Metric["validator"])
+	}
+}
+
+func TestExtractRPC_SentryConfig_MalformedSkipped(t *testing.T) {
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"sentry_config": `not-json`}))
+	if len(lines) != 0 {
+		t.Errorf("malformed sentry_config produced %d lines, want 0", len(lines))
+	}
+}

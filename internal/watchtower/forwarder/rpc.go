@@ -54,6 +54,12 @@ func extractRPC(validator string, payload protocol.RPCPayload) []vmLine {
 			lines = appendRPCBlock(lines, validator, ts, raw, log)
 		case "genesis":
 			lines = appendRPCGenesis(lines, validator, ts, raw, log)
+		case "sentry_status":
+			lines = appendRPCSentryStatus(lines, validator, ts, raw, log)
+		case "sentry_net_info":
+			lines = appendRPCSentryNetInfo(lines, validator, ts, raw, log)
+		case "sentry_config":
+			lines = appendRPCSentryConfig(lines, validator, ts, raw, log)
 		}
 	}
 	return lines
@@ -275,6 +281,60 @@ func appendRPCBlock(lines []vmLine, validator string, ts int64, raw json.RawMess
 	}
 	if s, ok := intSample("sentinel_rpc_block_num_txs", map[string]string{"validator": validator}, r.Block.Header.NumTxs, ts, "block", validator, log); ok {
 		lines = append(lines, s)
+	}
+	return lines
+}
+
+// appendRPCSentryStatus emits the sentry's self-view as a Prometheus info
+// metric mirroring sentinel_node_build_info but tagged with the "sentry_"
+// prefix so dashboards can show "validator vs. sentry" columns side-by-side.
+// A missing validator_info (sentries are not validators) degrades gracefully —
+// we only emit the info gauge.
+func appendRPCSentryStatus(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	r, ok := decodeResult[rpcStatus](raw, "sentry_status", validator, log)
+	if !ok {
+		return lines
+	}
+	lines = append(lines, vmSample("sentinel_sentry_info", map[string]string{
+		"validator":      validator,
+		"sentry_chain":   r.NodeInfo.Network,
+		"sentry_moniker": r.NodeInfo.Moniker,
+		"sentry_version": r.NodeInfo.Version,
+	}, 1, ts))
+	return lines
+}
+
+// appendRPCSentryNetInfo emits the sentry's peer count as
+// sentinel_rpc_peers_via_sentry{validator}. Paired on the dashboard with
+// sentinel_rpc_peers (the validator's own view) to surface the direct/via-
+// sentry split.
+func appendRPCSentryNetInfo(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	r, ok := decodeResult[rpcNetInfo](raw, "sentry_net_info", validator, log)
+	if !ok {
+		return lines
+	}
+	if s, ok := intSample("sentinel_rpc_peers_via_sentry", map[string]string{"validator": validator}, r.NPeers, ts, "sentry_net_info", validator, log); ok {
+		lines = append(lines, s)
+	}
+	return lines
+}
+
+// appendRPCSentryConfig mirrors appendNodeConfig (metrics-side) but for config
+// keys read on the sentry host. Emits sentinel_sentry_config{validator, key,
+// value}=1 — the metadata dashboards pivot on key/validator to surface any
+// drift between validator and sentry (e.g. p2p.pex differs).
+func appendRPCSentryConfig(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	var values map[string]string
+	if err := json.Unmarshal(raw, &values); err != nil {
+		log.Debug("rpc: sentry_config unmarshal failed", "validator", validator, "err", err)
+		return lines
+	}
+	for k, v := range values {
+		lines = append(lines, vmSample("sentinel_sentry_config", map[string]string{
+			"validator": validator,
+			"key":       k,
+			"value":     v,
+		}, 1, ts))
 	}
 	return lines
 }
