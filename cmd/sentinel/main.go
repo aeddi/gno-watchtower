@@ -14,6 +14,7 @@ import (
 	"github.com/aeddi/gno-watchtower/internal/sentinel/config"
 	"github.com/aeddi/gno-watchtower/internal/sentinel/doctor"
 	pkglogger "github.com/aeddi/gno-watchtower/pkg/logger"
+	"github.com/aeddi/gno-watchtower/pkg/noise"
 	"github.com/aeddi/gno-watchtower/pkg/version"
 )
 
@@ -31,10 +32,51 @@ func main() {
 		doctorCmd(os.Args[2:])
 	case "version":
 		versionCmd(os.Args[2:])
+	case "keygen":
+		keygenCmd(os.Args[2:])
 	default:
 		usage()
 		os.Exit(1)
 	}
+}
+
+// keygenCmd generates a Noise-XX keypair and writes it to <dir>/privkey +
+// <dir>/pubkey. The public key is also printed to stdout so operators can
+// paste it into the peer's config without `cat`ing the file.
+//
+// Intended for operators setting up a beacon-routed deployment: run this
+// once per sentinel install, hand the public key to whoever manages the
+// beacon (to add to its authorized_keys if mode 3 or 4 is desired).
+func keygenCmd(args []string) {
+	fs := flag.NewFlagSet("keygen", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "Usage: sentinel keygen <keys-dir>")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Generates a Noise static keypair for authenticating to a beacon.")
+		fmt.Fprintln(os.Stderr, "Writes <keys-dir>/privkey (mode 0600) and <keys-dir>/pubkey (mode 0644).")
+		fmt.Fprintln(os.Stderr, "Prints the public key to stdout.")
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	if fs.NArg() < 1 {
+		fs.Usage()
+		os.Exit(1)
+	}
+	dir := fs.Arg(0)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		log.Fatalf("create keys dir %s: %v", dir, err)
+	}
+	kp, err := noise.GenerateKeypair()
+	if err != nil {
+		log.Fatalf("generate keypair: %v", err)
+	}
+	if err := noise.WriteKeypair(dir, kp); err != nil {
+		log.Fatalf("write keypair: %v", err)
+	}
+	fmt.Printf("%x\n", kp.Public)
+	fmt.Fprintf(os.Stderr, "Wrote %s/privkey (mode 0600) and %s/pubkey (mode 0644).\n", dir, dir)
 }
 
 func versionCmd(args []string) {
@@ -147,4 +189,5 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  generate-config <output-file>                      Generate example config file")
 	fmt.Fprintln(os.Stderr, "  doctor <config>                                    Check config and setup")
 	fmt.Fprintln(os.Stderr, "  version [-v]                                       Print the build version")
+	fmt.Fprintln(os.Stderr, "  keygen <keys-dir>                                  Generate Noise keypair for talking to a beacon")
 }
