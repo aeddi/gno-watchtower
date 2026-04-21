@@ -161,6 +161,116 @@ sentinel version   # confirm the install
 
 Go installs into `$GOBIN` (defaults to `$GOPATH/bin`). Pin a version with `@v0.1.0` for reproducibility. Journald support is **not** built in this path unless you set `CGO_ENABLED=1` and have `libsystemd-dev` (or equivalent) installed.
 
+## Beacon setup (optional, for sentry-fronted validators)
+
+If your validator sits behind a sentry node, you can run a **beacon** on the sentry. The sentinel on the validator connects to the beacon over Noise, and the beacon forwards everything upstream to the central watchtower, adding a `sentry_*` view (peer count, build info, p2p.pex) to each RPC tick so Grafana can show "direct vs. via-sentry" side-by-side.
+
+```
+Validator machine                Sentry machine                Central server
+──────────────────               ──────────────               ───────────────
+┌──────────────┐  Noise (TCP)   ┌────────────┐  HTTPS POST   ┌────────────┐
+│   sentinel   │───────────────▶│   beacon   │──────────────▶│ watchtower │
+└──────────────┘                └─────┬──────┘               └────────────┘
+                                      │ GET /status,/net_info
+                                      ▼
+                                 sentry gnoland RPC
+```
+
+The validator keeps the bearer token; the beacon is a dumb pass-through that only rewrites the `/rpc` body. Any tampering with the token is still caught by the watchtower.
+
+### 1. Generate keypairs
+
+Both sides get one static Curve25519 keypair. The public keys are exchanged out-of-band (once, at install time).
+
+```sh
+# On the sentry machine (where the beacon runs)
+beacon keygen /etc/beacon/keys
+# Prints the beacon's public key (hex) — copy it.
+
+# On the validator machine (where the sentinel runs)
+sentinel keygen /etc/sentinel/keys
+# Prints the sentinel's public key (hex) — copy it.
+```
+
+### 2. Configure the sentinel
+
+In the sentinel's `config.toml`:
+
+```toml
+[server]
+url   = "noise://<sentry-host>:8080"
+token = "<bearer-token-from-make-add-validator>"
+
+[beacon]
+keys_dir   = "/etc/sentinel/keys"
+public_key = "<beacon-public-key-hex>"  # optional; pins the beacon's identity
+```
+
+### 3. Configure the beacon
+
+Generate a template and edit:
+
+```sh
+beacon generate-config /etc/beacon/config.toml
+$EDITOR /etc/beacon/config.toml
+```
+
+Set:
+- `[server] url` → `https://<DOMAIN>/watchtower`
+- `[beacon] listen_addr` → `0.0.0.0:8080`
+- `[beacon] keys_dir` → `/etc/beacon/keys`
+- `[rpc] rpc_url` → the sentry's local gnoland RPC (typically `http://localhost:26657`)
+- `[metadata] config_path` → the sentry's `config.toml` (for p2p.pex augmentation)
+
+### Authentication modes
+
+The Noise-XX handshake always provides confidentiality and authentication of the *server* when the sentinel pins `[beacon] public_key`. Peer-of-peer authentication is opt-in on each side:
+
+| sentinel `[beacon] public_key` | beacon `[beacon] authorized_keys` | Result |
+| --- | --- | --- |
+| unset | empty | Encrypted, but either side accepts any peer. Cheapest to deploy; rely on network controls. |
+| set | empty | Sentinel pins the beacon; any sentinel may connect to the beacon. |
+| unset | non-empty | Beacon allowlists sentinel public keys; sentinel accepts whatever beacon identity the TCP hostname resolves to. |
+| set | non-empty | Mutual pinning. Recommended for production. |
+
+### 4. Run the beacon
+
+**Docker:**
+
+```sh
+docker pull ghcr.io/aeddi/gno-watchtower/beacon:latest
+
+docker run -d --name beacon \
+  --restart unless-stopped \
+  -v /etc/beacon/config.toml:/etc/beacon/config.toml:ro \
+  -v /etc/beacon/keys:/etc/beacon/keys:ro \
+  -v /path/to/sentry/config.toml:/sentry-config.toml:ro \
+  -p 8080:8080 \
+  ghcr.io/aeddi/gno-watchtower/beacon:latest
+```
+
+The third mount exposes the sentry's gnoland `config.toml` to the beacon so it can read `p2p.pex` and related keys — point `[metadata] config_path` at `/sentry-config.toml` in that case.
+
+**Native + systemd:**
+
+```sh
+tar -xzf beacon_v0.1.0_linux_amd64.tar.gz
+sudo install -m 0755 beacon /usr/local/bin/beacon
+```
+
+```ini
+[Unit]
+Description=Gnoland Beacon
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/beacon run --log-format=journal /etc/beacon/config.toml
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
 ## Adding and removing validators
 
 Run these commands from the `deploy/` directory.
