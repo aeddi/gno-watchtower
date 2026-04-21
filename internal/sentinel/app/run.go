@@ -71,7 +71,16 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 	appLog := log.With("component", "app")
 	senderLog := log.With("component", "sender")
 	st := stats.New()
-	s := sender.New(cfg.Server.URL, cfg.Server.Token)
+	noiseCfg, err := cfg.NoiseConfig()
+	if err != nil {
+		appLog.Error("load beacon keys", "err", err)
+		return
+	}
+	s, err := sender.New(cfg.Server.URL, cfg.Server.Token, noiseCfg)
+	if err != nil {
+		appLog.Error("init sender", "err", err)
+		return
+	}
 
 	var wg sync.WaitGroup
 	defer wg.Wait()

@@ -7,12 +7,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+
+	"github.com/aeddi/gno-watchtower/pkg/noise"
 )
 
 type Sender struct {
@@ -21,12 +25,46 @@ type Sender struct {
 	client    *http.Client
 }
 
-func New(serverURL, token string) *Sender {
+// New builds a Sender. When serverURL uses the noise:// scheme, noiseCfg must
+// be non-nil and the sender routes requests through a Noise-wrapped
+// net.Conn; otherwise standard HTTPS is used.
+//
+// For noise://, the URL seen by the http.Client is internally rewritten to
+// http:// — the transport layer is encrypted by Noise, so the HTTP layer runs
+// in plaintext over the authenticated stream. The URL scheme is a routing
+// hint, nothing more; the real host/port in the URL still drives which TCP
+// peer the sender connects to.
+func New(serverURL, token string, noiseCfg *noise.Config) (*Sender, error) {
+	if strings.HasPrefix(serverURL, "noise://") {
+		if noiseCfg == nil {
+			return nil, fmt.Errorf("server.url is noise:// but no beacon keypair was configured")
+		}
+		// Rewrite noise://host:port/path → http://host:port/path for the
+		// http.Client; the Transport below gives it a Noise-wrapped conn.
+		rewritten := "http://" + strings.TrimPrefix(serverURL, "noise://")
+		cfg := *noiseCfg // copy so the caller's struct isn't retained
+		transport := &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return noise.Dial(ctx, network, addr, cfg)
+			},
+			// Reuse one persistent Noise session across posts — handshake is
+			// amortised over all the sentinel's traffic.
+			MaxIdleConns:        4,
+			MaxIdleConnsPerHost: 2,
+			IdleConnTimeout:     5 * time.Minute,
+			DisableCompression:  true, // bodies are already handled by sender (zstd/plain)
+		}
+		return &Sender{
+			serverURL: rewritten,
+			token:     token,
+			client:    &http.Client{Transport: transport, Timeout: 30 * time.Second},
+		}, nil
+	}
 	return &Sender{
 		serverURL: serverURL,
 		token:     token,
 		client:    &http.Client{Timeout: 30 * time.Second},
-	}
+	}, nil
 }
 
 // SendRaw makes a single POST attempt with raw bytes and a specific Content-Type.
