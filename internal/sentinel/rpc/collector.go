@@ -17,36 +17,44 @@ type statusResult struct {
 	} `json:"sync_info"`
 }
 
+const defaultGenesisRefreshInterval = 12 * time.Hour
+
 // Collector polls gnoland RPC endpoints and emits RPCPayloads to out.
 // Unchanged responses (by hash) are omitted from the payload (delta).
 // /block is always emitted when a new block is detected.
-// /genesis is static per chain and fetched once at first successful poll.
+// /genesis is re-fetched and re-emitted every genesisRefreshInterval.
 //
-// All fields (notably lastHeight, lastDump, genesisSent, genesisFailed) are
-// read and written exclusively from collect(), which is itself called from a
-// single goroutine driven by Run's ticker. No synchronisation needed; future
+// All fields (notably lastHeight, lastDump, lastGenesisSentAt, genesisFailed)
+// are read and written exclusively from collect(), which is itself called from
+// a single goroutine driven by Run's ticker. No synchronisation needed; future
 // readers must preserve this invariant.
 type Collector struct {
-	client        *Client
-	delta         *delta.Delta
-	pollInterval  time.Duration
-	dumpInterval  time.Duration
-	out           chan<- protocol.RPCPayload
-	lastHeight    int64
-	lastDump      time.Time
-	genesisSent   bool
-	genesisFailed int // # of consecutive failures; throttles log level
-	log           *slog.Logger
+	client                 *Client
+	delta                  *delta.Delta
+	pollInterval           time.Duration
+	dumpInterval           time.Duration
+	genesisRefreshInterval time.Duration
+	out                    chan<- protocol.RPCPayload
+	lastHeight             int64
+	lastDump               time.Time
+	lastGenesisSentAt      time.Time
+	genesisFailed          int // # of consecutive failures; throttles log level
+	log                    *slog.Logger
 }
 
-func NewCollector(client *Client, pollInterval, dumpInterval time.Duration, out chan<- protocol.RPCPayload, log *slog.Logger) *Collector {
+func NewCollector(client *Client, pollInterval, dumpInterval, genesisRefreshInterval time.Duration, out chan<- protocol.RPCPayload, log *slog.Logger) *Collector {
+	gri := genesisRefreshInterval
+	if gri <= 0 {
+		gri = defaultGenesisRefreshInterval
+	}
 	return &Collector{
-		client:       client,
-		delta:        delta.NewDelta(),
-		pollInterval: pollInterval,
-		dumpInterval: dumpInterval,
-		out:          out,
-		log:          log.With("component", "rpc_collector"),
+		client:                 client,
+		delta:                  delta.NewDelta(),
+		pollInterval:           pollInterval,
+		dumpInterval:           dumpInterval,
+		genesisRefreshInterval: gri,
+		out:                    out,
+		log:                    log.With("component", "rpc_collector"),
 	}
 }
 
@@ -133,16 +141,17 @@ func (c *Collector) collect(ctx context.Context) error {
 		}
 	}
 
-	// /genesis is static per chain — fetch once and never again. Transient
-	// failures retry each tick; to avoid log spam when a node persistently
-	// can't reach /genesis, we emit Warn once then drop to Debug.
-	if !c.genesisSent {
+	// /genesis is re-fetched and re-emitted every genesisRefreshInterval so
+	// the dashboard stat cards stay populated across restarts and long sessions.
+	// Transient failures retry each tick; log level throttles after the first.
+	if c.lastGenesisSentAt.IsZero() || time.Since(c.lastGenesisSentAt) >= c.genesisRefreshInterval {
 		raw, err := c.client.Genesis(ctx)
 		switch {
 		case err == nil:
 			payload.Data["genesis"] = raw
 			changed = append(changed, "genesis")
-			c.genesisSent = true
+			c.lastGenesisSentAt = time.Now()
+			c.genesisFailed = 0
 		case c.genesisFailed == 0:
 			c.log.Warn("endpoint error", "endpoint", "genesis", "err", err)
 			c.genesisFailed++

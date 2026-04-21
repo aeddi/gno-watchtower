@@ -110,6 +110,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 			client,
 			cfg.RPC.PollInterval.Duration,
 			cfg.RPC.DumpConsensusStateInterval.Duration,
+			cfg.RPC.GenesisRefreshInterval.Duration,
 			rpcOut,
 			log,
 		)
