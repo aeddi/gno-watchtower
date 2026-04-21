@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -483,4 +484,83 @@ func zstdCompress(data []byte) ([]byte, error) {
 	}
 	w.Close()
 	return buf.Bytes(), nil
+}
+
+// TestForwardLogs_DecompressedBombRejected exercises the zstd-bomb guard: a
+// small compressed payload that expands past maxLogsDecompressedBytes (500 MiB)
+// must be rejected with an error, not OOM the process.
+func TestForwardLogs_DecompressedBombRejected(t *testing.T) {
+	// Compress ~600 MiB of zeros — zstd collapses this to a few hundred bytes.
+	payload := bytes.Repeat([]byte{0}, 600<<20)
+	compressed, err := zstdCompress(payload)
+	if err != nil {
+		t.Fatalf("zstdCompress bomb: %v", err)
+	}
+	if len(compressed) > 1<<20 {
+		t.Fatalf("sanity: bomb compressed too large (%d bytes)", len(compressed))
+	}
+
+	// A Loki server that should never be called.
+	loki := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Loki must not be called when decompression exceeds the cap")
+	}))
+	defer loki.Close()
+
+	f := forwarder.New("http://vm-unused:8428", loki.URL, nil)
+	err = f.ForwardLogs(context.Background(), "val-01", compressed, "")
+	if err == nil {
+		t.Fatal("expected ForwardLogs to reject oversized decompressed payload")
+	}
+	if !strings.Contains(err.Error(), "exceeds") {
+		t.Errorf("error should mention size ceiling; got: %v", err)
+	}
+}
+
+// TestForwardLogs_ClockSkewClampedToNow covers the creation_grace_period gate:
+// a sentinel with a wildly off clock would have its batch rejected by Loki; we
+// clamp obviously-skewed timestamps to the watchtower's own clock before push.
+func TestForwardLogs_ClockSkewClampedToNow(t *testing.T) {
+	var lokiBody []byte
+	loki := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lokiBody, _ = io.ReadAll(r.Body)
+	}))
+	defer loki.Close()
+
+	// Line carries a ts 1 hour in the future — well past the 10-min guard.
+	farFuture := time.Now().Add(1 * time.Hour).Unix()
+	line := fmt.Sprintf(`{"level":"info","ts":%d,"msg":"hello from the future","module":"rpc-server"}`, farFuture)
+	payload := protocol.LogPayload{
+		Level: "info",
+		Lines: []json.RawMessage{json.RawMessage(line)},
+	}
+	body, _ := json.Marshal(payload)
+	compressed, _ := zstdCompress(body)
+
+	before := time.Now()
+	f := forwarder.New("http://vm-unused:8428", loki.URL, nil)
+	if err := f.ForwardLogs(context.Background(), "val-01", compressed, ""); err != nil {
+		t.Fatalf("ForwardLogs: %v", err)
+	}
+	after := time.Now()
+
+	var push struct {
+		Streams []struct {
+			Stream map[string]string `json:"stream"`
+			Values [][]string        `json:"values"`
+		} `json:"streams"`
+	}
+	if err := json.Unmarshal(lokiBody, &push); err != nil {
+		t.Fatalf("parse loki body: %v", err)
+	}
+	if len(push.Streams) != 1 || len(push.Streams[0].Values) != 1 {
+		t.Fatalf("expected 1 stream with 1 value, got %+v", push)
+	}
+	gotNano, err := strconv.ParseInt(push.Streams[0].Values[0][0], 10, 64)
+	if err != nil {
+		t.Fatalf("parse ts: %v", err)
+	}
+	got := time.Unix(0, gotNano)
+	if got.Before(before) || got.After(after) {
+		t.Errorf("ts not clamped to now: got %v, want between %v and %v", got, before, after)
+	}
 }

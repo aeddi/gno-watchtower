@@ -178,8 +178,30 @@ func bearerToken(r *http.Request) string {
 	return token
 }
 
-// remoteIP extracts the IP from r.RemoteAddr (host:port).
+// remoteIP returns the caller's IP for ban bookkeeping.
+//
+// The watchtower runs behind a trusted reverse proxy (Caddy in the reference
+// deploy) that terminates TLS and appends the connecting IP to
+// X-Forwarded-For. Without this extraction every sentinel would appear to
+// originate from Caddy's Docker-internal IP, collapsing the per-IP ban into a
+// single fleet-wide bucket — one bad validator could get everyone banned, or
+// nobody at all.
+//
+// We take the rightmost XFF entry because RFC-compliant proxies append their
+// view of the connecting IP as the last hop. A client-supplied XFF can prepend
+// arbitrary fakes at the front, but cannot tamper with the entry added by our
+// trusted proxy.
+//
+// Fallback: when no XFF header is present (direct connection, or a proxy that
+// doesn't set it), use r.RemoteAddr.
 func remoteIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		last := strings.TrimSpace(parts[len(parts)-1])
+		if last != "" {
+			return last
+		}
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr

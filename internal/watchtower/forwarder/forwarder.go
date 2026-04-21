@@ -168,9 +168,20 @@ type lokiStream struct {
 	Values [][]string        `json:"values"`
 }
 
+// Asymmetric clock-skew window for Loki-bound timestamps. Mirrors Loki's own
+// ingester gates: reject_old_samples_max_age (past) and creation_grace_period
+// (future). A sentinel whose clock drifts past either bound would have its
+// whole batch rejected; we clamp to now instead.
+const (
+	maxLogsTsFutureSkew = 10 * time.Minute
+	maxLogsTsPastSkew   = 168 * time.Hour
+)
+
 // toLokiPush converts a LogPayload to the Loki push API format.
-// Timestamps are extracted from the "ts" field of each line (nanoseconds since epoch).
-// Lines without a parseable "ts" field use the current time.
+// Timestamps are extracted from the "ts" field of each line (nanoseconds since
+// epoch). Lines without a parseable "ts" field, or whose ts would fall outside
+// Loki's own ingester gates (see maxLogsTsPastSkew / maxLogsTsFutureSkew), use
+// the watchtower's receive time.
 //
 // Lines are split across streams by their "module" field so that `module`
 // becomes an indexed Loki label (required for Grafana's label_values(module)
@@ -179,20 +190,30 @@ type lokiStream struct {
 // guarantees non-JSON stdout arrives here tagged as module="sentinel-raw".
 func toLokiPush(validator string, payload protocol.LogPayload) (*lokiPush, error) {
 	now := time.Now()
-	byModule := make(map[string][][]string)
+	type entry struct {
+		nano int64
+		raw  string
+	}
+	byModule := make(map[string][]entry)
 	for _, raw := range payload.Lines {
 		mod, ts := extractModuleAndTS(raw, now)
-		byModule[mod] = append(byModule[mod], []string{
-			strconv.FormatInt(ts.UnixNano(), 10),
-			string(raw),
-		})
+		if ts.Before(now.Add(-maxLogsTsPastSkew)) || ts.After(now.Add(maxLogsTsFutureSkew)) {
+			ts = now
+		}
+		byModule[mod] = append(byModule[mod], entry{nano: ts.UnixNano(), raw: string(raw)})
 	}
 	streams := make([]lokiStream, 0, len(byModule))
-	for mod, values := range byModule {
+	for mod, entries := range byModule {
 		// Loki rejects out-of-order entries per stream with 400. Upstream
 		// sentinel batches preserve order from docker, but sort defensively so
-		// a future reordering upstream can't silently break ingestion.
-		slices.SortFunc(values, func(a, b []string) int { return cmp.Compare(a[0], b[0]) })
+		// a future reordering upstream can't silently break ingestion. Sort
+		// numerically on the parsed nano rather than the formatted string
+		// because future sub-1970 timestamps would sort incorrectly as strings.
+		slices.SortFunc(entries, func(a, b entry) int { return cmp.Compare(a.nano, b.nano) })
+		values := make([][]string, len(entries))
+		for i, e := range entries {
+			values[i] = []string{strconv.FormatInt(e.nano, 10), e.raw}
+		}
 		streams = append(streams, lokiStream{
 			Stream: map[string]string{
 				"validator": validator,
@@ -264,15 +285,30 @@ func (f *Forwarder) post(ctx context.Context, url string, body []byte, contentTy
 	return nil
 }
 
-// zstdDecoder is a reusable stateless decoder; DecodeAll is safe for concurrent use.
-var zstdDecoder = func() *zstd.Decoder {
-	dec, err := zstd.NewReader(nil)
-	if err != nil {
-		panic("init zstd decoder: " + err.Error())
-	}
-	return dec
-}()
+// maxLogsDecompressedBytes caps the expanded size of a sentinel log payload.
+// zstd bombs can expand compressed input 100× or more; we accept up to 50 MiB
+// compressed (see handlers.maxBodyBytes) so bound the decompressed side at
+// ~10× that — generous for legitimate debug-mode batches, hostile to zip bombs.
+const maxLogsDecompressedBytes = 500 << 20
 
+// zstdDecompress decompresses zstd-encoded bytes with a hard cap on output
+// size. A new Decoder is built per call (stateful stream readers aren't safe
+// for concurrent reuse); the per-call init cost is negligible next to the
+// network round-trip the payload already traversed.
 func zstdDecompress(data []byte) ([]byte, error) {
-	return zstdDecoder.DecodeAll(data, nil)
+	dec, err := zstd.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("zstd: %w", err)
+	}
+	defer dec.Close()
+	// Read one byte past the ceiling so we can distinguish "exactly the limit"
+	// from "tried to exceed the limit".
+	out, err := io.ReadAll(io.LimitReader(dec, maxLogsDecompressedBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("zstd read: %w", err)
+	}
+	if int64(len(out)) > maxLogsDecompressedBytes {
+		return nil, fmt.Errorf("zstd: decompressed payload exceeds %d bytes", maxLogsDecompressedBytes)
+	}
+	return out, nil
 }

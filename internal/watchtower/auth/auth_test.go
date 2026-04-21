@@ -99,6 +99,88 @@ func TestAuth_BansIPAfterThreshold(t *testing.T) {
 	}
 }
 
+func TestAuth_BanIsKeyedOnXForwardedForRightmost(t *testing.T) {
+	// Behind a trusted proxy (Caddy), r.RemoteAddr is always the same
+	// Docker-internal IP. The ban must segregate by the proxy-appended
+	// XFF entry so one misbehaving validator doesn't poison the bucket
+	// for every other validator on the same proxy.
+	a := auth.New(map[string]config.ValidatorConfig{
+		"val-01": {Token: "good-token"},
+	}, 2, time.Minute) // ban after 2 failures
+
+	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	const proxyAddr = "172.18.0.2:52222" // stand-in for the Docker-internal Caddy IP
+
+	// Two failures from client 10.0.0.1 via the proxy — should ban that client.
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+		req.Header.Set("Authorization", "Bearer bad-token")
+		req.Header.Set("X-Forwarded-For", "10.0.0.1")
+		req.RemoteAddr = proxyAddr
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	// A different client via the same proxy must NOT be banned.
+	reqOther := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+	reqOther.Header.Set("Authorization", "Bearer good-token")
+	reqOther.Header.Set("X-Forwarded-For", "10.0.0.2")
+	reqOther.RemoteAddr = proxyAddr
+	rrOther := httptest.NewRecorder()
+	handler.ServeHTTP(rrOther, reqOther)
+	if rrOther.Code != http.StatusOK {
+		t.Fatalf("want 200 for uninvolved client via same proxy, got %d", rrOther.Code)
+	}
+
+	// The original client must still be banned.
+	reqBanned := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+	reqBanned.Header.Set("Authorization", "Bearer good-token")
+	reqBanned.Header.Set("X-Forwarded-For", "10.0.0.1")
+	reqBanned.RemoteAddr = proxyAddr
+	rrBanned := httptest.NewRecorder()
+	handler.ServeHTTP(rrBanned, reqBanned)
+	if rrBanned.Code != http.StatusTooManyRequests {
+		t.Errorf("want 429 for banned client, got %d", rrBanned.Code)
+	}
+}
+
+func TestAuth_XForwardedFor_TakesRightmostEntry(t *testing.T) {
+	// Client-supplied XFF prefix could spoof arbitrary upstream IPs; the
+	// proxy-appended rightmost entry is the authoritative client IP.
+	a := auth.New(map[string]config.ValidatorConfig{
+		"val-01": {Token: "good-token"},
+	}, 2, time.Minute)
+
+	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Trip the real-client ban by sending 2 bad-token requests whose XFF
+	// rightmost is 10.0.0.1.
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+		req.Header.Set("Authorization", "Bearer bad-token")
+		// Spoofed leftmost entries should be ignored.
+		req.Header.Set("X-Forwarded-For", "192.0.2.99, 203.0.113.99, 10.0.0.1")
+		req.RemoteAddr = "172.18.0.2:1234"
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	// Now a request from 10.0.0.1 (rightmost) should be banned even with a
+	// valid token — proving we key on the rightmost entry.
+	req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+	req.Header.Set("Authorization", "Bearer good-token")
+	req.Header.Set("X-Forwarded-For", "10.0.0.1")
+	req.RemoteAddr = "172.18.0.2:1234"
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusTooManyRequests {
+		t.Errorf("want 429 keyed on rightmost XFF, got %d", rr.Code)
+	}
+}
+
 func TestAuth_BanExpires(t *testing.T) {
 	a := auth.New(map[string]config.ValidatorConfig{
 		"val-01": {Token: "good-token"},

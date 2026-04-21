@@ -158,6 +158,14 @@ func runCmd(args []string) {
 	httpSrv := &http.Server{
 		Addr:    cfg.Server.ListenAddr,
 		Handler: srv.Handler(),
+		// Slowloris / hung-connection defenses. ReadTimeout is generous to
+		// cover worst-case 50 MiB batch uploads on a throttled link
+		// (~420 KB/s × 120s). Bodies larger than 50 MiB are rejected via
+		// http.MaxBytesReader in the handler, so 120s is a comfortable ceiling.
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       120 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {
