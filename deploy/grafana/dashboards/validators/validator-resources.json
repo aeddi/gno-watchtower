@@ -1,5 +1,7 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -51,37 +53,66 @@
       "type": "row",
       "title": "Container (validator process)",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 100,
       "panels": []
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "CPU seconds consumed by the validator container, rendered as cores. Reported by the sentinel sidecar via docker.sock.",
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "min": 0,
           "decimals": 2,
-          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1 },
-          "color": { "mode": "palette-classic" }
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 1
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
       "id": 1,
       "options": {
         "legend": {
-          "calcs": ["last", "mean", "max"],
+          "calcs": [
+            "last",
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
-        "tooltip": { "mode": "all", "sort": "desc" }
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "sum by (validator) (rate(sentinel_container_cpu_usage_seconds_total{validator=~\"$validator\"}[$__rate_interval]))",
           "legendFormat": "{{validator}}",
           "refId": "A"
@@ -91,32 +122,56 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "description": "Working set = usage − inactive_file (mirrors cAdvisor's working set). Resident memory actively used by the process.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "description": "Working set = usage \u2212 inactive_file (mirrors cAdvisor's working set). Resident memory actively used by the process.",
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
           "min": 0,
           "decimals": 1,
-          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1 },
-          "color": { "mode": "palette-classic" }
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 1
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
       "id": 2,
       "options": {
         "legend": {
-          "calcs": ["last", "mean", "max"],
+          "calcs": [
+            "last",
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
-        "tooltip": { "mode": "all", "sort": "desc" }
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "max by (validator) (sentinel_container_memory_working_set_bytes{validator=~\"$validator\"})",
           "legendFormat": "{{validator}}",
           "refId": "A"
@@ -126,32 +181,55 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Inbound network throughput for the validator container, summed across all its interfaces.",
       "fieldConfig": {
         "defaults": {
           "unit": "Bps",
           "min": 0,
           "decimals": 1,
-          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
-          "color": { "mode": "palette-classic" }
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
       "id": 3,
       "options": {
         "legend": {
-          "calcs": ["last", "mean"],
+          "calcs": [
+            "last",
+            "mean"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
-        "tooltip": { "mode": "all", "sort": "desc" }
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "sum by (validator) (rate(sentinel_container_network_receive_bytes_total{validator=~\"$validator\"}[$__rate_interval]))",
           "legendFormat": "{{validator}}",
           "refId": "A"
@@ -161,32 +239,55 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Outbound network throughput for the validator container, summed across all its interfaces.",
       "fieldConfig": {
         "defaults": {
           "unit": "Bps",
           "min": 0,
           "decimals": 1,
-          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
-          "color": { "mode": "palette-classic" }
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
       "id": 4,
       "options": {
         "legend": {
-          "calcs": ["last", "mean"],
+          "calcs": [
+            "last",
+            "mean"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
-        "tooltip": { "mode": "all", "sort": "desc" }
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "sum by (validator) (rate(sentinel_container_network_transmit_bytes_total{validator=~\"$validator\"}[$__rate_interval]))",
           "legendFormat": "{{validator}}",
           "refId": "A"
@@ -196,44 +297,90 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Snapshot of current container usage per validator.",
       "fieldConfig": {
         "defaults": {
-          "custom": { "align": "auto", "cellOptions": { "type": "auto" } },
-          "color": { "mode": "thresholds" }
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          },
+          "color": {
+            "mode": "thresholds"
+          }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "memory" },
+            "matcher": {
+              "id": "byName",
+              "options": "memory"
+            },
             "properties": [
-              { "id": "unit", "value": "bytes" },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
               {
                 "id": "custom.cellOptions",
-                "value": { "type": "color-background", "mode": "gradient" }
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
               },
-              { "id": "color", "value": { "mode": "continuous-BlYlRd" } }
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-BlYlRd"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "cpu" },
+            "matcher": {
+              "id": "byName",
+              "options": "cpu"
+            },
             "properties": [
-              { "id": "unit", "value": "percentunit" },
-              { "id": "decimals", "value": 3 }
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              }
             ]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 17 },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
       "id": 5,
       "options": {
         "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "memory" }]
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "memory"
+          }
+        ]
       },
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "sum by (validator) (rate(sentinel_container_cpu_usage_seconds_total{validator=~\"$validator\"}[$__rate_interval]))",
           "legendFormat": "{{validator}}",
           "refId": "A",
@@ -241,7 +388,10 @@
           "instant": true
         },
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "max by (validator) (sentinel_container_memory_working_set_bytes{validator=~\"$validator\"})",
           "legendFormat": "{{validator}}",
           "refId": "B",
@@ -254,7 +404,10 @@
       "transformations": [
         {
           "id": "joinByField",
-          "options": { "byField": "validator", "mode": "outer" }
+          "options": {
+            "byField": "validator",
+            "mode": "outer"
+          }
         },
         {
           "id": "organize",
@@ -267,13 +420,28 @@
               "instance 1": true,
               "instance 2": true
             },
-            "renameByName": { "Value #A": "cpu", "Value #B": "memory" },
-            "indexByName": { "validator": 0, "cpu": 1, "memory": 2 }
+            "renameByName": {
+              "Value #A": "cpu",
+              "Value #B": "memory"
+            },
+            "indexByName": {
+              "validator": 0,
+              "cpu": 1,
+              "memory": 2
+            }
           }
         },
         {
           "id": "filterFieldsByName",
-          "options": { "include": { "names": ["validator", "cpu", "memory"] } }
+          "options": {
+            "include": {
+              "names": [
+                "validator",
+                "cpu",
+                "memory"
+              ]
+            }
+          }
         }
       ]
     },
@@ -281,12 +449,20 @@
       "type": "row",
       "title": "Host (validator machine)",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
       "id": 101,
       "panels": []
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Total CPU utilisation of the validator's host machine (all cores averaged). Reported by the sentinel via gopsutil.",
       "fieldConfig": {
         "defaults": {
@@ -294,25 +470,46 @@
           "min": 0,
           "max": 100,
           "decimals": 1,
-          "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 1 },
-          "color": { "mode": "palette-classic" }
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 1
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
       "id": 6,
       "options": {
         "legend": {
-          "calcs": ["last", "mean", "max"],
+          "calcs": [
+            "last",
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
-        "tooltip": { "mode": "all", "sort": "desc" }
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "max by (validator) (sentinel_host_cpu_percent{validator=~\"$validator\"})",
           "legendFormat": "{{validator}}",
           "refId": "A"
@@ -322,49 +519,88 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Used vs total RAM on the validator's host. Used is the kernel-reported active memory.",
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
           "min": 0,
           "decimals": 1,
-          "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 1 },
-          "color": { "mode": "palette-classic" }
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 1
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": [
           {
-            "matcher": { "id": "byRegexp", "options": ".*total$" },
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*total$"
+            },
             "properties": [
               {
                 "id": "custom.lineStyle",
-                "value": { "dash": [10, 10], "fill": "dash" }
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
               },
-              { "id": "custom.fillOpacity", "value": 0 }
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
             ]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
       "id": 7,
       "options": {
         "legend": {
-          "calcs": ["last", "mean", "max"],
+          "calcs": [
+            "last",
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
-        "tooltip": { "mode": "all", "sort": "desc" }
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "max by (validator) (sentinel_host_memory_used_bytes{validator=~\"$validator\"})",
           "legendFormat": "{{validator}} used",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "max by (validator) (sentinel_host_memory_total_bytes{validator=~\"$validator\"})",
           "legendFormat": "{{validator}} total",
           "refId": "B"
@@ -374,49 +610,88 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Root filesystem usage on the validator's host.",
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
           "min": 0,
           "decimals": 1,
-          "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 1 },
-          "color": { "mode": "palette-classic" }
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 1
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": [
           {
-            "matcher": { "id": "byRegexp", "options": ".*total$" },
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*total$"
+            },
             "properties": [
               {
                 "id": "custom.lineStyle",
-                "value": { "dash": [10, 10], "fill": "dash" }
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
               },
-              { "id": "custom.fillOpacity", "value": 0 }
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
             ]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 34
+      },
       "id": 8,
       "options": {
         "legend": {
-          "calcs": ["last", "mean", "max"],
+          "calcs": [
+            "last",
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
-        "tooltip": { "mode": "all", "sort": "desc" }
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "max by (validator) (sentinel_host_disk_used_bytes{validator=~\"$validator\"})",
           "legendFormat": "{{validator}} used",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "max by (validator) (sentinel_host_disk_total_bytes{validator=~\"$validator\"})",
           "legendFormat": "{{validator}} total",
           "refId": "B"
@@ -426,32 +701,55 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Inbound network throughput across all host interfaces.",
       "fieldConfig": {
         "defaults": {
           "unit": "Bps",
           "min": 0,
           "decimals": 1,
-          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
-          "color": { "mode": "palette-classic" }
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 34
+      },
       "id": 9,
       "options": {
         "legend": {
-          "calcs": ["last", "mean"],
+          "calcs": [
+            "last",
+            "mean"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
-        "tooltip": { "mode": "all", "sort": "desc" }
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "sum by (validator) (rate(sentinel_host_network_receive_bytes_total{validator=~\"$validator\"}[$__rate_interval]))",
           "legendFormat": "{{validator}}",
           "refId": "A"
@@ -461,32 +759,55 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Outbound network throughput across all host interfaces.",
       "fieldConfig": {
         "defaults": {
           "unit": "Bps",
           "min": 0,
           "decimals": 1,
-          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
-          "color": { "mode": "palette-classic" }
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 42
+      },
       "id": 10,
       "options": {
         "legend": {
-          "calcs": ["last", "mean"],
+          "calcs": [
+            "last",
+            "mean"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
-        "tooltip": { "mode": "all", "sort": "desc" }
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "sum by (validator) (rate(sentinel_host_network_transmit_bytes_total{validator=~\"$validator\"}[$__rate_interval]))",
           "legendFormat": "{{validator}}",
           "refId": "A"
@@ -496,7 +817,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Container memory working set as a fraction of its cgroup limit. Values above ~0.9 signal OOM risk.",
       "fieldConfig": {
         "defaults": {
@@ -504,25 +828,46 @@
           "min": 0,
           "max": 1,
           "decimals": 2,
-          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1 },
-          "color": { "mode": "palette-classic" }
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 1
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 42
+      },
       "id": 11,
       "options": {
         "legend": {
-          "calcs": ["last", "mean", "max"],
+          "calcs": [
+            "last",
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
-        "tooltip": { "mode": "all", "sort": "desc" }
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "expr": "max by (validator) (sentinel_container_memory_working_set_bytes{validator=~\"$validator\"}) / clamp_min(max by (validator) (sentinel_container_memory_limit_bytes{validator=~\"$validator\"} > 0), 1)",
           "legendFormat": "{{validator}}",
           "refId": "A"
@@ -532,14 +877,28 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "30s",
+  "refresh": "10s",
   "schemaVersion": 39,
-  "tags": ["validator", "resources"],
+  "tags": [
+    "validator",
+    "resources"
+  ],
   "templating": {
     "list": [
       {
-        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
-        "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoriametrics"
+        },
         "definition": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)",
         "includeAll": true,
         "label": "Validator",
@@ -558,7 +917,10 @@
       }
     ]
   },
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "Validator Resources",

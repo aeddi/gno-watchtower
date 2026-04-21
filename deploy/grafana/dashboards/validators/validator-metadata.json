@@ -270,7 +270,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (app_hash) (max by (validator, app_hash) (last_over_time(sentinel_genesis_info[15m]))))",
+          "expr": "count(count by (app_hash) (max by (validator, app_hash) (last_over_time(sentinel_genesis_info[1d]))))",
           "legendFormat": "distinct values",
           "refId": "A"
         }
@@ -315,7 +315,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (genesis_time) (max by (validator, genesis_time) (last_over_time(sentinel_genesis_info[15m]))))",
+          "expr": "count(count by (genesis_time) (max by (validator, genesis_time) (last_over_time(sentinel_genesis_info[1d]))))",
           "legendFormat": "distinct values",
           "refId": "A"
         }
@@ -360,7 +360,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (chain_id) (max by (validator, chain_id) (last_over_time(sentinel_genesis_info[15m]))))",
+          "expr": "count(count by (chain_id) (max by (validator, chain_id) (last_over_time(sentinel_genesis_info[1d]))))",
           "legendFormat": "distinct values",
           "refId": "A"
         }
@@ -549,7 +549,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"application.prune_strategy\"}[15m]))))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"application.prune_strategy\"}[1d]))))",
           "legendFormat": "prune_strategy",
           "refId": "A"
         }
@@ -594,7 +594,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"consensus.peer_gossip_sleep_duration\"}[15m]))))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"consensus.peer_gossip_sleep_duration\"}[1d]))))",
           "legendFormat": "peer_gossip_sleep_duration",
           "refId": "A"
         }
@@ -639,7 +639,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"consensus.timeout_commit\"}[15m]))))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"consensus.timeout_commit\"}[1d]))))",
           "legendFormat": "timeout_commit",
           "refId": "A"
         }
@@ -684,7 +684,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"mempool.size\"}[15m]))))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"mempool.size\"}[1d]))))",
           "legendFormat": "size",
           "refId": "A"
         }
@@ -729,7 +729,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.flush_throttle_timeout\"}[15m]))))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.flush_throttle_timeout\"}[1d]))))",
           "legendFormat": "flush_throttle_timeout",
           "refId": "A"
         }
@@ -774,7 +774,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.max_num_outbound_peers\"}[15m]))))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.max_num_outbound_peers\"}[1d]))))",
           "legendFormat": "max_num_outbound_peers",
           "refId": "A"
         }
@@ -819,7 +819,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.pex\"}[15m]))))",
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.pex\"}[1d]))))",
           "legendFormat": "pex",
           "refId": "A"
         }
