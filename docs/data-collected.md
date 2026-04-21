@@ -46,6 +46,24 @@ sentinel polls 6 RPC endpoints in `internal/sentinel/rpc/collector.go` plus
 paths — verified with `grep -rn "metrics.<Name>."` at the locations cited
 below.
 
+### Optional beacon hop (sentry-fronted validators)
+
+When the validator sits behind a sentry, the sentinel connects to a **beacon**
+on the sentry over Noise-encrypted TCP (`pkg/noise`); the beacon forwards all
+five pipelines to the watchtower over HTTPS, unchanged and without re-
+authenticating (the sentinel's bearer token flows through untouched). One
+exception: the RPC pipeline's payload is augmented in-flight — the beacon
+fetches the sentry's own `/status`, `/net_info`, and config keys and injects
+them as `sentry_status`, `sentry_net_info`, `sentry_config` alongside the
+validator-side keys (`internal/beacon/augment/augment.go`). These surface as
+the `sentinel_sentry_*` metric family — see
+[Sentry identity & view](#sentry-identity--view-optional-beacon-only).
+
+Auth is unchanged: the watchtower still authenticates by bearer token, so a
+compromised beacon cannot impersonate the validator. The beacon's own Noise
+identity is optionally pinned on both sides (sentinel pins the beacon's
+pubkey; beacon allowlists accepted sentinel pubkeys) — see README.
+
 ## Signal catalogue
 
 Column key for **Preferred**:
@@ -62,6 +80,24 @@ Column key for **Preferred**:
 | `catching_up` flag           | `/status.sync_info.catching_up` (3s)            | `sentinel_rpc_catching_up`                                     | **RPC**   | Only source; critical signal.                             |
 | Own voting power             | `/status.validator_info.voting_power` (3s)      | `sentinel_rpc_validator_voting_power`                          | **RPC**   | Only source.                                              |
 | Chain ID / moniker / version | `/status.node_info.{network, moniker, version}` | `sentinel_node_build_info{chain_id,moniker,version}` (value=1) | **RPC**   | Emitted as a Prometheus info-metric on every status poll. |
+
+### Sentry identity & view (optional, beacon-only)
+
+Signals injected by the beacon's `/rpc` augmenter
+(`internal/beacon/augment/augment.go`) on every tick that carries
+`net_info`. Present only when a beacon fronts the validator; absent
+otherwise. All three carry the validator label like the rest of the
+catalogue.
+
+| Signal             | Source                                                        | Metric emitted                                                               | Rationale                                                                                                                |
+| ------------------ | ------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Sentry build info  | beacon fetches sentry's `/status.node_info` per RPC tick      | `sentinel_sentry_info{sentry_chain,sentry_moniker,sentry_version}` (value=1) | Lets metadata dashboards show the sentry's version alongside the validator's — drift between the two is a deploy smell. |
+| Sentry peer count  | beacon fetches sentry's `/net_info.n_peers` per RPC tick      | `sentinel_rpc_peers_via_sentry`                                              | On sentry-fronted setups the validator sees only the sentry; the real p2p surface is what the sentry reports.           |
+| Sentry config keys | beacon reads sentry's config (same `ConfigKeys` as `metadata`) | `sentinel_sentry_config{key,value}` (value=1)                                | Pair-wise drift check: compare `sentinel_node_config` against `sentinel_sentry_config` for the same validator.          |
+
+The beacon fails open: any fetch error logs a warning and forwards the
+original payload unchanged, so `sentinel_sentry_*` series simply go stale
+until the next successful augmentation.
 
 ### Block / genesis / config metadata
 
@@ -251,10 +287,14 @@ same dashboard slot.
 - **`validator-chain.json`** — primary operational board. Merges RPC and OTLP
   signals: height, catching_up, peers, mempool, consensus state,
   blocks-behind-tip, block-build time, RPC server latency, gas price, plus a
-  fleet-wide consensus-quorum row.
+  fleet-wide consensus-quorum row. When a beacon is deployed, the RPC snapshot
+  gains `sentry` / `peers_via_sentry` / `pex` / `pex_sentry` columns and the
+  Peers panel overlays direct vs. via-sentry series.
 - **`validator-metadata.json`** — fleet drift board. Build info, genesis
   (consensus params + validator set), config keys. Consistency stats flag
-  divergence as red cells.
+  divergence as red cells. When a beacon is deployed, Build info adds
+  `sentry_moniker` + `sentry_version` columns and a separate "Config values
+  (sentry)" table surfaces the sentry-side config drift.
 - **`validator-resources.json`** — per-validator host + container resources
   (sentinel-sourced — the only pipeline that can see remote validators' hosts).
 - **`node-logs.json`** — Loki log viewer with module/level filters.
