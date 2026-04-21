@@ -169,7 +169,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (validator, sentry_moniker, sentry_version) (last_over_time(sentinel_sentry_info{validator=~\"$validator\"}[1m]))",
+          "expr": "max by (validator, sentry_moniker, sentry_version) (last_over_time(sentinel_sentry_info{validator=~\"$validator\"}[1d]))",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -893,7 +893,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "last_over_time(sentinel_sentry_config{validator=~\"$validator\"}[1h])",
+          "expr": "last_over_time(sentinel_sentry_config{validator=~\"$validator\"}[1d])",
           "format": "table",
           "instant": true,
           "refId": "A"

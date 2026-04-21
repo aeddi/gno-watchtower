@@ -311,7 +311,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "max by (validator, sentry_moniker) (last_over_time(sentinel_sentry_info{validator=~\"$validator\"}[1m]))",
+          "expr": "max by (validator, sentry_moniker) (last_over_time(sentinel_sentry_info{validator=~\"$validator\"}[1d]))",
           "legendFormat": "{{validator}}",
           "refId": "F",
           "format": "table",
@@ -322,7 +322,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "max by (validator) (sentinel_rpc_peers_via_sentry{validator=~\"$validator\"})",
+          "expr": "max by (validator) (last_over_time(sentinel_rpc_peers_via_sentry{validator=~\"$validator\"}[1d]))",
           "legendFormat": "{{validator}}",
           "refId": "G",
           "format": "table",
@@ -333,7 +333,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "label_replace(max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.pex\",validator=~\"$validator\"}[1m])), \"pex\", \"$1\", \"value\", \".*\")",
+          "expr": "label_replace(max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.pex\",validator=~\"$validator\"}[1d])), \"pex\", \"$1\", \"value\", \".*\")",
           "legendFormat": "{{validator}}",
           "refId": "H",
           "format": "table",
@@ -344,7 +344,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "label_replace(max by (validator, value) (last_over_time(sentinel_sentry_config{key=\"p2p.pex\",validator=~\"$validator\"}[1m])), \"pex_sentry\", \"$1\", \"value\", \".*\")",
+          "expr": "label_replace(max by (validator, value) (last_over_time(sentinel_sentry_config{key=\"p2p.pex\",validator=~\"$validator\"}[1d])), \"pex_sentry\", \"$1\", \"value\", \".*\")",
           "legendFormat": "{{validator}}",
           "refId": "I",
           "format": "table",
@@ -468,9 +468,7 @@
       "id": 3,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -538,9 +536,7 @@
       "id": 7,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -612,9 +608,7 @@
       "id": 2001,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -631,7 +625,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum(max by (address) (sentinel_rpc_validator_set_power))",
+          "expr": "sum(max by (address) (last_over_time(sentinel_rpc_validator_set_power[1d])))",
           "legendFormat": "Total voting power",
           "refId": "A"
         }
@@ -677,9 +671,7 @@
       "id": 2002,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -696,7 +688,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s]))",
+          "expr": "sum(max by (address) (last_over_time(sentinel_rpc_validator_set_power[1d])) * on(address) last_over_time(sentinel_validator_online[30s]))",
           "legendFormat": "Active voting power",
           "refId": "A"
         }
@@ -738,9 +730,7 @@
       "id": 2003,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -757,7 +747,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3) + 1",
+          "expr": "floor(sum(max by (address) (last_over_time(sentinel_rpc_validator_set_power[1d]))) * 2 / 3) + 1",
           "legendFormat": "Required for consensus",
           "refId": "A"
         }
@@ -807,9 +797,7 @@
       "id": 2004,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -826,7 +814,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s])) - (floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3) + 1)",
+          "expr": "sum(max by (address) (last_over_time(sentinel_rpc_validator_set_power[1d])) * on(address) last_over_time(sentinel_validator_online[30s])) - (floor(sum(max by (address) (last_over_time(sentinel_rpc_validator_set_power[1d]))) * 2 / 3) + 1)",
           "legendFormat": "Margin (active \u2212 required)",
           "refId": "A"
         }
@@ -1028,7 +1016,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "max by (address) (sentinel_rpc_validator_set_power)",
+          "expr": "max by (address) (last_over_time(sentinel_rpc_validator_set_power[1d]))",
           "format": "table",
           "instant": true,
           "legendFormat": "",
@@ -1039,7 +1027,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "max by (address) (last_over_time(sentinel_validator_online[30s])) or (max by (address)(sentinel_rpc_validator_set_power) * 0)",
+          "expr": "max by (address) (last_over_time(sentinel_validator_online[30s])) or (max by (address)(last_over_time(sentinel_rpc_validator_set_power[1d])) * 0)",
           "format": "table",
           "instant": true,
           "legendFormat": "",
@@ -1050,7 +1038,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "scalar(sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s]))) - (scalar(floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3)) + 1) - max by (address) (sentinel_rpc_validator_set_power)",
+          "expr": "scalar(sum(max by (address) (last_over_time(sentinel_rpc_validator_set_power[1d])) * on(address) last_over_time(sentinel_validator_online[30s]))) - (scalar(floor(sum(max by (address) (last_over_time(sentinel_rpc_validator_set_power[1d]))) * 2 / 3)) + 1) - max by (address) (last_over_time(sentinel_rpc_validator_set_power[1d]))",
           "format": "table",
           "instant": true,
           "legendFormat": "",
@@ -1114,13 +1102,7 @@
           "id": "filterFieldsByName",
           "options": {
             "include": {
-              "names": [
-                "address",
-                "validator",
-                "power",
-                "online",
-                "can_lose"
-              ]
+              "names": ["address", "validator", "power", "online", "can_lose"]
             }
           }
         }
@@ -1170,11 +1152,7 @@
       "id": 5,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "max",
-            "mean"
-          ],
+          "calcs": ["last", "max", "mean"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1229,10 +1207,7 @@
       "id": 6,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean"
-          ],
+          "calcs": ["last", "mean"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1287,11 +1262,7 @@
       "id": 8,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1346,11 +1317,7 @@
       "id": 9,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1405,11 +1372,7 @@
       "id": 10,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1464,11 +1427,7 @@
       "id": 11,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1523,11 +1482,7 @@
       "id": 12,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1595,11 +1550,7 @@
       "id": 13,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "min",
-            "max"
-          ],
+          "calcs": ["last", "min", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1624,7 +1575,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "max by (validator) (sentinel_rpc_peers_via_sentry{validator=~\"$validator\"})",
+          "expr": "max by (validator) (last_over_time(sentinel_rpc_peers_via_sentry{validator=~\"$validator\"}[1d]))",
           "legendFormat": "{{validator}} (via-sentry)",
           "refId": "B"
         }
@@ -1663,11 +1614,7 @@
       "id": 14,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "min",
-            "max"
-          ],
+          "calcs": ["last", "min", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1722,11 +1669,7 @@
       "id": 15,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "min",
-            "max"
-          ],
+          "calcs": ["last", "min", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1794,10 +1737,7 @@
       "id": 16,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "max"
-          ],
+          "calcs": ["last", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1852,10 +1792,7 @@
       "id": 17,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "max"
-          ],
+          "calcs": ["last", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1910,11 +1847,7 @@
       "id": 18,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1999,10 +1932,7 @@
       "id": 19,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "max"
-          ],
+          "calcs": ["last", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -2149,9 +2079,7 @@
       "id": 21,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -2168,7 +2096,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "max by (validator) (sentinel_rpc_validator_set_size{validator=~\"$validator\"})",
+          "expr": "max by (validator) (last_over_time(sentinel_rpc_validator_set_size{validator=~\"$validator\"}[1d]))",
           "legendFormat": "{{validator}}",
           "refId": "A"
         }
@@ -2220,11 +2148,7 @@
       "id": 23,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -2279,11 +2203,7 @@
       "id": 24,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -2338,11 +2258,7 @@
       "id": 25,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -2397,11 +2313,7 @@
       "id": 26,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -2428,21 +2340,14 @@
   ],
   "refresh": "10s",
   "schemaVersion": 39,
-  "tags": [
-    "validator",
-    "chain"
-  ],
+  "tags": ["validator", "chain"],
   "templating": {
     "list": [
       {
         "current": {
           "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": ["All"],
+          "value": ["$__all"]
         },
         "datasource": {
           "type": "prometheus",
