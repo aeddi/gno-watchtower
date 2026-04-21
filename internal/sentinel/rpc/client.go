@@ -65,21 +65,27 @@ func (c *Client) get(ctx context.Context, path string) (json.RawMessage, error) 
 func (c *Client) Status(ctx context.Context) (json.RawMessage, error) {
 	return c.get(ctx, "/status")
 }
+
 func (c *Client) NetInfo(ctx context.Context) (json.RawMessage, error) {
 	return c.get(ctx, "/net_info")
 }
+
 func (c *Client) NumUnconfirmedTxs(ctx context.Context) (json.RawMessage, error) {
 	return c.get(ctx, "/num_unconfirmed_txs")
 }
+
 func (c *Client) DumpConsensusState(ctx context.Context) (json.RawMessage, error) {
 	return c.get(ctx, "/dump_consensus_state")
 }
+
 func (c *Client) Validators(ctx context.Context, height int64) (json.RawMessage, error) {
 	return c.get(ctx, fmt.Sprintf("/validators?height=%d", height))
 }
+
 func (c *Client) Block(ctx context.Context, height int64) (json.RawMessage, error) {
 	return c.get(ctx, fmt.Sprintf("/block?height=%d", height))
 }
+
 func (c *Client) Genesis(ctx context.Context) (json.RawMessage, error) {
 	return c.get(ctx, "/genesis")
 }

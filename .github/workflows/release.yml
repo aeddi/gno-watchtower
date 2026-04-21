@@ -24,12 +24,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
-      contents: write   # attach archives + checksums to the Release
+      contents: write # attach archives + checksums to the Release
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # goreleaser needs full history for changelog
+          fetch-depth: 0 # goreleaser needs full history for changelog
           # persist-credentials stays default (true) — goreleaser uses the
           # checkout token to push release assets.
       - name: Set up Go
@@ -50,8 +50,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
-      contents: read      # read Dockerfile + source for build
-      packages: write     # push to ghcr.io
+      contents: read # read Dockerfile + source for build
+      packages: write # push to ghcr.io
     strategy:
       fail-fast: false
       matrix:
@@ -69,7 +69,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          persist-credentials: false   # don't need git write access
+          persist-credentials: false # don't need git write access
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Buildx

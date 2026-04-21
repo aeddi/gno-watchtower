@@ -34,8 +34,8 @@ _For the full catalogue of signals collected (per pipeline, cadence, transport, 
 
 - Either Docker ([Option 1](#option-1--docker-recommended)) or a native `sentinel` binary ([Option 2](#option-2--native-binary--systemd))
 - Network access to **one** of:
-  - the central `watchtower` over HTTPS (port **443**), for direct setups
-  - the sentry's `beacon` over TCP (default port **8080**, [configurable](#beacon-config-configtoml)), for [sentry-fronted setups](#sentry-fronted-setup-with-beacon)
+    - the central `watchtower` over HTTPS (port **443**), for direct setups
+    - the sentry's `beacon` over TCP (default port **8080**, [configurable](#beacon-config-configtoml)), for [sentry-fronted setups](#sentry-fronted-setup-with-beacon)
 
 **Server:**
 
@@ -369,7 +369,7 @@ Releases follow [Semantic Versioning](https://semver.org). Each release publishe
 
 - **Binaries** on the [Releases page](https://github.com/aeddi/gno-watchtower/releases) for `sentinel`, `beacon`, and `watchtower` — `linux/{amd64,arm64}` and `darwin/{amd64,arm64}`.
 - **Docker images** at `ghcr.io/aeddi/gno-watchtower/{sentinel,beacon,watchtower}`. Available tags:
-  - `:vX.Y.Z`, `:X.Y.Z`, `:X.Y`, `:latest` — releases
-  - `:main`, `:sha-<short>` — main-branch builds (not for production)
+    - `:vX.Y.Z`, `:X.Y.Z`, `:X.Y`, `:latest` — releases
+    - `:main`, `:sha-<short>` — main-branch builds (not for production)
 
 Check the version of a running binary with `<bin> version` (or `-v` for commit + build time + Go toolchain).

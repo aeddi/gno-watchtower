@@ -27,8 +27,8 @@ var prologue = []byte("gno-watchtower-noise-v1")
 // handshake (confidentiality-only); if non-empty, the peer's static public key
 // must appear in the list or the connection is closed after the handshake.
 type Config struct {
-	Static          Keypair
-	AuthorizedKeys  [][]byte // optional; exact-match check on peer static pubkey
+	Static         Keypair
+	AuthorizedKeys [][]byte // optional; exact-match check on peer static pubkey
 }
 
 // Clone returns a copy safe to mutate.

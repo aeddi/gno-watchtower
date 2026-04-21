@@ -26,7 +26,7 @@ scrape_configs:
       # dashboards. Drop everything not in the common query list to keep the
       # index compact on a long-lived dev/prod cluster. Re-enable as needed.
       - source_labels: [__name__]
-        regex: "container_(cpu_usage_seconds_total|memory_usage_bytes|memory_working_set_bytes|network_receive_bytes_total|network_transmit_bytes_total|fs_reads_bytes_total|fs_writes_bytes_total|last_seen|spec_memory_limit_bytes)"
+        regex: 'container_(cpu_usage_seconds_total|memory_usage_bytes|memory_working_set_bytes|network_receive_bytes_total|network_transmit_bytes_total|fs_reads_bytes_total|fs_writes_bytes_total|last_seen|spec_memory_limit_bytes)'
         action: keep
 
   - job_name: watchtower

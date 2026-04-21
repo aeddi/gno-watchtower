@@ -190,7 +190,7 @@ type MetadataConfig struct {
 // reports absolute counters (bytes sent, drops, retries) per data type so the
 // watchtower can export them as Prometheus counters for pipeline dashboards.
 type SelfConfig struct {
-	Enabled       bool     `toml:"enabled"`
+	Enabled        bool     `toml:"enabled"`
 	ReportInterval Duration `toml:"report_interval"`
 }
 

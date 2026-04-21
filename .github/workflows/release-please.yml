@@ -34,8 +34,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
-      contents: write        # release-please commits CHANGELOG + pushes tags
-      pull-requests: write   # release-please opens / updates the Release PR
+      contents: write # release-please commits CHANGELOG + pushes tags
+      pull-requests: write # release-please opens / updates the Release PR
     steps:
       - name: Run release-please
         uses: googleapis/release-please-action@v4

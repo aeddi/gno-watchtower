@@ -26,24 +26,24 @@ KEYS_DIR="/etc/${BIN}/keys"
 # portably (no bashisms).
 last_arg=""
 for arg in "$@"; do
-    last_arg=$arg
+  last_arg=$arg
 done
 
 if [ "${1:-}" = "run" ] && [ "$last_arg" = "$CONFIG_PATH" ]; then
-    if [ ! -f "$CONFIG_PATH" ]; then
-        mkdir -p "$(dirname "$CONFIG_PATH")"
-        /usr/local/bin/"$BIN" generate-config "$CONFIG_PATH"
-        echo "entrypoint: wrote default config to $CONFIG_PATH — edit <placeholders> (url, token, ...) so the daemon can start" >&2
+  if [ ! -f "$CONFIG_PATH" ]; then
+    mkdir -p "$(dirname "$CONFIG_PATH")"
+    /usr/local/bin/"$BIN" generate-config "$CONFIG_PATH"
+    echo "entrypoint: wrote default config to $CONFIG_PATH — edit <placeholders> (url, token, ...) so the daemon can start" >&2
+  fi
+  case "$BIN" in
+  sentinel | beacon)
+    if [ ! -f "$KEYS_DIR/privkey" ]; then
+      mkdir -p "$KEYS_DIR"
+      /usr/local/bin/"$BIN" keygen "$KEYS_DIR"
+      echo "entrypoint: generated Noise keypair in $KEYS_DIR" >&2
     fi
-    case "$BIN" in
-        sentinel|beacon)
-            if [ ! -f "$KEYS_DIR/privkey" ]; then
-                mkdir -p "$KEYS_DIR"
-                /usr/local/bin/"$BIN" keygen "$KEYS_DIR"
-                echo "entrypoint: generated Noise keypair in $KEYS_DIR" >&2
-            fi
-            ;;
-    esac
+    ;;
+  esac
 fi
 
 exec /usr/local/bin/"$BIN" "$@"

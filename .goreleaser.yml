@@ -55,25 +55,25 @@ builds:
 archives:
   - id: sentinel
     ids: [sentinel]
-    name_template: "sentinel_{{.Version}}_{{.Os}}_{{.Arch}}"
+    name_template: 'sentinel_{{.Version}}_{{.Os}}_{{.Arch}}'
     formats: [tar.gz]
     files:
       - README.md
   - id: watchtower
     ids: [watchtower]
-    name_template: "watchtower_{{.Version}}_{{.Os}}_{{.Arch}}"
+    name_template: 'watchtower_{{.Version}}_{{.Os}}_{{.Arch}}'
     formats: [tar.gz]
     files:
       - README.md
   - id: beacon
     ids: [beacon]
-    name_template: "beacon_{{.Version}}_{{.Os}}_{{.Arch}}"
+    name_template: 'beacon_{{.Version}}_{{.Os}}_{{.Arch}}'
     formats: [tar.gz]
     files:
       - README.md
 
 checksum:
-  name_template: "checksums.txt"
+  name_template: 'checksums.txt'
 
 # release-please owns the release notes (generated from Conventional Commits).
 # goreleaser just attaches the built binaries to the existing release.

@@ -1,62 +1,1577 @@
 {
-  "annotations": {"list": []},
+  "annotations": { "list": [] },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
   "links": [
-    {"title": "Validator metadata", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Chain ID, moniker, binary, genesis, config keys", "url": "/d/validator-metadata/validator-metadata?${__url_time_range}&${validator:queryparam}"},
-    {"title": "Validator resources", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Per-validator host + container resources", "url": "/d/validator-resources/validator-resources?${__url_time_range}&${validator:queryparam}"},
-    {"title": "Validator logs", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Per-validator log browser (Loki)", "url": "/d/validator-logs/validator-logs?${__url_time_range}&${validator:queryparam}"},
-    {"title": "Watchtower pipeline", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Data pipeline health, storage, retention", "url": "/d/watchtower-pipeline/watchtower-pipeline?${__url_time_range}&${validator:queryparam}"},
-    {"title": "Watchtower resources", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Watchtower host + container resources", "url": "/d/watchtower-resources/watchtower-resources?${__url_time_range}&${validator:queryparam}"}
+    {
+      "title": "Validator metadata",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Chain ID, moniker, binary, genesis, config keys",
+      "url": "/d/validator-metadata/validator-metadata?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Validator resources",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Per-validator host + container resources",
+      "url": "/d/validator-resources/validator-resources?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Validator logs",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Per-validator log browser (Loki)",
+      "url": "/d/validator-logs/validator-logs?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Watchtower pipeline",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Data pipeline health, storage, retention",
+      "url": "/d/watchtower-pipeline/watchtower-pipeline?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Watchtower resources",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Watchtower host + container resources",
+      "url": "/d/watchtower-resources/watchtower-resources?${__url_time_range}&${validator:queryparam}"
+    }
   ],
   "panels": [
-    {"type": "row", "title": "Sync status (RPC, 3s)", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "id": 1000, "panels": []},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[RPC, 3s] — Snapshot of RPC health per validator: block height, peer count (direct vs via-sentry when the beacon is enabled), mempool txs, catching_up, and p2p.pex on both sides.", "fieldConfig": {"defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}}, "color": {"mode": "thresholds"}}, "overrides": [{"matcher": {"id": "byName", "options": "catching_up"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}]}, {"matcher": {"id": "byName", "options": "peers"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 2}, {"color": "green", "value": 3}]}}]}, {"matcher": {"id": "byName", "options": "peers_via_sentry"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 2}, {"color": "green", "value": 3}]}}]}, {"matcher": {"id": "byName", "options": "behind"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 2}, {"color": "red", "value": 5}]}}]}]}, "gridPos": {"h": 8, "w": 24, "x": 0, "y": 1}, "id": 27, "options": {"showHeader": true, "sortBy": [{"desc": true, "displayName": "height"}]}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_latest_block_height{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "A", "format": "table", "instant": true}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_peers{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "B", "format": "table", "instant": true}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_mempool_txs{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "C", "format": "table", "instant": true}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_catching_up{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "D", "format": "table", "instant": true}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "scalar(max(sentinel_rpc_latest_block_height)) - max by (validator) (sentinel_rpc_latest_block_height{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "E", "format": "table", "instant": true}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator, sentry_moniker) (last_over_time(sentinel_sentry_info{validator=~\"$validator\"}[1m]))", "legendFormat": "{{validator}}", "refId": "F", "format": "table", "instant": true}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_peers_via_sentry{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "G", "format": "table", "instant": true}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "label_replace(max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.pex\",validator=~\"$validator\"}[1m])), \"pex\", \"$1\", \"value\", \".*\")", "legendFormat": "{{validator}}", "refId": "H", "format": "table", "instant": true}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "label_replace(max by (validator, value) (last_over_time(sentinel_sentry_config{key=\"p2p.pex\",validator=~\"$validator\"}[1m])), \"pex_sentry\", \"$1\", \"value\", \".*\")", "legendFormat": "{{validator}}", "refId": "I", "format": "table", "instant": true}], "title": "RPC snapshot", "type": "table", "transformations": [{"id": "joinByField", "options": {"byField": "validator", "mode": "outer"}}, {"id": "organize", "options": {"excludeByName": {"Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "Time 6": true, "Time 7": true, "Time 8": true, "Time 9": true, "Value #F": true, "Value #H": true, "Value #I": true, "value": true, "value 1": true, "value 2": true}, "renameByName": {"Value #A": "height", "Value #B": "peers", "Value #C": "mempool", "Value #D": "catching_up", "Value #E": "behind", "sentry_moniker": "sentry", "Value #G": "peers_via_sentry"}, "indexByName": {"validator": 0, "sentry": 1, "height": 2, "behind": 3, "peers": 4, "peers_via_sentry": 5, "pex": 6, "pex_sentry": 7, "mempool": 8, "catching_up": 9}}}, {"id": "filterFieldsByName", "options": {"include": {"names": ["validator", "sentry", "height", "behind", "peers", "peers_via_sentry", "pex", "pex_sentry", "mempool", "catching_up"]}}}]},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Mean interval between successive blocks over the last rate window. gnoland targets ~3s. A stall clamps the denominator so the cell shows a huge-but-finite value rather than +Inf. 3s-resolution RPC-derived complement to the 60s OTLP 'Avg block interval' below.", "fieldConfig": {"defaults": {"unit": "s", "min": 0, "decimals": 2, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5}, {"color": "red", "value": 10}]}}, "overrides": []}, "gridPos": {"h": 5, "w": 12, "x": 0, "y": 9}, "id": 3, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "auto", "textMode": "value_and_name", "colorMode": "background", "graphMode": "area", "justifyMode": "auto"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "1 / clamp_min(max by (validator) (rate(sentinel_rpc_latest_block_height{validator=~\"$validator\"}[$__rate_interval])), 1e-9)", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Blocktime", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[RPC, 3s] Blocks behind the highest observed tip across all validators. 0 = at tip. Sustained non-zero means this node has fallen behind.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 2}, {"color": "red", "value": 5}]}}, "overrides": []}, "gridPos": {"h": 5, "w": 12, "x": 12, "y": 9}, "id": 7, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "auto", "textMode": "value_and_name", "colorMode": "background", "graphMode": "area", "justifyMode": "auto"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "scalar(max(sentinel_rpc_latest_block_height)) - max by (validator) (sentinel_rpc_latest_block_height{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Blocks behind tip", "type": "stat"},
-    {"type": "row", "title": "Consensus quorum (fleet-wide)", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14}, "id": 2000, "panels": []},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Sum of voting_power across the active validator set (any validator — online or offline).", "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "text", "value": null}]}}, "overrides": []}, "gridPos": {"h": 5, "w": 6, "x": 0, "y": 15}, "id": 2001, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "auto", "textMode": "value_and_name", "colorMode": "background", "graphMode": "area", "justifyMode": "auto"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum(max by (address) (sentinel_rpc_validator_set_power))", "legendFormat": "Total voting power", "refId": "A"}], "title": "Total voting power", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Sum of voting_power across validators that are currently online and synced (catching_up=false). A reporting sentinel with a fresh sample is required.", "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []}, "gridPos": {"h": 5, "w": 6, "x": 6, "y": 15}, "id": 2002, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "auto", "textMode": "value_and_name", "colorMode": "background", "graphMode": "area", "justifyMode": "auto"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s]))", "legendFormat": "Active voting power", "refId": "A"}], "title": "Active voting power", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "floor(total × 2/3) + 1 — the tendermint BFT quorum threshold (tm2/pkg/bft/types/vote_set.go:272).", "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "text", "value": null}]}}, "overrides": []}, "gridPos": {"h": 5, "w": 6, "x": 12, "y": 15}, "id": 2003, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "auto", "textMode": "value_and_name", "colorMode": "background", "graphMode": "area", "justifyMode": "auto"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3) + 1", "legendFormat": "Required for consensus", "refId": "A"}], "title": "Required for consensus", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Positive = how much voting power can go offline before the chain stalls. Zero = one more drop breaks consensus. Negative = chain is stalled.", "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 0}, {"color": "green", "value": 1}]}}, "overrides": []}, "gridPos": {"h": 5, "w": 6, "x": 18, "y": 15}, "id": 2004, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "auto", "textMode": "value_and_name", "colorMode": "background", "graphMode": "area", "justifyMode": "auto"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s])) - (floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3) + 1)", "legendFormat": "Margin (active − required)", "refId": "A"}], "title": "Margin (active − required)", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Per-validator voting-power status. Colour reflects losing-this-validator impact: green = chain keeps consensus without it; orange = active validator whose loss drops us below quorum (SPOF); red = validator is in the set but offline.", "fieldConfig": {"defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}}, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "text", "value": null}]}}, "overrides": [{"matcher": {"id": "byName", "options": "online"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, {"id": "mappings", "value": [{"type": "value", "options": {"0": {"text": "offline", "index": 0}, "1": {"text": "online", "index": 1}}}]}]}, {"matcher": {"id": "byName", "options": "can_lose"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "orange", "value": null}, {"color": "green", "value": 0}]}}, {"id": "description", "value": "active_vp − own_power − required. ≥ 0: losing this validator keeps quorum (safe). < 0: SPOF. For an offline validator it tells you what the margin would be if they came back."}]}, {"matcher": {"id": "byName", "options": "power"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "text", "value": null}]}}]}, {"matcher": {"id": "byName", "options": "validator"}, "properties": [{"id": "mappings", "value": [{"type": "special", "options": {"match": "empty", "result": {"text": "unknown", "index": 0}}}, {"type": "special", "options": {"match": "null", "result": {"text": "unknown", "index": 1}}}]}]}]}, "gridPos": {"h": 10, "w": 24, "x": 0, "y": 20}, "id": 2005, "options": {"showHeader": true, "sortBy": [{"desc": true, "displayName": "power"}]}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (address) (sentinel_rpc_validator_set_power)", "format": "table", "instant": true, "legendFormat": "", "refId": "A"}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "(max by (address) (sentinel_rpc_validator_set_power) * 0) + on(address) group_left() (last_over_time(sentinel_validator_online[30s]) or on(address) (max by (address) (sentinel_rpc_validator_set_power) * 0))", "format": "table", "instant": true, "legendFormat": "", "refId": "B"}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "scalar(sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s]))) - scalar(floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3 + 1)) - max by (address) (sentinel_rpc_validator_set_power)", "format": "table", "instant": true, "legendFormat": "", "refId": "C"}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (address, validator) (sentinel_rpc_validator_voting_power)", "format": "table", "instant": true, "legendFormat": "", "refId": "D"}], "title": "Per-validator voting power", "type": "table", "transformations": [{"id": "joinByField", "options": {"byField": "address", "mode": "outer"}}, {"id": "organize", "options": {"excludeByName": {"Time 1": true, "Time 2": true, "Time 3": true, "job 1": true, "job 2": true, "job 3": true, "instance 1": true, "instance 2": true, "instance 3": true, "Value #D": true, "Time 4": true, "job 4": true, "instance 4": true}, "renameByName": {"Value #A": "power", "Value #B": "online", "Value #C": "can_lose"}, "indexByName": {"address": 0, "validator": 1, "power": 2, "online": 3, "can_lose": 4}}}, {"id": "filterFieldsByName", "options": {"include": {"names": ["address", "validator", "power", "online", "can_lose"]}}}]},
-    {"type": "row", "title": "Block production", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 30}, "id": 1001, "panels": []},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[RPC, 3s] — Block height over time. A flat line = the chain stalled for that validator.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 31}, "id": 5, "options": {"legend": {"calcs": ["last", "max", "mean"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_latest_block_height{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Block height", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[RPC, 3s] — Blocks committed per second per validator (rate of the height counter over 1m).", "fieldConfig": {"defaults": {"unit": "ops", "min": 0, "decimals": 2, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 31}, "id": 6, "options": {"legend": {"calcs": ["last", "mean"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (rate(sentinel_rpc_latest_block_height{validator=~\"$validator\"}[$__rate_interval]))", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Block rate (blocks/s)", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[OTLP, 60s] — Average interval between consecutive blocks as observed by each validator. Computed over the rate window so a stalled chain reads as a rising mean. gnoland emits this in seconds.", "fieldConfig": {"defaults": {"unit": "s", "min": 0, "decimals": 2, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 6, "x": 0, "y": 39}, "id": 8, "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (validator) (rate(block_interval_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(block_interval_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Avg block interval", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[OTLP, 60s] — Average block-build duration in ms, reported only by validators that proposed a block within the window. Non-proposers show no data.", "fieldConfig": {"defaults": {"unit": "ms", "min": 0, "decimals": 1, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 6, "x": 6, "y": 39}, "id": 9, "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (validator) (rate(build_block_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(build_block_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Avg build block time (proposer only)", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[OTLP, 60s] — Average block size in bytes over the rate window.", "fieldConfig": {"defaults": {"unit": "bytes", "min": 0, "decimals": 1, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 6, "x": 12, "y": 39}, "id": 10, "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (validator) (rate(block_size_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(block_size_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Avg block size", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[OTLP, 60s] — Average gas price of committed blocks (gnoland unit: token amount per gas). Fires only when the chain processes paid transactions; silent on an idle testnet.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 2, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 6, "x": 18, "y": 39}, "id": 11, "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (validator) (rate(block_gas_price_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(block_gas_price_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Avg block gas price", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[RPC, per-block] — Transactions included in the most recently observed block per validator.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 7, "w": 24, "x": 0, "y": 47}, "id": 12, "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_block_num_txs{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Txs per block (latest observed)", "type": "timeseries"},
-    {"type": "row", "title": "P2P", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 54}, "id": 1002, "panels": []},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[RPC, 3s — total] — Connected p2p peer count per validator. `direct` is what the validator sees (behind the sentry, typically just the sentry); `via-sentry` is what the beacon reports from the sentry's own /net_info (visible only if a beacon is deployed). Drops usually correlate with missed consensus rounds.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 8, "x": 0, "y": 55}, "id": 13, "options": {"legend": {"calcs": ["last", "min", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_peers{validator=~\"$validator\"})", "legendFormat": "{{validator}} (direct)", "refId": "A"}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_peers_via_sentry{validator=~\"$validator\"})", "legendFormat": "{{validator}} (via-sentry)", "refId": "B"}], "title": "Peers (direct vs via-sentry)", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[OTLP, 60s — inbound split] — Number of inbound p2p peers (peers that initiated connection to this validator).", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 8, "x": 8, "y": 55}, "id": 14, "options": {"legend": {"calcs": ["last", "min", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (inbound_peers_gauge{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Inbound peers", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[OTLP, 60s — outbound split] — Number of outbound p2p peers (peers this validator connected to).", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 8, "x": 16, "y": 55}, "id": 15, "options": {"legend": {"calcs": ["last", "min", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (outbound_peers_gauge{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Outbound peers", "type": "timeseries"},
-    {"type": "row", "title": "Mempool", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 63}, "id": 1003, "panels": []},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[RPC, 3s always-emit] — Unconfirmed transactions sitting in the mempool. Growth = backpressure or stuck consensus.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 8, "x": 0, "y": 64}, "id": 16, "options": {"legend": {"calcs": ["last", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_mempool_txs{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Mempool transactions", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[RPC, 3s always-emit] — Total bytes of unconfirmed transactions in the mempool.", "fieldConfig": {"defaults": {"unit": "bytes", "min": 0, "decimals": 1, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 8, "x": 8, "y": 64}, "id": 17, "options": {"legend": {"calcs": ["last", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_mempool_bytes{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Mempool bytes", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[OTLP, 60s] — Mempool-cache (rejected/duplicate) tx observations per poll window. Only fires when spam or duplicate-tx traffic hits the node; silent otherwise.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 1, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 8, "x": 16, "y": 64}, "id": 18, "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (validator) (rate(num_cached_txs_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(num_cached_txs_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Cached mempool tx rate", "type": "timeseries"},
-    {"type": "row", "title": "Consensus", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 72}, "id": 1004, "panels": []},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[RPC, 30s] — Consensus round at the current height. 0 = happy path. Spikes indicate missed proposals / re-votes.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 1}, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}]}}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 73}, "id": 19, "options": {"legend": {"calcs": ["last", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_consensus_round{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Consensus round", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[RPC, 30s] — Current consensus step (tendermint state machine). Rendered as a state timeline because the step is categorical: 1=propose, 2=prevote, 3=precommit, 4=commit. 'Stuck in prevote' is visually obvious here.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "color": {"mode": "thresholds"}, "mappings": [{"type": "value", "options": {"1": {"text": "propose", "color": "blue", "index": 0}, "2": {"text": "prevote", "color": "yellow", "index": 1}, "3": {"text": "precommit", "color": "orange", "index": 2}, "4": {"text": "commit", "color": "green", "index": 3}}}], "thresholds": {"mode": "absolute", "steps": [{"color": "text", "value": null}]}}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 73}, "id": 20, "options": {"legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "none"}, "showValue": "auto", "alignValue": "left", "mergeValues": true, "rowHeight": 0.9}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_consensus_step{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Consensus step", "type": "state-timeline"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[RPC, per-block] — Number of validators in the active set as seen by each validator. Should be identical across nodes.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "text", "value": null}]}}, "overrides": []}, "gridPos": {"h": 5, "w": 8, "x": 0, "y": 81}, "id": 21, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "auto", "textMode": "value_and_name", "colorMode": "value", "graphMode": "none", "justifyMode": "auto"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator) (sentinel_rpc_validator_set_size{validator=~\"$validator\"})", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Validator set size", "type": "stat"},
-    {"type": "row", "title": "RPC server performance", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 86}, "id": 1005, "panels": []},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[OTLP, 60s] — HTTP RPC request throughput observed by gnoland's own server. Includes the sentinel's status/net_info/block polls and any external callers.", "fieldConfig": {"defaults": {"unit": "reqps", "min": 0, "decimals": 2, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 6, "x": 0, "y": 87}, "id": 23, "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (validator) (rate(http_request_time_hist_count{validator=~\"$validator\"}[$__rate_interval]))", "legendFormat": "{{validator}}", "refId": "A"}], "title": "HTTP request rate", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[OTLP, 60s] — Average HTTP RPC response time in ms, per validator (via histogram sum/count rate).", "fieldConfig": {"defaults": {"unit": "ms", "min": 0, "decimals": 2, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 6, "x": 6, "y": 87}, "id": 24, "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (validator) (rate(http_request_time_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(http_request_time_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Avg HTTP request time", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[OTLP, 60s] — WebSocket RPC request rate. Silent on an idle cluster; fires when a client holds an open /websocket subscription.", "fieldConfig": {"defaults": {"unit": "reqps", "min": 0, "decimals": 2, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 6, "x": 12, "y": 87}, "id": 25, "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (validator) (rate(ws_request_time_hist_count{validator=~\"$validator\"}[$__rate_interval]))", "legendFormat": "{{validator}}", "refId": "A"}], "title": "WS request rate", "type": "timeseries"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "[OTLP, 60s] — Average WebSocket RPC response time.", "fieldConfig": {"defaults": {"unit": "ms", "min": 0, "decimals": 2, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 8, "w": 6, "x": 18, "y": 87}, "id": 26, "options": {"legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "all", "sort": "desc"}}, "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "sum by (validator) (rate(ws_request_time_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(ws_request_time_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)", "legendFormat": "{{validator}}", "refId": "A"}], "title": "Avg WS request time", "type": "timeseries"}
+    {
+      "type": "row",
+      "title": "Sync status (RPC, 3s)",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1000,
+      "panels": []
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[RPC, 3s] — Snapshot of RPC health per validator: block height, peer count (direct vs via-sentry when the beacon is enabled), mempool txs, catching_up, and p2p.pex on both sides.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "catching_up" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "red", "value": 1 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "peers" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "yellow", "value": 2 },
+                    { "color": "green", "value": 3 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "peers_via_sentry" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "yellow", "value": 2 },
+                    { "color": "green", "value": 3 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "behind" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 2 },
+                    { "color": "red", "value": 5 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 1 },
+      "id": 27,
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "height" }]
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_latest_block_height{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "A",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_peers{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "B",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_mempool_txs{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "C",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_catching_up{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "D",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "scalar(max(sentinel_rpc_latest_block_height)) - max by (validator) (sentinel_rpc_latest_block_height{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "E",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator, sentry_moniker) (last_over_time(sentinel_sentry_info{validator=~\"$validator\"}[1m]))",
+          "legendFormat": "{{validator}}",
+          "refId": "F",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_peers_via_sentry{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "G",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "label_replace(max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.pex\",validator=~\"$validator\"}[1m])), \"pex\", \"$1\", \"value\", \".*\")",
+          "legendFormat": "{{validator}}",
+          "refId": "H",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "label_replace(max by (validator, value) (last_over_time(sentinel_sentry_config{key=\"p2p.pex\",validator=~\"$validator\"}[1m])), \"pex_sentry\", \"$1\", \"value\", \".*\")",
+          "legendFormat": "{{validator}}",
+          "refId": "I",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "title": "RPC snapshot",
+      "type": "table",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": { "byField": "validator", "mode": "outer" }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "Time 5": true,
+              "Time 6": true,
+              "Time 7": true,
+              "Time 8": true,
+              "Time 9": true,
+              "Value #F": true,
+              "Value #H": true,
+              "Value #I": true,
+              "value": true,
+              "value 1": true,
+              "value 2": true
+            },
+            "renameByName": {
+              "Value #A": "height",
+              "Value #B": "peers",
+              "Value #C": "mempool",
+              "Value #D": "catching_up",
+              "Value #E": "behind",
+              "sentry_moniker": "sentry",
+              "Value #G": "peers_via_sentry"
+            },
+            "indexByName": {
+              "validator": 0,
+              "sentry": 1,
+              "height": 2,
+              "behind": 3,
+              "peers": 4,
+              "peers_via_sentry": 5,
+              "pex": 6,
+              "pex_sentry": 7,
+              "mempool": 8,
+              "catching_up": 9
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "validator",
+                "sentry",
+                "height",
+                "behind",
+                "peers",
+                "peers_via_sentry",
+                "pex",
+                "pex_sentry",
+                "mempool",
+                "catching_up"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Mean interval between successive blocks over the last rate window. gnoland targets ~3s. A stall clamps the denominator so the cell shows a huge-but-finite value rather than +Inf. 3s-resolution RPC-derived complement to the 60s OTLP 'Avg block interval' below.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 9 },
+      "id": 3,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "1 / clamp_min(max by (validator) (rate(sentinel_rpc_latest_block_height{validator=~\"$validator\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Blocktime",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[RPC, 3s] Blocks behind the highest observed tip across all validators. 0 = at tip. Sustained non-zero means this node has fallen behind.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 9 },
+      "id": 7,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "scalar(max(sentinel_rpc_latest_block_height)) - max by (validator) (sentinel_rpc_latest_block_height{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Blocks behind tip",
+      "type": "stat"
+    },
+    {
+      "type": "row",
+      "title": "Consensus quorum (fleet-wide)",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 2000,
+      "panels": []
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Sum of voting_power across the active validator set (any validator — online or offline).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "text", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 15 },
+      "id": 2001,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum(max by (address) (sentinel_rpc_validator_set_power))",
+          "legendFormat": "Total voting power",
+          "refId": "A"
+        }
+      ],
+      "title": "Total voting power",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Sum of voting_power across validators that are currently online and synced (catching_up=false). A reporting sentinel with a fresh sample is required.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 15 },
+      "id": 2002,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s]))",
+          "legendFormat": "Active voting power",
+          "refId": "A"
+        }
+      ],
+      "title": "Active voting power",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "floor(total × 2/3) + 1 — the tendermint BFT quorum threshold (tm2/pkg/bft/types/vote_set.go:272).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "text", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 15 },
+      "id": 2003,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3) + 1",
+          "legendFormat": "Required for consensus",
+          "refId": "A"
+        }
+      ],
+      "title": "Required for consensus",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Positive = how much voting power can go offline before the chain stalls. Zero = one more drop breaks consensus. Negative = chain is stalled.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0 },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 15 },
+      "id": 2004,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s])) - (floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3) + 1)",
+          "legendFormat": "Margin (active − required)",
+          "refId": "A"
+        }
+      ],
+      "title": "Margin (active − required)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Per-validator voting-power status. Colour reflects losing-this-validator impact: green = chain keeps consensus without it; orange = active validator whose loss drops us below quorum (SPOF); red = validator is in the set but offline.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } },
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "text", "value": null }]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "online" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "green", "value": 1 }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": { "text": "offline", "index": 0 },
+                      "1": { "text": "online", "index": 1 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "can_lose" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "orange", "value": null },
+                    { "color": "green", "value": 0 }
+                  ]
+                }
+              },
+              {
+                "id": "description",
+                "value": "active_vp − own_power − required. ≥ 0: losing this validator keeps quorum (safe). < 0: SPOF. For an offline validator it tells you what the margin would be if they came back."
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "power" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [{ "color": "text", "value": null }]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "validator" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": { "text": "unknown", "index": 0 }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": { "text": "unknown", "index": 1 }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+      "id": 2005,
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "power" }]
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (address) (sentinel_rpc_validator_set_power)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "(max by (address) (sentinel_rpc_validator_set_power) * 0) + on(address) group_left() (last_over_time(sentinel_validator_online[30s]) or on(address) (max by (address) (sentinel_rpc_validator_set_power) * 0))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "scalar(sum(max by (address) (sentinel_rpc_validator_set_power) * on(address) last_over_time(sentinel_validator_online[30s]))) - scalar(floor(sum(max by (address) (sentinel_rpc_validator_set_power)) * 2 / 3 + 1)) - max by (address) (sentinel_rpc_validator_set_power)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (address, validator) (sentinel_rpc_validator_voting_power)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "refId": "D"
+        }
+      ],
+      "title": "Per-validator voting power",
+      "type": "table",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": { "byField": "address", "mode": "outer" }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "job 1": true,
+              "job 2": true,
+              "job 3": true,
+              "instance 1": true,
+              "instance 2": true,
+              "instance 3": true,
+              "Value #D": true,
+              "Time 4": true,
+              "job 4": true,
+              "instance 4": true
+            },
+            "renameByName": {
+              "Value #A": "power",
+              "Value #B": "online",
+              "Value #C": "can_lose"
+            },
+            "indexByName": {
+              "address": 0,
+              "validator": 1,
+              "power": 2,
+              "online": 3,
+              "can_lose": 4
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": ["address", "validator", "power", "online", "can_lose"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Block production",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "id": 1001,
+      "panels": []
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[RPC, 3s] — Block height over time. A flat line = the chain stalled for that validator.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": ["last", "max", "mean"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_latest_block_height{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Block height",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[RPC, 3s] — Blocks committed per second per validator (rate of the height counter over 1m).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "decimals": 2,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (rate(sentinel_rpc_latest_block_height{validator=~\"$validator\"}[$__rate_interval]))",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Block rate (blocks/s)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[OTLP, 60s] — Average interval between consecutive blocks as observed by each validator. Computed over the rate window so a stalled chain reads as a rising mean. gnoland emits this in seconds.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 2,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 39 },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (validator) (rate(block_interval_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(block_interval_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg block interval",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[OTLP, 60s] — Average block-build duration in ms, reported only by validators that proposed a block within the window. Non-proposers show no data.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "decimals": 1,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 39 },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (validator) (rate(build_block_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(build_block_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg build block time (proposer only)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[OTLP, 60s] — Average block size in bytes over the rate window.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "decimals": 1,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 39 },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (validator) (rate(block_size_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(block_size_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg block size",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[OTLP, 60s] — Average gas price of committed blocks (gnoland unit: token amount per gas). Fires only when the chain processes paid transactions; silent on an idle testnet.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 2,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 39 },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (validator) (rate(block_gas_price_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(block_gas_price_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg block gas price",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[RPC, per-block] — Transactions included in the most recently observed block per validator.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 47 },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_block_num_txs{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Txs per block (latest observed)",
+      "type": "timeseries"
+    },
+    {
+      "type": "row",
+      "title": "P2P",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 54 },
+      "id": 1002,
+      "panels": []
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[RPC, 3s — total] — Connected p2p peer count per validator. `direct` is what the validator sees (behind the sentry, typically just the sentry); `via-sentry` is what the beacon reports from the sentry's own /net_info (visible only if a beacon is deployed). Drops usually correlate with missed consensus rounds.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 55 },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": ["last", "min", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_peers{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}} (direct)",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_peers_via_sentry{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}} (via-sentry)",
+          "refId": "B"
+        }
+      ],
+      "title": "Peers (direct vs via-sentry)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[OTLP, 60s — inbound split] — Number of inbound p2p peers (peers that initiated connection to this validator).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 55 },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": ["last", "min", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (inbound_peers_gauge{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Inbound peers",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[OTLP, 60s — outbound split] — Number of outbound p2p peers (peers this validator connected to).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 55 },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": ["last", "min", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (outbound_peers_gauge{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Outbound peers",
+      "type": "timeseries"
+    },
+    {
+      "type": "row",
+      "title": "Mempool",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 63 },
+      "id": 1003,
+      "panels": []
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[RPC, 3s always-emit] — Unconfirmed transactions sitting in the mempool. Growth = backpressure or stuck consensus.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 64 },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": ["last", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_mempool_txs{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Mempool transactions",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[RPC, 3s always-emit] — Total bytes of unconfirmed transactions in the mempool.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "decimals": 1,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 64 },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": ["last", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_mempool_bytes{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Mempool bytes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[OTLP, 60s] — Mempool-cache (rejected/duplicate) tx observations per poll window. Only fires when spam or duplicate-tx traffic hits the node; silent otherwise.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 64 },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (validator) (rate(num_cached_txs_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(num_cached_txs_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Cached mempool tx rate",
+      "type": "timeseries"
+    },
+    {
+      "type": "row",
+      "title": "Consensus",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 72 },
+      "id": 1004,
+      "panels": []
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[RPC, 30s] — Consensus round at the current height. 0 = happy path. Spikes indicate missed proposals / re-votes.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1 },
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 73 },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": ["last", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_consensus_round{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Consensus round",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[RPC, 30s] — Current consensus step (tendermint state machine). Rendered as a state timeline because the step is categorical: 1=propose, 2=prevote, 3=precommit, 4=commit. 'Stuck in prevote' is visually obvious here.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": { "text": "propose", "color": "blue", "index": 0 },
+                "2": { "text": "prevote", "color": "yellow", "index": 1 },
+                "3": { "text": "precommit", "color": "orange", "index": 2 },
+                "4": { "text": "commit", "color": "green", "index": 3 }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "text", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 73 },
+      "id": 20,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "none" },
+        "showValue": "auto",
+        "alignValue": "left",
+        "mergeValues": true,
+        "rowHeight": 0.9
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_consensus_step{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Consensus step",
+      "type": "state-timeline"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[RPC, per-block] — Number of validators in the active set as seen by each validator. Should be identical across nodes.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "text", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 81 },
+      "id": 21,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator) (sentinel_rpc_validator_set_size{validator=~\"$validator\"})",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Validator set size",
+      "type": "stat"
+    },
+    {
+      "type": "row",
+      "title": "RPC server performance",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 86 },
+      "id": 1005,
+      "panels": []
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[OTLP, 60s] — HTTP RPC request throughput observed by gnoland's own server. Includes the sentinel's status/net_info/block polls and any external callers.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "decimals": 2,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 87 },
+      "id": 23,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (validator) (rate(http_request_time_hist_count{validator=~\"$validator\"}[$__rate_interval]))",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP request rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[OTLP, 60s] — Average HTTP RPC response time in ms, per validator (via histogram sum/count rate).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "decimals": 2,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 87 },
+      "id": 24,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (validator) (rate(http_request_time_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(http_request_time_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg HTTP request time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[OTLP, 60s] — WebSocket RPC request rate. Silent on an idle cluster; fires when a client holds an open /websocket subscription.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "decimals": 2,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 87 },
+      "id": 25,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (validator) (rate(ws_request_time_hist_count{validator=~\"$validator\"}[$__rate_interval]))",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "WS request rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "[OTLP, 60s] — Average WebSocket RPC response time.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "decimals": 2,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 87 },
+      "id": 26,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "all", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (validator) (rate(ws_request_time_hist_sum{validator=~\"$validator\"}[$__rate_interval])) / clamp_min(sum by (validator) (rate(ws_request_time_hist_count{validator=~\"$validator\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "{{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg WS request time",
+      "type": "timeseries"
+    }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
   "tags": ["validator", "chain"],
   "templating": {
     "list": [
-      {"current": {"selected": true, "text": ["All"], "value": ["$__all"]}, "datasource": {"type": "prometheus", "uid": "victoriametrics"}, "definition": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)", "includeAll": true, "label": "Validator", "multi": true, "name": "validator", "options": [], "query": {"query": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)", "refId": "PrometheusVariableQueryEditor-VariableQuery"}, "refresh": 1, "regex": "", "skipUrlSync": false, "sort": 1, "type": "query"}
+      {
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+        "definition": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)",
+        "includeAll": true,
+        "label": "Validator",
+        "multi": true,
+        "name": "validator",
+        "options": [],
+        "query": {
+          "query": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
     ]
   },
-  "time": {"from": "now-1h", "to": "now"},
+  "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
   "title": "Validator Chain",

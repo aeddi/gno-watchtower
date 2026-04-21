@@ -89,11 +89,11 @@ func (a *Augmenter) augmentRPC(ctx context.Context, body []byte) ([]byte, error)
 	// Run the three fetches in parallel; any failure aborts and the caller
 	// falls back to passing through. 1-2 ms latency added per augmented tick.
 	var (
-		wg                 sync.WaitGroup
-		statusRaw, netRaw  json.RawMessage
-		configRaw          json.RawMessage
-		statusErr, netErr  error
-		configErr          error
+		wg                sync.WaitGroup
+		statusRaw, netRaw json.RawMessage
+		configRaw         json.RawMessage
+		statusErr, netErr error
+		configErr         error
 	)
 	wg.Add(2)
 	go func() { defer wg.Done(); statusRaw, statusErr = a.rpc.Status(ctx) }()

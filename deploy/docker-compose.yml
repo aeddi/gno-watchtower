@@ -2,8 +2,8 @@ services:
   caddy:
     image: caddy:2
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -23,19 +23,19 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: watchtower
-    command: ["run", "/etc/watchtower/config.toml"]
+    command: ['run', '/etc/watchtower/config.toml']
     volumes:
       - ./watchtower.toml:/etc/watchtower/config.toml:ro
     environment:
       # Surface retention windows via /metrics so dashboards can show
       # "used / limit" panels without reparsing config.env at query time.
-      LOGS_RETENTION: "${LOGS_RETENTION}"
-      METRICS_RETENTION: "${METRICS_RETENTION}"
+      LOGS_RETENTION: '${LOGS_RETENTION}'
+      METRICS_RETENTION: '${METRICS_RETENTION}'
     networks:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/health']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -48,10 +48,10 @@ services:
   victoria-metrics:
     image: victoriametrics/victoria-metrics:v1.115.0
     command:
-      - "-retentionPeriod=${METRICS_RETENTION}"
-      - "-storageDataPath=/data"
-      - "-storage.minFreeDiskSpaceBytes=10737418240"
-      - "-promscrape.config=/etc/vm/scrape.yml"
+      - '-retentionPeriod=${METRICS_RETENTION}'
+      - '-storageDataPath=/data'
+      - '-storage.minFreeDiskSpaceBytes=10737418240'
+      - '-promscrape.config=/etc/vm/scrape.yml'
     volumes:
       - vm_data:/data
       - ./victoria-metrics/scrape.yml:/etc/vm/scrape.yml:ro
@@ -59,7 +59,7 @@ services:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8428/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8428/health']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -67,15 +67,15 @@ services:
   node-exporter:
     image: prom/node-exporter:v1.8.2
     command:
-      - "--path.rootfs=/host"
+      - '--path.rootfs=/host'
       # Collectors off by default because they're noisy or useless in containers.
-      - "--no-collector.wifi"
-      - "--no-collector.hwmon"
-      - "--no-collector.ipvs"
-      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+      - '--no-collector.wifi'
+      - '--no-collector.hwmon'
+      - '--no-collector.ipvs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)'
     pid: host
     volumes:
-      - "/:/host:ro,rslave"
+      - '/:/host:ro,rslave'
     networks:
       - monitoring
     restart: unless-stopped
@@ -106,7 +106,7 @@ services:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3100/ready']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -116,7 +116,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
-      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_SIGN_UP: 'false'
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
@@ -126,7 +126,7 @@ services:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health']
       interval: 10s
       timeout: 5s
       retries: 3

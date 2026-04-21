@@ -1,49 +1,950 @@
 {
-  "annotations": {"list": []},
+  "annotations": { "list": [] },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
   "links": [
-    {"title": "Validator chain", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Block height, peers, mempool, consensus quorum", "url": "/d/validator-chain/validator-chain?${__url_time_range}&${validator:queryparam}"},
-    {"title": "Validator resources", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Per-validator host + container resources", "url": "/d/validator-resources/validator-resources?${__url_time_range}&${validator:queryparam}"},
-    {"title": "Validator logs", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Per-validator log browser (Loki)", "url": "/d/validator-logs/validator-logs?${__url_time_range}&${validator:queryparam}"},
-    {"title": "Watchtower pipeline", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Data pipeline health, storage, retention", "url": "/d/watchtower-pipeline/watchtower-pipeline?${__url_time_range}&${validator:queryparam}"},
-    {"title": "Watchtower resources", "type": "link", "icon": "external link", "targetBlank": false, "tooltip": "Watchtower host + container resources", "url": "/d/watchtower-resources/watchtower-resources?${__url_time_range}&${validator:queryparam}"}
+    {
+      "title": "Validator chain",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Block height, peers, mempool, consensus quorum",
+      "url": "/d/validator-chain/validator-chain?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Validator resources",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Per-validator host + container resources",
+      "url": "/d/validator-resources/validator-resources?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Validator logs",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Per-validator log browser (Loki)",
+      "url": "/d/validator-logs/validator-logs?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Watchtower pipeline",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Data pipeline health, storage, retention",
+      "url": "/d/watchtower-pipeline/watchtower-pipeline?${__url_time_range}&${validator:queryparam}"
+    },
+    {
+      "title": "Watchtower resources",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "tooltip": "Watchtower host + container resources",
+      "url": "/d/watchtower-resources/watchtower-resources?${__url_time_range}&${validator:queryparam}"
+    }
   ],
   "panels": [
-    {"type": "row", "title": "Binary drift — RPC /status.node_info", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "id": 1000, "panels": []},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct values of the version label across fleet. 1 = agreement, ≥2 = version drift.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 12, "x": 0, "y": 1}, "id": 1, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (version) (max by (validator, version) (last_over_time(sentinel_node_build_info[1m]))))", "legendFormat": "distinct values", "refId": "A"}], "title": "Version agreement", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct values of chain_id. Divergence means you're running two different chains.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 12, "x": 12, "y": 1}, "id": 2, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (chain_id) (max by (validator, chain_id) (last_over_time(sentinel_node_build_info[1m]))))", "legendFormat": "distinct values", "refId": "A"}], "title": "Chain ID agreement", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Per-validator build identity (from /status.node_info) joined with the sentry's own build identity when the beacon is deployed (sentry_moniker/sentry_version come from sentinel_sentry_info). A validator vs. sentry version gap is a deployment drift signal.", "fieldConfig": {"defaults": {"unit": "none", "custom": {"align": "auto", "cellOptions": {"type": "auto"}}}, "overrides": []}, "gridPos": {"h": 8, "w": 24, "x": 0, "y": 5}, "id": 4, "options": {"showHeader": true}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator, chain_id, moniker, version) (last_over_time(sentinel_node_build_info{validator=~\"$validator\"}[1m]))", "format": "table", "instant": true, "refId": "A"}, {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator, sentry_moniker, sentry_version) (last_over_time(sentinel_sentry_info{validator=~\"$validator\"}[1m]))", "format": "table", "instant": true, "refId": "B"}], "title": "Build info — validator + sentry per row", "type": "table", "transformations": [{"id": "joinByField", "options": {"byField": "validator", "mode": "outer"}}, {"id": "organize", "options": {"excludeByName": {"Time 1": true, "Time 2": true, "Value #A": true, "Value #B": true, "__name__ 1": true, "__name__ 2": true, "job 1": true, "job 2": true, "instance 1": true, "instance 2": true}, "renameByName": {}, "indexByName": {"validator": 0, "chain_id": 1, "version": 2, "moniker": 3, "sentry_moniker": 4, "sentry_version": 5}}}, {"id": "filterFieldsByName", "options": {"include": {"names": ["validator", "chain_id", "version", "moniker", "sentry_moniker", "sentry_version"]}}}]},
-    {"type": "row", "title": "Chain drift — RPC /genesis", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 13}, "id": 1001, "panels": []},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct genesis app_hash values. MUST be 1 across the whole fleet. Non-1 = nodes are on different chains/forks.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 8, "x": 0, "y": 14}, "id": 5, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (app_hash) (max by (validator, app_hash) (last_over_time(sentinel_genesis_info[1m]))))", "legendFormat": "distinct values", "refId": "A"}], "title": "App hash agreement", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct genesis_time values.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 8, "x": 8, "y": 14}, "id": 6, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (genesis_time) (max by (validator, genesis_time) (last_over_time(sentinel_genesis_info[1m]))))", "legendFormat": "distinct values", "refId": "A"}], "title": "Genesis time agreement", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct genesis chain_id values.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 8, "x": 16, "y": 14}, "id": 7, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (chain_id) (max by (validator, chain_id) (last_over_time(sentinel_genesis_info[1m]))))", "legendFormat": "distinct values", "refId": "A"}], "title": "Genesis chain_id agreement", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Per-validator /genesis top-level identity. chain_id, genesis_time and app_hash must match across the whole fleet.", "fieldConfig": {"defaults": {"unit": "none", "custom": {"align": "auto", "cellOptions": {"type": "auto"}}}, "overrides": []}, "gridPos": {"h": 8, "w": 24, "x": 0, "y": 18}, "id": 8, "options": {"showHeader": true}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator, chain_id, genesis_time, app_hash) (last_over_time(sentinel_genesis_info{validator=~\"$validator\"}[1h]))", "format": "table", "instant": true, "refId": "A"}], "title": "Genesis info — one row per validator", "type": "table", "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "__name__": true, "job": true, "instance": true}, "renameByName": {}, "indexByName": {"validator": 0, "chain_id": 1, "genesis_time": 2, "app_hash": 3}}}]},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Per-validator consensus params from /genesis. Rows: (validator, param, value). Scan each param for value consistency across validators. Prometheus label-valued schema means Grafana shows one row per (validator, param) — use column filters or sorting to group by param.", "fieldConfig": {"defaults": {"unit": "none", "custom": {"align": "auto", "cellOptions": {"type": "auto"}}}, "overrides": []}, "gridPos": {"h": 12, "w": 24, "x": 0, "y": 26}, "id": 9, "options": {"showHeader": true}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator, param, value) (last_over_time(sentinel_genesis_consensus_param{validator=~\"$validator\"}[1h]))", "format": "table", "instant": true, "refId": "A"}], "title": "Genesis consensus params", "type": "table", "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "__name__": true, "job": true, "instance": true}, "renameByName": {}}}]},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Genesis validator set as observed by $validator. Should be identical across the fleet — app_hash divergence in the panel above is how you catch a mismatch.", "fieldConfig": {"defaults": {"unit": "none", "custom": {"align": "auto", "cellOptions": {"type": "auto"}}}, "overrides": []}, "gridPos": {"h": 10, "w": 24, "x": 0, "y": 38}, "id": 10, "options": {"showHeader": true}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "max by (validator, address, pub_key, power, name) (last_over_time(sentinel_genesis_validator{validator=~\"$validator\"}[1h]))", "format": "table", "instant": true, "refId": "A"}], "title": "Genesis validator set (as seen by $validator)", "type": "table", "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "__name__": true, "job": true, "instance": true}, "renameByName": {}, "indexByName": {"validator": 0, "address": 1, "name": 2, "power": 3, "pub_key": 4}}}]},
-    {"type": "row", "title": "Config drift — metadata collector", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 48}, "id": 1002, "panels": []},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct values of application.prune_strategy across the fleet. 1 = agreement, ≥2 = drift.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 8, "x": 0, "y": 49}, "id": 100, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"application.prune_strategy\"}[1m]))))", "legendFormat": "prune_strategy", "refId": "A"}], "title": "application.prune_strategy", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct values of consensus.peer_gossip_sleep_duration across the fleet. 1 = agreement, ≥2 = drift.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 8, "x": 8, "y": 49}, "id": 101, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"consensus.peer_gossip_sleep_duration\"}[1m]))))", "legendFormat": "peer_gossip_sleep_duration", "refId": "A"}], "title": "consensus.peer_gossip_sleep_duration", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct values of consensus.timeout_commit across the fleet. 1 = agreement, ≥2 = drift.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 8, "x": 16, "y": 49}, "id": 102, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"consensus.timeout_commit\"}[1m]))))", "legendFormat": "timeout_commit", "refId": "A"}], "title": "consensus.timeout_commit", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct values of mempool.size across the fleet. 1 = agreement, ≥2 = drift.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 8, "x": 0, "y": 53}, "id": 103, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"mempool.size\"}[1m]))))", "legendFormat": "size", "refId": "A"}], "title": "mempool.size", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct values of p2p.flush_throttle_timeout across the fleet. 1 = agreement, ≥2 = drift.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 8, "x": 8, "y": 53}, "id": 104, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.flush_throttle_timeout\"}[1m]))))", "legendFormat": "flush_throttle_timeout", "refId": "A"}], "title": "p2p.flush_throttle_timeout", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct values of p2p.max_num_outbound_peers across the fleet. 1 = agreement, ≥2 = drift.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 8, "x": 16, "y": 53}, "id": 105, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.max_num_outbound_peers\"}[1m]))))", "legendFormat": "max_num_outbound_peers", "refId": "A"}], "title": "p2p.max_num_outbound_peers", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Distinct values of p2p.pex across the fleet. 1 = agreement, ≥2 = drift.", "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 8, "x": 0, "y": 57}, "id": 106, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center"}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.pex\"}[1m]))))", "legendFormat": "pex", "refId": "A"}], "title": "p2p.pex", "type": "stat"},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Per-validator config values (gnoland config.toml via fsnotify-watched metadata collector). Rows: (validator, key, value). Scan each key for value consistency across validators.", "fieldConfig": {"defaults": {"unit": "none", "custom": {"align": "auto", "cellOptions": {"type": "auto"}}}, "overrides": []}, "gridPos": {"h": 12, "w": 24, "x": 0, "y": 61}, "id": 200, "options": {"showHeader": true}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "last_over_time(sentinel_node_config{validator=~\"$validator\"}[1h])", "format": "table", "instant": true, "refId": "A"}], "title": "Config values (validator)", "type": "table", "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "__name__": true, "job": true, "instance": true}, "renameByName": {}}}]},
-    {"type": "row", "title": "Sentry drift — beacon-augmented", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 73}, "id": 1003, "panels": []},
-    {"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "description": "Same config keys as above but read on the sentry host (via beacon). Compare side-by-side with the validator-side table to spot p2p.pex or any other drift between the two machines. Empty if no beacon is deployed for this validator.", "fieldConfig": {"defaults": {"unit": "none", "custom": {"align": "auto", "cellOptions": {"type": "auto"}}}, "overrides": []}, "gridPos": {"h": 12, "w": 24, "x": 0, "y": 74}, "id": 201, "options": {"showHeader": true}, "pluginVersion": "12.4.1", "targets": [{"datasource": {"type": "prometheus", "uid": "victoriametrics"}, "expr": "last_over_time(sentinel_sentry_config{validator=~\"$validator\"}[1h])", "format": "table", "instant": true, "refId": "A"}], "title": "Config values (sentry)", "type": "table", "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "__name__": true, "job": true, "instance": true}, "renameByName": {}}}]}
+    {
+      "type": "row",
+      "title": "Binary drift — RPC /status.node_info",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1000,
+      "panels": []
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct values of the version label across fleet. 1 = agreement, ≥2 = version drift.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (version) (max by (validator, version) (last_over_time(sentinel_node_build_info[1m]))))",
+          "legendFormat": "distinct values",
+          "refId": "A"
+        }
+      ],
+      "title": "Version agreement",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct values of chain_id. Divergence means you're running two different chains.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (chain_id) (max by (validator, chain_id) (last_over_time(sentinel_node_build_info[1m]))))",
+          "legendFormat": "distinct values",
+          "refId": "A"
+        }
+      ],
+      "title": "Chain ID agreement",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Per-validator build identity (from /status.node_info) joined with the sentry's own build identity when the beacon is deployed (sentry_moniker/sentry_version come from sentinel_sentry_info). A validator vs. sentry version gap is a deployment drift signal.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 5 },
+      "id": 4,
+      "options": { "showHeader": true },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator, chain_id, moniker, version) (last_over_time(sentinel_node_build_info{validator=~\"$validator\"}[1m]))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator, sentry_moniker, sentry_version) (last_over_time(sentinel_sentry_info{validator=~\"$validator\"}[1m]))",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Build info — validator + sentry per row",
+      "type": "table",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": { "byField": "validator", "mode": "outer" }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "Value #A": true,
+              "Value #B": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "job 1": true,
+              "job 2": true,
+              "instance 1": true,
+              "instance 2": true
+            },
+            "renameByName": {},
+            "indexByName": {
+              "validator": 0,
+              "chain_id": 1,
+              "version": 2,
+              "moniker": 3,
+              "sentry_moniker": 4,
+              "sentry_version": 5
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "validator",
+                "chain_id",
+                "version",
+                "moniker",
+                "sentry_moniker",
+                "sentry_version"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Chain drift — RPC /genesis",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "id": 1001,
+      "panels": []
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct genesis app_hash values. MUST be 1 across the whole fleet. Non-1 = nodes are on different chains/forks.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 14 },
+      "id": 5,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (app_hash) (max by (validator, app_hash) (last_over_time(sentinel_genesis_info[1m]))))",
+          "legendFormat": "distinct values",
+          "refId": "A"
+        }
+      ],
+      "title": "App hash agreement",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct genesis_time values.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 14 },
+      "id": 6,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (genesis_time) (max by (validator, genesis_time) (last_over_time(sentinel_genesis_info[1m]))))",
+          "legendFormat": "distinct values",
+          "refId": "A"
+        }
+      ],
+      "title": "Genesis time agreement",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct genesis chain_id values.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 14 },
+      "id": 7,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (chain_id) (max by (validator, chain_id) (last_over_time(sentinel_genesis_info[1m]))))",
+          "legendFormat": "distinct values",
+          "refId": "A"
+        }
+      ],
+      "title": "Genesis chain_id agreement",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Per-validator /genesis top-level identity. chain_id, genesis_time and app_hash must match across the whole fleet.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
+      "id": 8,
+      "options": { "showHeader": true },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator, chain_id, genesis_time, app_hash) (last_over_time(sentinel_genesis_info{validator=~\"$validator\"}[1h]))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Genesis info — one row per validator",
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {},
+            "indexByName": {
+              "validator": 0,
+              "chain_id": 1,
+              "genesis_time": 2,
+              "app_hash": 3
+            }
+          }
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Per-validator consensus params from /genesis. Rows: (validator, param, value). Scan each param for value consistency across validators. Prometheus label-valued schema means Grafana shows one row per (validator, param) — use column filters or sorting to group by param.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 26 },
+      "id": 9,
+      "options": { "showHeader": true },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator, param, value) (last_over_time(sentinel_genesis_consensus_param{validator=~\"$validator\"}[1h]))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Genesis consensus params",
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {}
+          }
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Genesis validator set as observed by $validator. Should be identical across the fleet — app_hash divergence in the panel above is how you catch a mismatch.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 38 },
+      "id": 10,
+      "options": { "showHeader": true },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (validator, address, pub_key, power, name) (last_over_time(sentinel_genesis_validator{validator=~\"$validator\"}[1h]))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Genesis validator set (as seen by $validator)",
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {},
+            "indexByName": {
+              "validator": 0,
+              "address": 1,
+              "name": 2,
+              "power": 3,
+              "pub_key": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Config drift — metadata collector",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 48 },
+      "id": 1002,
+      "panels": []
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct values of application.prune_strategy across the fleet. 1 = agreement, ≥2 = drift.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 49 },
+      "id": 100,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"application.prune_strategy\"}[1m]))))",
+          "legendFormat": "prune_strategy",
+          "refId": "A"
+        }
+      ],
+      "title": "application.prune_strategy",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct values of consensus.peer_gossip_sleep_duration across the fleet. 1 = agreement, ≥2 = drift.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 49 },
+      "id": 101,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"consensus.peer_gossip_sleep_duration\"}[1m]))))",
+          "legendFormat": "peer_gossip_sleep_duration",
+          "refId": "A"
+        }
+      ],
+      "title": "consensus.peer_gossip_sleep_duration",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct values of consensus.timeout_commit across the fleet. 1 = agreement, ≥2 = drift.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 49 },
+      "id": 102,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"consensus.timeout_commit\"}[1m]))))",
+          "legendFormat": "timeout_commit",
+          "refId": "A"
+        }
+      ],
+      "title": "consensus.timeout_commit",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct values of mempool.size across the fleet. 1 = agreement, ≥2 = drift.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 53 },
+      "id": 103,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"mempool.size\"}[1m]))))",
+          "legendFormat": "size",
+          "refId": "A"
+        }
+      ],
+      "title": "mempool.size",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct values of p2p.flush_throttle_timeout across the fleet. 1 = agreement, ≥2 = drift.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 53 },
+      "id": 104,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.flush_throttle_timeout\"}[1m]))))",
+          "legendFormat": "flush_throttle_timeout",
+          "refId": "A"
+        }
+      ],
+      "title": "p2p.flush_throttle_timeout",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct values of p2p.max_num_outbound_peers across the fleet. 1 = agreement, ≥2 = drift.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 53 },
+      "id": 105,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.max_num_outbound_peers\"}[1m]))))",
+          "legendFormat": "max_num_outbound_peers",
+          "refId": "A"
+        }
+      ],
+      "title": "p2p.max_num_outbound_peers",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Distinct values of p2p.pex across the fleet. 1 = agreement, ≥2 = drift.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 57 },
+      "id": 106,
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (value) (max by (validator, value) (last_over_time(sentinel_node_config{key=\"p2p.pex\"}[1m]))))",
+          "legendFormat": "pex",
+          "refId": "A"
+        }
+      ],
+      "title": "p2p.pex",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Per-validator config values (gnoland config.toml via fsnotify-watched metadata collector). Rows: (validator, key, value). Scan each key for value consistency across validators.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 61 },
+      "id": 200,
+      "options": { "showHeader": true },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "last_over_time(sentinel_node_config{validator=~\"$validator\"}[1h])",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Config values (validator)",
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {}
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Sentry drift — beacon-augmented",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 73 },
+      "id": 1003,
+      "panels": []
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "description": "Same config keys as above but read on the sentry host (via beacon). Compare side-by-side with the validator-side table to spot p2p.pex or any other drift between the two machines. Empty if no beacon is deployed for this validator.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 74 },
+      "id": 201,
+      "options": { "showHeader": true },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "last_over_time(sentinel_sentry_config{validator=~\"$validator\"}[1h])",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Config values (sentry)",
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {}
+          }
+        }
+      ]
+    }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
   "tags": ["validator", "metadata"],
   "templating": {
     "list": [
-      {"current": {"selected": true, "text": ["All"], "value": ["$__all"]}, "datasource": {"type": "prometheus", "uid": "victoriametrics"}, "definition": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)", "includeAll": true, "label": "Validator", "multi": true, "name": "validator", "options": [], "query": {"query": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)", "refId": "PrometheusVariableQueryEditor-VariableQuery"}, "refresh": 1, "regex": "", "skipUrlSync": false, "sort": 1, "type": "query"}
+      {
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+        "definition": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)",
+        "includeAll": true,
+        "label": "Validator",
+        "multi": true,
+        "name": "validator",
+        "options": [],
+        "query": {
+          "query": "label_values({__name__=~\"sentinel_rpc_latest_block_height|sentinel_host_cpu_percent|block_interval_hist_count|inbound_peers_gauge\"}, validator)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
     ]
   },
-  "time": {"from": "now-5m", "to": "now"},
+  "time": { "from": "now-5m", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
   "title": "Validator Metadata",
