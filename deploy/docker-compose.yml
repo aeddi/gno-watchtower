@@ -22,6 +22,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+      target: watchtower
     command: ["run", "/etc/watchtower/config.toml"]
     volumes:
       - ./watchtower.toml:/etc/watchtower/config.toml:ro

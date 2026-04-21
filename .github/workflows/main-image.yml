@@ -1,11 +1,13 @@
 # Main-branch Docker images: publishes a floating :main tag + immutable
-# :sha-* tag for both sentinel and beacon on every push to main. Also runs
-# on PRs as a build-only validation (no registry push, no packages:write
-# scope) so broken Dockerfiles are caught before merge.
+# :sha-* tag for watchtower, sentinel and beacon on every push to main.
+# Also runs on PRs as a build-only validation (no registry push, no
+# packages:write scope) so broken Dockerfiles are caught before merge.
 #
 # Binaries are NOT built here — that happens on tag push via release.yml.
 # This workflow exists so devs who want to run bleeding-edge images can do
-# `docker pull .../{sentinel,beacon}:main` without waiting for a release cut.
+# `docker pull .../{watchtower,sentinel,beacon}:main` without waiting for a
+# release cut. All three images are built from the root Dockerfile via
+# --target.
 name: main-image
 
 on:
@@ -22,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # PR builds: validate both Dockerfiles compile for both platforms; no push.
+  # PR builds: validate every target compiles for both platforms; no push.
   # Deliberately no packages:write scope — a compromised action in the build
   # graph can't exfiltrate the registry token if the job never had it.
   validate:
@@ -34,9 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image:
-          - { name: sentinel, dockerfile: sentinel.Dockerfile }
-          - { name: beacon, dockerfile: beacon.Dockerfile }
+        image: [sentinel, beacon, watchtower]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,15 +50,16 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.image.dockerfile }}
+          file: Dockerfile
+          target: ${{ matrix.image }}
           platforms: linux/amd64,linux/arm64
           push: false
           build-args: |
             VERSION=pr-${{ github.event.pull_request.number }}
-          cache-from: type=gha,scope=${{ matrix.image.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
-  # Push builds: tag :main + :sha-* and publish to GHCR for both images.
+  # Push builds: tag :main + :sha-* and publish to GHCR for each image.
   publish:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
@@ -69,9 +70,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image:
-          - { name: sentinel, dockerfile: sentinel.Dockerfile }
-          - { name: beacon, dockerfile: beacon.Dockerfile }
+        image: [sentinel, beacon, watchtower]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -91,7 +90,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/aeddi/gno-watchtower/${{ matrix.image.name }}
+          images: ghcr.io/aeddi/gno-watchtower/${{ matrix.image }}
           tags: |
             type=raw,value=main
             type=sha,prefix=sha-,format=short
@@ -99,12 +98,13 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.image.dockerfile }}
+          file: Dockerfile
+          target: ${{ matrix.image }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ github.sha }}
-          cache-from: type=gha,scope=${{ matrix.image.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

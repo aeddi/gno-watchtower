@@ -3,8 +3,9 @@
 # Fires on tag pushes matching v*.*.* — which happen automatically when a
 # release-please PR merges (see release-please.yml). The goreleaser and
 # docker jobs run in parallel: goreleaser attaches cross-platform binary
-# archives to the GitHub Release, docker pushes multi-arch sentinel and
-# beacon images to ghcr.io/aeddi/gno-watchtower/{sentinel,beacon}.
+# archives to the GitHub Release, docker pushes multi-arch watchtower,
+# sentinel and beacon images to ghcr.io/aeddi/gno-watchtower/<name>.
+# All three images are built from the root Dockerfile via --target.
 name: release
 
 on:
@@ -56,13 +57,14 @@ jobs:
       matrix:
         image:
           - name: sentinel
-            dockerfile: sentinel.Dockerfile
             title: gno-watchtower sentinel
             description: Sentinel sidecar for gno-watchtower monitoring.
           - name: beacon
-            dockerfile: beacon.Dockerfile
             title: gno-watchtower beacon
             description: Sentry-side Noise relay for gno-watchtower monitoring.
+          - name: watchtower
+            title: gno-watchtower
+            description: Central ingest/auth/forward service for gno-watchtower.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -99,7 +101,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.image.dockerfile }}
+          file: Dockerfile
+          target: ${{ matrix.image.name }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
