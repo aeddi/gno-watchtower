@@ -2,10 +2,11 @@
 #
 # Multi-target Dockerfile for every gno-watchtower binary.
 #
-# Targets:
-#   watchtower — central server (deploy/docker-compose.yml builds this)
-#   sentinel   — validator-side collector (published to ghcr.io/.../sentinel)
-#   beacon     — sentry-side Noise relay (published to ghcr.io/.../beacon)
+# Targets (all three published to ghcr.io/aeddi/gno-watchtower/<name>):
+#   sentinel   — validator-side collector
+#   beacon     — sentry-side Noise relay
+#   watchtower — central ingest/auth/forward service (also built locally by
+#                deploy/docker-compose.yml to run the self-hosted server stack)
 #
 # All three share a single `base` stage that does `go mod download` + copies
 # the source tree once. Per-binary `builder-*` stages then compile only their
