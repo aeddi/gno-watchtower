@@ -42,7 +42,10 @@ func New(serverURL, token string, noiseCfg *noise.Config) (*Sender, error) {
 		// Rewrite noise://host:port/path → http://host:port/path for the
 		// http.Client; the Transport below gives it a Noise-wrapped conn.
 		rewritten := "http://" + strings.TrimPrefix(serverURL, "noise://")
-		cfg := *noiseCfg // copy so the caller's struct isn't retained
+		// Deep copy (Clone copies the AuthorizedKeys backing slice) so the
+		// caller's struct isn't retained and mutations to their AuthorizedKeys
+		// after New() returns cannot race with our Dial goroutines.
+		cfg := noiseCfg.Clone()
 		transport := &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				return noise.Dial(ctx, network, addr, cfg)

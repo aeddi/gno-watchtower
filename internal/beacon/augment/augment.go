@@ -2,15 +2,16 @@
 // view of the network: peer count (from /net_info), chain/moniker/version
 // (from /status), and configured metadata keys (from config.toml).
 //
-// The augmenter fails open: if any of the three fetches fails, the original
-// payload is forwarded unchanged with a warning log. Missing sentry data in
-// the watchtower is better than missing validator data.
+// The augmenter fails open per fetch: each of the three sentry lookups
+// contributes independently, so a single sentry-side hiccup on /net_info
+// does not cost us sentry_status + sentry_config in the same tick. When
+// every fetch fails, the original payload is forwarded unchanged. Missing
+// sentry data in the watchtower is better than missing validator data.
 package augment
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"strings"
 	"sync"
@@ -97,8 +98,11 @@ func (a *Augmenter) augmentRPC(ctx context.Context, body []byte) ([]byte, error)
 	ctx, cancel := context.WithTimeout(ctx, augmentDeadline)
 	defer cancel()
 
-	// Run the three fetches in parallel; any failure aborts and the caller
-	// falls back to passing through. 1-2 ms latency added per augmented tick.
+	// Run the three fetches in parallel. Per-fetch fail-open: each key is
+	// injected only if its own RPC succeeded; one sentry hiccup on /net_info
+	// must not cost us sentry_status + sentry_config in the same tick. When
+	// all three fail we return (nil, nil) so the caller forwards the original
+	// body unchanged. 1-2 ms latency added per augmented tick.
 	var (
 		wg                sync.WaitGroup
 		statusRaw, netRaw json.RawMessage
@@ -113,17 +117,31 @@ func (a *Augmenter) augmentRPC(ctx context.Context, body []byte) ([]byte, error)
 	}
 	wg.Wait()
 
-	if err := errors.Join(statusErr, netErr, configErr); err != nil {
-		return nil, err
-	}
-
-	// Inject the three augmentation keys. Re-marshal the modified data map
+	// Inject what we got; skip what failed. Re-marshal the modified data map
 	// back into payload.data without touching other top-level fields of the
 	// payload (like collected_at etc.).
-	data["sentry_status"] = statusRaw
-	data["sentry_net_info"] = netRaw
-	if configRaw != nil {
+	injected := 0
+	if statusErr == nil && len(statusRaw) > 0 {
+		data["sentry_status"] = statusRaw
+		injected++
+	} else if statusErr != nil {
+		a.log.Debug("augment: sentry /status fetch failed — skipping sentry_status", "err", statusErr)
+	}
+	if netErr == nil && len(netRaw) > 0 {
+		data["sentry_net_info"] = netRaw
+		injected++
+	} else if netErr != nil {
+		a.log.Debug("augment: sentry /net_info fetch failed — skipping sentry_net_info", "err", netErr)
+	}
+	if configErr == nil && configRaw != nil {
 		data["sentry_config"] = configRaw
+		injected++
+	} else if configErr != nil {
+		a.log.Debug("augment: sentry config fetch failed — skipping sentry_config", "err", configErr)
+	}
+	if injected == 0 {
+		// All fetches failed — pass through the original body unchanged.
+		return nil, nil
 	}
 	reencoded, err := json.Marshal(data)
 	if err != nil {

@@ -8,6 +8,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -127,7 +128,7 @@ func (s *Server) Run(ctx context.Context) error {
 	}()
 
 	s.log.Info("beacon listening", "addr", s.listenAddr, "upstream", s.upstream.String())
-	if err := s.srv.Serve(s.lis); err != nil && err != http.ErrServerClosed {
+	if err := s.srv.Serve(s.lis); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
@@ -150,7 +151,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	// fall through to the original body; never drop a request because of an
 	// augmentation issue.
 	if s.transform != nil {
-		out := safeTransform(s.log, s.transform, r.Context(), r.URL.Path, body)
+		out := safeTransform(r.Context(), s.log, s.transform, r.URL.Path, body)
 		if out != nil {
 			body = out
 		}
@@ -187,7 +188,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 // safeTransform calls fn but recovers from panics, logging and returning nil
 // so the request falls back to the original body. Augmentation is
 // best-effort: a crash in the hook must not drop the sentinel's data.
-func safeTransform(log *slog.Logger, fn BodyTransform, ctx context.Context, path string, body []byte) (out []byte) {
+func safeTransform(ctx context.Context, log *slog.Logger, fn BodyTransform, path string, body []byte) (out []byte) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error("transform panic", "path", path, "err", r)

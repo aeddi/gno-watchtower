@@ -104,25 +104,66 @@ func TestTransform_RPCWithNetInfo_InjectsSentryKeys(t *testing.T) {
 	}
 }
 
-func TestTransform_StatusFails_PassesThrough(t *testing.T) {
+// Per-key fail-open: one sentry hiccup costs only the failing key's series,
+// not the whole augmentation. A missing /status still leaves sentry_net_info
+// injected; a missing /net_info still leaves sentry_status injected.
+
+func TestTransform_StatusFails_OtherKeysInjected(t *testing.T) {
 	srv := newFakeGnoland(t, map[string]bool{"/status": true})
 	defer srv.Close()
 
 	a := New(&config.Config{RPC: config.RPCConfig{RPCURL: srv.URL}}, nil, logger.Noop())
 	body := withNetInfo(`{"n_peers":"7"}`)
-	if out := a.Transform(context.Background(), "/rpc", body); out != nil {
-		t.Fatalf("fail-open expected on /status failure, got %q", out)
+	out := a.Transform(context.Background(), "/rpc", body)
+	if out == nil {
+		t.Fatal("expected partial augmentation; got passthrough")
+	}
+	var env struct {
+		Data map[string]json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(out, &env); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := env.Data["sentry_status"]; ok {
+		t.Error("sentry_status should be absent when /status fetch failed")
+	}
+	if _, ok := env.Data["sentry_net_info"]; !ok {
+		t.Error("sentry_net_info should still be injected when only /status failed")
 	}
 }
 
-func TestTransform_NetInfoFails_PassesThrough(t *testing.T) {
+func TestTransform_NetInfoFails_OtherKeysInjected(t *testing.T) {
 	srv := newFakeGnoland(t, map[string]bool{"/net_info": true})
 	defer srv.Close()
 
 	a := New(&config.Config{RPC: config.RPCConfig{RPCURL: srv.URL}}, nil, logger.Noop())
 	body := withNetInfo(`{"n_peers":"7"}`)
+	out := a.Transform(context.Background(), "/rpc", body)
+	if out == nil {
+		t.Fatal("expected partial augmentation; got passthrough")
+	}
+	var env struct {
+		Data map[string]json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(out, &env); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := env.Data["sentry_net_info"]; ok {
+		t.Error("sentry_net_info should be absent when /net_info fetch failed")
+	}
+	if _, ok := env.Data["sentry_status"]; !ok {
+		t.Error("sentry_status should still be injected when only /net_info failed")
+	}
+}
+
+func TestTransform_AllFetchesFail_PassesThrough(t *testing.T) {
+	srv := newFakeGnoland(t, map[string]bool{"/status": true, "/net_info": true})
+	defer srv.Close()
+
+	a := New(&config.Config{RPC: config.RPCConfig{RPCURL: srv.URL}}, nil, logger.Noop())
+	body := withNetInfo(`{"n_peers":"7"}`)
 	if out := a.Transform(context.Background(), "/rpc", body); out != nil {
-		t.Fatalf("fail-open expected on /net_info failure, got %q", out)
+		t.Fatalf("all-failed augmentation should pass through; got %q", out)
 	}
 }
 

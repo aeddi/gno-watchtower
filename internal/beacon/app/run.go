@@ -43,13 +43,11 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		if err := srv.Run(ctx); err != nil && ctx.Err() == nil {
 			appLog.Error("server stopped", "err", err)
 		}
-	}()
+	})
 
 	<-ctx.Done()
 	appLog.Info("beacon shutdown")
