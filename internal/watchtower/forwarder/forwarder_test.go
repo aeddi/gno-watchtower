@@ -148,8 +148,8 @@ func TestForwardLogs_UsesGnoFloatEpochTimestamp(t *testing.T) {
 
 	var push struct {
 		Streams []struct {
-			Stream map[string]string `json:"stream"`
-			Values [][]string        `json:"values"`
+			Stream map[string]string   `json:"stream"`
+			Values [][]json.RawMessage `json:"values"`
 		} `json:"streams"`
 	}
 	if err := json.Unmarshal(lokiBody, &push); err != nil {
@@ -158,7 +158,11 @@ func TestForwardLogs_UsesGnoFloatEpochTimestamp(t *testing.T) {
 	if len(push.Streams) == 0 || len(push.Streams[0].Values) == 0 {
 		t.Fatal("no values pushed to loki")
 	}
-	gotTS := push.Streams[0].Values[0][0]
+	// Each value is [ "<nanos>", "<line>", {metadata} ]; we only need [0].
+	var gotTS string
+	if err := json.Unmarshal(push.Streams[0].Values[0][0], &gotTS); err != nil {
+		t.Fatalf("unmarshal ts: %v", err)
+	}
 	// 1776544197.2256565 seconds → 1776544197225656500 ns. Allow ±1ms rounding slack.
 	const wantNs = int64(1776544197225656500)
 	var got int64
@@ -283,8 +287,8 @@ func TestForwardLogs_DecompressesAndPushesToLoki(t *testing.T) {
 
 	var push struct {
 		Streams []struct {
-			Stream map[string]string `json:"stream"`
-			Values [][]string        `json:"values"`
+			Stream map[string]string   `json:"stream"`
+			Values [][]json.RawMessage `json:"values"`
 		} `json:"streams"`
 	}
 	if err := json.Unmarshal(lokiBody, &push); err != nil {
@@ -300,61 +304,20 @@ func TestForwardLogs_DecompressesAndPushesToLoki(t *testing.T) {
 	if s.Stream["level"] != "warn" {
 		t.Errorf("level label: got %q", s.Stream["level"])
 	}
-	if s.Stream["module"] != "rpc-server" {
-		t.Errorf("module label: got %q (want rpc-server)", s.Stream["module"])
+	// module must NOT be a stream label — cardinality concern. It goes in
+	// per-entry structured metadata instead.
+	if _, ok := s.Stream["module"]; ok {
+		t.Errorf("module promoted to stream label (should be structured metadata): %v", s.Stream)
 	}
-}
-
-func TestForwardLogs_SplitsByModule(t *testing.T) {
-	// One payload with lines from multiple modules must produce one Loki stream
-	// per (validator, level, module) tuple so `module` is an indexed label
-	// (required for Grafana's label_values(module) dropdown).
-	var lokiBody []byte
-	lokiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		lokiBody, _ = io.ReadAll(r.Body)
-	}))
-	defer lokiSrv.Close()
-
-	payload := protocol.LogPayload{
-		Level: "info",
-		Lines: []json.RawMessage{
-			json.RawMessage(`{"level":"info","ts":1.0,"msg":"a","module":"rpc-server"}`),
-			json.RawMessage(`{"level":"info","ts":2.0,"msg":"b","module":"consensus"}`),
-			json.RawMessage(`{"level":"info","ts":3.0,"msg":"c","module":"rpc-server"}`),
-		},
+	if len(s.Values) == 0 {
+		t.Fatal("no values in stream")
 	}
-	body, _ := json.Marshal(payload)
-	compressed, _ := zstdCompress(body)
-
-	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL, nil)
-	if err := f.ForwardLogs(context.Background(), "val-01", compressed, ""); err != nil {
-		t.Fatalf("ForwardLogs: %v", err)
+	var md map[string]string
+	if err := json.Unmarshal(s.Values[0][2], &md); err != nil {
+		t.Fatalf("unmarshal structured metadata: %v", err)
 	}
-
-	var push struct {
-		Streams []struct {
-			Stream map[string]string `json:"stream"`
-			Values [][]string        `json:"values"`
-		} `json:"streams"`
-	}
-	if err := json.Unmarshal(lokiBody, &push); err != nil {
-		t.Fatalf("parse loki body: %v", err)
-	}
-	byModule := make(map[string]int)
-	for _, s := range push.Streams {
-		if s.Stream["validator"] != "val-01" || s.Stream["level"] != "info" {
-			t.Errorf("unexpected stream labels: %v", s.Stream)
-		}
-		byModule[s.Stream["module"]] += len(s.Values)
-	}
-	if byModule["rpc-server"] != 2 {
-		t.Errorf("rpc-server line count: got %d, want 2", byModule["rpc-server"])
-	}
-	if byModule["consensus"] != 1 {
-		t.Errorf("consensus line count: got %d, want 1", byModule["consensus"])
-	}
-	if len(byModule) != 2 {
-		t.Errorf("distinct modules: got %d (%v), want 2", len(byModule), byModule)
+	if md["module"] != "rpc-server" {
+		t.Errorf("module metadata: got %q (want rpc-server)", md["module"])
 	}
 }
 
@@ -383,17 +346,22 @@ func TestForwardLogs_MissingModuleFallsBackToUnknown(t *testing.T) {
 	}
 	var push struct {
 		Streams []struct {
-			Stream map[string]string `json:"stream"`
+			Stream map[string]string   `json:"stream"`
+			Values [][]json.RawMessage `json:"values"`
 		} `json:"streams"`
 	}
 	if err := json.Unmarshal(lokiBody, &push); err != nil {
 		t.Fatalf("parse loki body: %v", err)
 	}
-	if len(push.Streams) != 1 {
-		t.Fatalf("stream count: got %d, want 1", len(push.Streams))
+	if len(push.Streams) != 1 || len(push.Streams[0].Values) != 1 {
+		t.Fatalf("expected 1 stream with 1 value, got %+v", push)
 	}
-	if push.Streams[0].Stream["module"] != "unknown" {
-		t.Errorf("missing module: got %q, want 'unknown'", push.Streams[0].Stream["module"])
+	var md map[string]string
+	if err := json.Unmarshal(push.Streams[0].Values[0][2], &md); err != nil {
+		t.Fatalf("unmarshal metadata: %v", err)
+	}
+	if md["module"] != "unknown" {
+		t.Errorf("missing module metadata: got %q, want 'unknown'", md["module"])
 	}
 }
 
@@ -545,8 +513,8 @@ func TestForwardLogs_ClockSkewClampedToNow(t *testing.T) {
 
 	var push struct {
 		Streams []struct {
-			Stream map[string]string `json:"stream"`
-			Values [][]string        `json:"values"`
+			Stream map[string]string   `json:"stream"`
+			Values [][]json.RawMessage `json:"values"`
 		} `json:"streams"`
 	}
 	if err := json.Unmarshal(lokiBody, &push); err != nil {
@@ -555,7 +523,11 @@ func TestForwardLogs_ClockSkewClampedToNow(t *testing.T) {
 	if len(push.Streams) != 1 || len(push.Streams[0].Values) != 1 {
 		t.Fatalf("expected 1 stream with 1 value, got %+v", push)
 	}
-	gotNano, err := strconv.ParseInt(push.Streams[0].Values[0][0], 10, 64)
+	var tsStr string
+	if err := json.Unmarshal(push.Streams[0].Values[0][0], &tsStr); err != nil {
+		t.Fatalf("unmarshal ts: %v", err)
+	}
+	gotNano, err := strconv.ParseInt(tsStr, 10, 64)
 	if err != nil {
 		t.Fatalf("parse ts: %v", err)
 	}

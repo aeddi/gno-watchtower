@@ -163,9 +163,13 @@ type lokiPush struct {
 	Streams []lokiStream `json:"streams"`
 }
 
+// lokiStream follows the Loki push API shape. Each value is a 3-element
+// heterogeneous array: [ "<nanos>", "<log line>", { "key": "value", ... } ]
+// where the third element is per-entry structured metadata. Using []any here
+// lets encoding/json emit that mixed shape without a custom Marshaler.
 type lokiStream struct {
 	Stream map[string]string `json:"stream"`
-	Values [][]string        `json:"values"`
+	Values [][]any           `json:"values"`
 }
 
 // Asymmetric clock-skew window for Loki-bound timestamps. Mirrors Loki's own
@@ -178,52 +182,59 @@ const (
 )
 
 // toLokiPush converts a LogPayload to the Loki push API format.
-// Timestamps are extracted from the "ts" field of each line (nanoseconds since
-// epoch). Lines without a parseable "ts" field, or whose ts would fall outside
-// Loki's own ingester gates (see maxLogsTsPastSkew / maxLogsTsFutureSkew), use
-// the watchtower's receive time.
 //
-// Lines are split across streams by their "module" field so that `module`
-// becomes an indexed Loki label (required for Grafana's label_values(module)
-// dropdown — structured metadata extracted at query time via `| json` doesn't
-// populate the index). Missing/empty module falls back to "unknown"; sentinel
-// guarantees non-JSON stdout arrives here tagged as module="sentinel-raw".
+// Timestamps come from each line's "ts" field (nanoseconds since epoch). Lines
+// without a parseable "ts", or whose ts falls outside Loki's ingester gates
+// (see maxLogsTsPastSkew / maxLogsTsFutureSkew), use the watchtower's receive
+// time.
+//
+// All lines for a given (validator, level) share a single stream. The "module"
+// field is emitted as *per-entry structured metadata*, not a stream label —
+// gnoland has ~15 distinct modules and promoting them to labels would push
+// stream cardinality toward validators × levels × modules, which Loki treats
+// as anti-pattern. Queries filter via `| module="X"` at query time; requires
+// `allow_structured_metadata: true` in loki-config.yml (our default).
+//
+// Missing/empty module falls back to "unknown"; sentinel guarantees non-JSON
+// stdout arrives here tagged as module="sentinel-raw".
 func toLokiPush(validator string, payload protocol.LogPayload) (*lokiPush, error) {
 	now := time.Now()
 	type entry struct {
-		nano int64
-		raw  string
+		nano   int64
+		raw    string
+		module string
 	}
-	byModule := make(map[string][]entry)
+	entries := make([]entry, 0, len(payload.Lines))
 	for _, raw := range payload.Lines {
 		mod, ts := extractModuleAndTS(raw, now)
 		if ts.Before(now.Add(-maxLogsTsPastSkew)) || ts.After(now.Add(maxLogsTsFutureSkew)) {
 			ts = now
 		}
-		byModule[mod] = append(byModule[mod], entry{nano: ts.UnixNano(), raw: string(raw)})
+		entries = append(entries, entry{nano: ts.UnixNano(), raw: string(raw), module: mod})
 	}
-	streams := make([]lokiStream, 0, len(byModule))
-	for mod, entries := range byModule {
-		// Loki rejects out-of-order entries per stream with 400. Upstream
-		// sentinel batches preserve order from docker, but sort defensively so
-		// a future reordering upstream can't silently break ingestion. Sort
-		// numerically on the parsed nano rather than the formatted string
-		// because future sub-1970 timestamps would sort incorrectly as strings.
-		slices.SortFunc(entries, func(a, b entry) int { return cmp.Compare(a.nano, b.nano) })
-		values := make([][]string, len(entries))
-		for i, e := range entries {
-			values[i] = []string{strconv.FormatInt(e.nano, 10), e.raw}
+	// Loki rejects out-of-order entries per stream with 400. Upstream sentinel
+	// batches preserve order from docker, but sort defensively. Sort
+	// numerically on the parsed nano rather than the formatted string because
+	// future sub-1970 timestamps would sort incorrectly as strings.
+	slices.SortFunc(entries, func(a, b entry) int { return cmp.Compare(a.nano, b.nano) })
+	values := make([][]any, len(entries))
+	for i, e := range entries {
+		values[i] = []any{
+			strconv.FormatInt(e.nano, 10),
+			e.raw,
+			map[string]string{"module": e.module},
 		}
-		streams = append(streams, lokiStream{
-			Stream: map[string]string{
-				"validator": validator,
-				"level":     payload.Level,
-				"module":    mod,
-			},
-			Values: values,
-		})
 	}
-	return &lokiPush{Streams: streams}, nil
+	if len(values) == 0 {
+		return &lokiPush{Streams: []lokiStream{}}, nil
+	}
+	return &lokiPush{Streams: []lokiStream{{
+		Stream: map[string]string{
+			"validator": validator,
+			"level":     payload.Level,
+		},
+		Values: values,
+	}}}, nil
 }
 
 // extractModuleAndTS reads both the "module" and "ts" fields from a raw JSON
