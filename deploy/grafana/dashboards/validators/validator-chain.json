@@ -115,11 +115,24 @@
                 "value": {
                   "mode": "absolute",
                   "steps": [
-                    { "color": "red", "value": null },
+                    { "color": "transparent", "value": null },
+                    { "color": "red", "value": 0 },
                     { "color": "yellow", "value": 2 },
                     { "color": "green", "value": 3 }
                   ]
                 }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": { "text": "—" }
+                    }
+                  }
+                ]
               }
             ]
           },
