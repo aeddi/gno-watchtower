@@ -40,6 +40,18 @@ builds:
     ldflags:
       - -s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version={{.Version}}
 
+  - id: beacon
+    main: ./cmd/beacon
+    binary: beacon
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version={{.Version}}
+
 archives:
   - id: sentinel
     ids: [sentinel]
@@ -50,6 +62,12 @@ archives:
   - id: watchtower
     ids: [watchtower]
     name_template: "watchtower_{{.Version}}_{{.Os}}_{{.Arch}}"
+    formats: [tar.gz]
+    files:
+      - README.md
+  - id: beacon
+    ids: [beacon]
+    name_template: "beacon_{{.Version}}_{{.Os}}_{{.Arch}}"
     formats: [tar.gz]
     files:
       - README.md

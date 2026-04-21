@@ -1,10 +1,10 @@
-# Tag-triggered release: build binaries (goreleaser) and Docker image (buildx).
+# Tag-triggered release: build binaries (goreleaser) and Docker images (buildx).
 #
 # Fires on tag pushes matching v*.*.* — which happen automatically when a
 # release-please PR merges (see release-please.yml). The goreleaser and
 # docker jobs run in parallel: goreleaser attaches cross-platform binary
-# archives to the GitHub Release, docker pushes a multi-arch sentinel
-# image to ghcr.io/aeddi/gno-watchtower/sentinel.
+# archives to the GitHub Release, docker pushes multi-arch sentinel and
+# beacon images to ghcr.io/aeddi/gno-watchtower/{sentinel,beacon}.
 name: release
 
 on:
@@ -51,6 +51,18 @@ jobs:
     permissions:
       contents: read      # read Dockerfile + source for build
       packages: write     # push to ghcr.io
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: sentinel
+            dockerfile: sentinel.Dockerfile
+            title: gno-watchtower sentinel
+            description: Sentinel sidecar for gno-watchtower monitoring.
+          - name: beacon
+            dockerfile: beacon.Dockerfile
+            title: gno-watchtower beacon
+            description: Sentry-side Noise relay for gno-watchtower monitoring.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,7 +82,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/aeddi/gno-watchtower/sentinel
+          images: ghcr.io/aeddi/gno-watchtower/${{ matrix.image.name }}
           # Semver stripping: v0.2.0 → :0.2.0, :0.2, :latest, :sha-abcd123
           # Retain the v-prefixed form too so `docker pull …:v0.2.0` works.
           tags: |
@@ -80,19 +92,19 @@ jobs:
             type=raw,value=latest
             type=sha,prefix=sha-,format=short
           labels: |
-            org.opencontainers.image.title=gno-watchtower sentinel
-            org.opencontainers.image.description=Sentinel sidecar for gno-watchtower monitoring.
+            org.opencontainers.image.title=${{ matrix.image.title }}
+            org.opencontainers.image.description=${{ matrix.image.description }}
             org.opencontainers.image.licenses=MIT
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: sentinel.Dockerfile
+          file: ${{ matrix.image.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ github.ref_name }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
