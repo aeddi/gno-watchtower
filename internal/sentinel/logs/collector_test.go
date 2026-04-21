@@ -3,6 +3,8 @@ package logs_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -56,8 +58,8 @@ func TestParseLevel(t *testing.T) {
 		{`{"level":"warn","msg":"x"}`, "warn"},
 		{`{"level":"error","msg":"x"}`, "error"},
 		{`{"level":"unknown","msg":"x"}`, "info"}, // unknown → info
-		{`{"msg":"no level"}`, "info"},             // missing → info
-		{`not json`, "info"},                       // invalid JSON → info
+		{`{"msg":"no level"}`, "info"},            // missing → info
+		{`not json`, "info"},                      // invalid JSON → info
 	}
 	for _, tt := range tests {
 		got := logs.ParseLevel(json.RawMessage(tt.input))
@@ -143,6 +145,37 @@ func TestCollector_BatchesBySize(t *testing.T) {
 		}
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("expected size-triggered batch, not timeout-triggered")
+	}
+}
+
+// reconnectingSource returns from Tail immediately (simulating a closed stream,
+// e.g. when the source docker container restarts). Callers must reconnect.
+type reconnectingSource struct {
+	calls atomic.Int32
+}
+
+func (s *reconnectingSource) Tail(_ context.Context, _ chan<- logs.LogLine) error {
+	s.calls.Add(1)
+	return errors.New("source closed")
+}
+
+func TestCollector_ReconnectsAfterSourceTailReturns(t *testing.T) {
+	// Regression: collector.Run used to start Tail in a fire-and-forget goroutine;
+	// when the source container restarted and Tail returned, sentinel silently
+	// stopped forwarding until its OWN restart. We want Tail to be re-invoked.
+	src := &reconnectingSource{}
+	out := make(chan protocol.LogPayload, 4)
+	c := logs.NewCollector(src, "info", 1024*1024, 10*time.Millisecond, out, logger.Noop())
+	c.SetReconnectBackoff(20 * time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	go c.Run(ctx)
+	<-ctx.Done()
+
+	got := src.calls.Load()
+	if got < 3 {
+		t.Errorf("Tail call count: got %d, want ≥3 (collector must reconnect after Tail returns)", got)
 	}
 }
 

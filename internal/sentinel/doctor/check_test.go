@@ -18,7 +18,6 @@ func TestCheckResult_Fields(t *testing.T) {
 func TestExports_MetadataAndResources(t *testing.T) {
 	// Verify exported symbols compile (compile error = RED).
 	_ = metadata.ConfigKeys
-	_ = metadata.SHA256File
 	_ = metadata.RunCmd
 	_ = metadata.ReadConfigKey
 	_ = resources.ContainerStats

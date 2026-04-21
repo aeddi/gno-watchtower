@@ -48,7 +48,7 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 			afterKey: "container_name",
 			comment:  "Alternative: use journald as log source",
 			key:      "journald_unit",
-			value:    PlaceholderJournaldUnit,
+			value:    placeholderJournaldUnit,
 		})
 	} else if cfg.Logs.Source == LogSourceJournald {
 		alts = append(alts, alternative{
@@ -56,31 +56,19 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 			afterKey: "journald_unit",
 			comment:  "Alternative: use docker as log source",
 			key:      "container_name",
-			value:    PlaceholderContainerName,
+			value:    placeholderContainerName,
 		})
 	}
 
-	// ---- Metadata path/cmd alternatives
+	// ---- Metadata config path/cmd alternative
 	if env.Docker != nil {
-		alts = append(alts, alternative{
-			afterKey: "binary_version_cmd",
-			comment:  "Alternative: use binary path directly (runs <path> version)",
-			key:      "binary_path",
-			value:    PlaceholderBinaryPath,
-		})
 		alts = append(alts, alternative{
 			afterKey: "config_get_cmd",
 			comment:  "Alternative: read config file directly",
 			key:      "config_path",
-			value:    PlaceholderConfigPath,
+			value:    placeholderConfigPath,
 		})
 	} else {
-		alts = append(alts, alternative{
-			afterKey: "binary_path",
-			comment:  "Alternative: run a command to get the version (e.g. via docker exec)",
-			key:      "binary_version_cmd",
-			value:    "docker exec <container> gnoland version",
-		})
 		alts = append(alts, alternative{
 			afterKey: "config_path",
 			comment:  "Alternative: run a command to get config values (e.g. via docker exec)",

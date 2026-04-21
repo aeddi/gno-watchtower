@@ -4,15 +4,19 @@ package sender
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+
+	"github.com/aeddi/gno-watchtower/pkg/noise"
 )
 
 type Sender struct {
@@ -21,47 +25,49 @@ type Sender struct {
 	client    *http.Client
 }
 
-func New(serverURL, token string) *Sender {
+// New builds a Sender. When serverURL uses the noise:// scheme, noiseCfg must
+// be non-nil and the sender routes requests through a Noise-wrapped
+// net.Conn; otherwise standard HTTPS is used.
+//
+// For noise://, the URL seen by the http.Client is internally rewritten to
+// http:// — the transport layer is encrypted by Noise, so the HTTP layer runs
+// in plaintext over the authenticated stream. The URL scheme is a routing
+// hint, nothing more; the real host/port in the URL still drives which TCP
+// peer the sender connects to.
+func New(serverURL, token string, noiseCfg *noise.Config) (*Sender, error) {
+	if strings.HasPrefix(serverURL, "noise://") {
+		if noiseCfg == nil {
+			return nil, fmt.Errorf("server.url is noise:// but no beacon keypair was configured")
+		}
+		// Rewrite noise://host:port/path → http://host:port/path for the
+		// http.Client; the Transport below gives it a Noise-wrapped conn.
+		rewritten := "http://" + strings.TrimPrefix(serverURL, "noise://")
+		// Deep copy (Clone copies the AuthorizedKeys backing slice) so the
+		// caller's struct isn't retained and mutations to their AuthorizedKeys
+		// after New() returns cannot race with our Dial goroutines.
+		cfg := noiseCfg.Clone()
+		transport := &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return noise.Dial(ctx, network, addr, cfg)
+			},
+			// Reuse one persistent Noise session across posts — handshake is
+			// amortised over all the sentinel's traffic.
+			MaxIdleConns:        4,
+			MaxIdleConnsPerHost: 2,
+			IdleConnTimeout:     5 * time.Minute,
+			DisableCompression:  true, // bodies are already handled by sender (zstd/plain)
+		}
+		return &Sender{
+			serverURL: rewritten,
+			token:     token,
+			client:    &http.Client{Transport: transport, Timeout: 30 * time.Second},
+		}, nil
+	}
 	return &Sender{
 		serverURL: serverURL,
 		token:     token,
 		client:    &http.Client{Timeout: 30 * time.Second},
-	}
-}
-
-// Send makes a single POST attempt with a JSON body. Returns an error for non-2xx responses.
-func (s *Sender) Send(ctx context.Context, path string, payload any) error {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-	return s.post(ctx, path, body, "application/json", "")
-}
-
-// SendCompressed makes a single POST attempt with a zstd-compressed JSON body.
-// Sets Content-Encoding: zstd on the request.
-func (s *Sender) SendCompressed(ctx context.Context, path string, payload any) error {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-	compressed := ZstdCompress(body)
-	return s.post(ctx, path, compressed, "application/json", "zstd")
-}
-
-// SendWithRetry retries Send up to maxAttempts times with exponential backoff.
-// initialBackoff is the wait before the second attempt; it doubles each retry, capped at 30s.
-func (s *Sender) SendWithRetry(ctx context.Context, path string, payload any, maxAttempts int, initialBackoff time.Duration) error {
-	return retry(ctx, maxAttempts, initialBackoff, func() error {
-		return s.Send(ctx, path, payload)
-	})
-}
-
-// SendCompressedWithRetry retries SendCompressed up to maxAttempts times with exponential backoff.
-func (s *Sender) SendCompressedWithRetry(ctx context.Context, path string, payload any, maxAttempts int, initialBackoff time.Duration) error {
-	return retry(ctx, maxAttempts, initialBackoff, func() error {
-		return s.SendCompressed(ctx, path, payload)
-	})
+	}, nil
 }
 
 // SendRaw makes a single POST attempt with raw bytes and a specific Content-Type.
@@ -176,15 +182,17 @@ func retry(ctx context.Context, maxAttempts int, initialBackoff time.Duration, f
 }
 
 // zstdEncoder is a reusable stateless encoder; EncodeAll is safe for concurrent use.
-var zstdEncoder = func() *zstd.Encoder {
+// Built lazily on first use via sync.OnceValue so package initialisation stays
+// free of the zstd library's setup cost for callers that never compress.
+var zstdEncoder = sync.OnceValue(func() *zstd.Encoder {
 	enc, err := zstd.NewWriter(nil)
 	if err != nil {
 		panic("init zstd encoder: " + err.Error())
 	}
 	return enc
-}()
+})
 
 // ZstdCompress returns the zstd-compressed form of data.
 func ZstdCompress(data []byte) []byte {
-	return zstdEncoder.EncodeAll(data, make([]byte, 0, len(data)))
+	return zstdEncoder().EncodeAll(data, make([]byte, 0, len(data)))
 }

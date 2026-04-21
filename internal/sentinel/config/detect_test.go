@@ -30,12 +30,6 @@ func TestApplyDetection_DockerFound(t *testing.T) {
 	if cfg.RPC.RPCURL != "http://localhost:26657" {
 		t.Errorf("RPC.RPCURL: got %q", cfg.RPC.RPCURL)
 	}
-	if cfg.Metadata.BinaryVersionCmd == "" {
-		t.Error("Metadata.BinaryVersionCmd should be set in docker mode")
-	}
-	if cfg.Metadata.BinaryPath != "" {
-		t.Error("Metadata.BinaryPath should be empty in docker mode")
-	}
 	if cfg.Metadata.ConfigGetCmd == "" {
 		t.Error("Metadata.ConfigGetCmd should be set in docker mode")
 	}
@@ -86,20 +80,13 @@ func TestApplyDetection_BinaryFound(t *testing.T) {
 	cfg := DefaultConfig()
 	env := &Environment{
 		Binary: &BinaryResult{
-			Path:        "/usr/local/bin/gnoland",
-			GenesisPath: "/usr/local/bin/genesis.json",
-			ConfigPath:  "/usr/local/bin/gnoland-data/config/config.toml",
+			Path:       "/usr/local/bin/gnoland",
+			ConfigPath: "/usr/local/bin/gnoland-data/config/config.toml",
 		},
 	}
 
 	applyDetection(cfg, env)
 
-	if cfg.Metadata.BinaryPath != "/usr/local/bin/gnoland" {
-		t.Errorf("Metadata.BinaryPath: got %q", cfg.Metadata.BinaryPath)
-	}
-	if cfg.Metadata.GenesisPath != "/usr/local/bin/genesis.json" {
-		t.Errorf("Metadata.GenesisPath: got %q", cfg.Metadata.GenesisPath)
-	}
 	if cfg.Metadata.ConfigPath != "/usr/local/bin/gnoland-data/config/config.toml" {
 		t.Errorf("Metadata.ConfigPath: got %q", cfg.Metadata.ConfigPath)
 	}
@@ -131,7 +118,7 @@ func TestApplyDetection_NothingFound(t *testing.T) {
 	if cfg.Logs.ContainerName != "<gnoland-container-name>" {
 		t.Errorf("Logs.ContainerName: got %q, want placeholder", cfg.Logs.ContainerName)
 	}
-	if cfg.Metadata.BinaryPath != "<path-to-gnoland>" {
-		t.Errorf("Metadata.BinaryPath: got %q, want placeholder", cfg.Metadata.BinaryPath)
+	if cfg.Metadata.ConfigPath != "<path-to-gnoland-config>" {
+		t.Errorf("Metadata.ConfigPath: got %q, want placeholder", cfg.Metadata.ConfigPath)
 	}
 }

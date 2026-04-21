@@ -3,6 +3,7 @@ package metadata_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,11 +15,34 @@ import (
 	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
-func TestCollector_BinaryVersionCmd_EmitsVersion(t *testing.T) {
+const sampleConfigTOML = `
+moniker = "my-node"
+
+[application]
+prune_strategy = "everything"
+
+[consensus]
+peer_gossip_sleep_duration = "10ms"
+timeout_commit = "3s"
+
+[mempool]
+size = 10000
+
+[p2p]
+flush_throttle_timeout = "10ms"
+max_num_outbound_peers = 40
+pex = true
+`
+
+func TestCollector_ConfigPath_EmitsConfigValues(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(sampleConfigTOML), 0644); err != nil {
+		t.Fatal(err)
+	}
 	cfg := config.MetadataConfig{
-		Enabled:          true,
-		CheckInterval:    config.Duration{Duration: 10 * time.Millisecond},
-		BinaryVersionCmd: "echo v1.2.3",
+		Enabled:       true,
+		CheckInterval: config.Duration{Duration: 10 * time.Millisecond},
+		ConfigPath:    path,
 	}
 	out := make(chan protocol.MetricsPayload, 5)
 	c := metadata.NewCollector(cfg, out, logger.Noop())
@@ -32,67 +56,75 @@ func TestCollector_BinaryVersionCmd_EmitsVersion(t *testing.T) {
 		if p.CollectedAt.IsZero() {
 			t.Error("CollectedAt must not be zero")
 		}
-		raw, ok := p.Data["binary_version"]
+		raw, ok := p.Data["config"]
 		if !ok {
-			t.Fatal("expected data[binary_version]")
+			t.Fatal("expected data[config]")
 		}
-		if string(raw) != `"v1.2.3"` {
-			t.Errorf("binary_version: got %s, want %q", raw, "v1.2.3")
+		var values map[string]string
+		if err := json.Unmarshal(raw, &values); err != nil {
+			t.Fatalf("unmarshal config: %v", err)
+		}
+		wantKeys := map[string]string{
+			"application.prune_strategy":           "everything",
+			"consensus.peer_gossip_sleep_duration": "10ms",
+			"consensus.timeout_commit":             "3s",
+			"mempool.size":                         "10000",
+			"p2p.flush_throttle_timeout":           "10ms",
+			"p2p.max_num_outbound_peers":           "40",
+			"p2p.pex":                              "true",
+		}
+		for k, want := range wantKeys {
+			if got := values[k]; got != want {
+				t.Errorf("config[%q] = %q, want %q", k, got, want)
+			}
 		}
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("expected payload within 200ms")
 	}
 }
 
-func TestCollector_ConflictDetection_SkipsItem(t *testing.T) {
-	tmpDir := t.TempDir()
-	genPath := filepath.Join(tmpDir, "genesis.json")
-	if err := os.WriteFile(genPath, []byte(`{"chain_id":"test"}`), 0644); err != nil {
+func TestCollector_ForceInterval_ReEmitsConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(sampleConfigTOML), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	cfg := config.MetadataConfig{
-		Enabled:          true,
-		CheckInterval:    config.Duration{Duration: 10 * time.Millisecond},
-		BinaryPath:       "/usr/local/bin/gnoland",
-		BinaryVersionCmd: "echo fakehash", // CONFLICT: both set
-		GenesisPath:      genPath,
+		Enabled:       true,
+		CheckInterval: config.Duration{Duration: 200 * time.Millisecond},
+		ForceInterval: config.Duration{Duration: 50 * time.Millisecond},
+		ConfigPath:    path,
 	}
-	out := make(chan protocol.MetricsPayload, 5)
+	out := make(chan protocol.MetricsPayload, 10)
 	c := metadata.NewCollector(cfg, out, logger.Noop())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
 	defer cancel()
 	go c.Run(ctx)
 
-	select {
-	case p := <-out:
-		if _, ok := p.Data["binary_version"]; ok {
-			t.Error("binary_version must not be collected when path and cmd both set")
+	var configPayloads int
+	deadline := time.After(400 * time.Millisecond)
+loop:
+	for {
+		select {
+		case p := <-out:
+			if _, ok := p.Data["config"]; ok {
+				configPayloads++
+				if configPayloads >= 2 {
+					break loop
+				}
+			}
+		case <-deadline:
+			break loop
 		}
-		if _, ok := p.Data["genesis_checksum"]; !ok {
-			t.Error("genesis_checksum must be collected (only path set)")
-		}
-	case <-time.After(200 * time.Millisecond):
-		t.Fatal("expected payload within 200ms")
+	}
+	if configPayloads < 2 {
+		t.Fatalf("expected at least 2 config payloads from force re-emit, got %d", configPayloads)
 	}
 }
 
 func TestReadConfigKey(t *testing.T) {
-	const content = `
-moniker = "my-node"
-db_backend = "goleveldb"
-
-[p2p]
-laddr = "tcp://0.0.0.0:26656"
-persistent_peers = ""
-
-[telemetry]
-enabled = true
-exporter_endpoint = "http://localhost:4317"
-`
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(sampleConfigTOML), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -101,11 +133,13 @@ exporter_endpoint = "http://localhost:4317"
 		want string
 	}{
 		{"moniker", "my-node"},
-		{"db_backend", "goleveldb"},
-		{"p2p.laddr", "tcp://0.0.0.0:26656"},
-		{"p2p.persistent_peers", ""},
-		{"telemetry.enabled", "true"},
-		{"telemetry.exporter_endpoint", "http://localhost:4317"},
+		{"application.prune_strategy", "everything"},
+		{"consensus.peer_gossip_sleep_duration", "10ms"},
+		{"consensus.timeout_commit", "3s"},
+		{"mempool.size", "10000"},
+		{"p2p.flush_throttle_timeout", "10ms"},
+		{"p2p.max_num_outbound_peers", "40"},
+		{"p2p.pex", "true"},
 	}
 	for _, tt := range tests {
 		got, err := metadata.ReadConfigKey(path, tt.key)

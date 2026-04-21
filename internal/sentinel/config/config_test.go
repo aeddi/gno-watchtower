@@ -169,14 +169,14 @@ token = "tok"
 
 [otlp]
 enabled     = true
-listen_addr = "localhost:4317"
+listen_addr = "localhost:4318"
 `
 	cfg := mustLoadTOML(t, content)
 	if !cfg.OTLP.Enabled {
 		t.Error("OTLP.Enabled: want true")
 	}
-	if cfg.OTLP.ListenAddr != "localhost:4317" {
-		t.Errorf("OTLP.ListenAddr: got %q, want %q", cfg.OTLP.ListenAddr, "localhost:4317")
+	if cfg.OTLP.ListenAddr != "localhost:4318" {
+		t.Errorf("OTLP.ListenAddr: got %q, want %q", cfg.OTLP.ListenAddr, "localhost:4318")
 	}
 }
 
@@ -213,9 +213,7 @@ token = "tok"
 [metadata]
 enabled        = true
 check_interval = "10m"
-binary_path    = "/usr/local/bin/gnoland"
 config_path    = "/etc/gnoland/config.toml"
-genesis_path   = "/etc/gnoland/genesis.json"
 `
 	cfg := mustLoadTOML(t, content)
 	if !cfg.Metadata.Enabled {
@@ -224,14 +222,36 @@ genesis_path   = "/etc/gnoland/genesis.json"
 	if cfg.Metadata.CheckInterval.Duration != 10*time.Minute {
 		t.Errorf("Metadata.CheckInterval: got %v, want 10m", cfg.Metadata.CheckInterval.Duration)
 	}
-	if cfg.Metadata.BinaryPath != "/usr/local/bin/gnoland" {
-		t.Errorf("Metadata.BinaryPath: got %q", cfg.Metadata.BinaryPath)
-	}
 	if cfg.Metadata.ConfigPath != "/etc/gnoland/config.toml" {
 		t.Errorf("Metadata.ConfigPath: got %q", cfg.Metadata.ConfigPath)
 	}
-	if cfg.Metadata.GenesisPath != "/etc/gnoland/genesis.json" {
-		t.Errorf("Metadata.GenesisPath: got %q", cfg.Metadata.GenesisPath)
+}
+
+func TestLoad_MetadataConfigPathAndCmdConflict(t *testing.T) {
+	const content = `
+[server]
+url   = "https://example.com"
+token = "tok"
+
+[metadata]
+enabled        = true
+check_interval = "10m"
+config_path    = "/etc/gnoland/config.toml"
+config_get_cmd = "gnoland config get %s"
+`
+	f, err := os.CreateTemp("", "sentinel-config-*.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	_, err = config.Load(f.Name())
+	if err == nil {
+		t.Fatal("expected error: metadata.config_path and metadata.config_get_cmd both set")
 	}
 }
 
@@ -371,7 +391,7 @@ func TestDefaultConfig(t *testing.T) {
 	if !cfg.OTLP.Enabled {
 		t.Error("OTLP.Enabled: want true")
 	}
-	if cfg.OTLP.ListenAddr != "localhost:4317" {
+	if cfg.OTLP.ListenAddr != "localhost:4318" {
 		t.Errorf("OTLP.ListenAddr: got %q", cfg.OTLP.ListenAddr)
 	}
 	if !cfg.Resources.Enabled {
@@ -392,14 +412,8 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Metadata.CheckInterval.Duration != 10*time.Minute {
 		t.Errorf("Metadata.CheckInterval: got %v", cfg.Metadata.CheckInterval.Duration)
 	}
-	if cfg.Metadata.BinaryPath != "<path-to-gnoland>" {
-		t.Errorf("Metadata.BinaryPath: got %q", cfg.Metadata.BinaryPath)
-	}
 	if cfg.Metadata.ConfigPath != "<path-to-gnoland-config>" {
 		t.Errorf("Metadata.ConfigPath: got %q", cfg.Metadata.ConfigPath)
-	}
-	if cfg.Metadata.GenesisPath != "<path-to-genesis-json>" {
-		t.Errorf("Metadata.GenesisPath: got %q", cfg.Metadata.GenesisPath)
 	}
 }
 

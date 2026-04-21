@@ -34,6 +34,7 @@ func WithValidator(ctx context.Context, name string, cfg config.ValidatorConfig)
 type ipRecord struct {
 	failures  int
 	banExpiry time.Time
+	lastSeen  time.Time
 }
 
 // Authenticator validates Bearer tokens and manages per-IP failure tracking.
@@ -96,6 +97,10 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// Successful auth clears any failure counter for this IP so a brief
+		// bad-token retry (e.g. after a config push) doesn't inch a legitimate
+		// client toward a self-ban.
+		a.recordSuccess(ip)
 		ctx := context.WithValue(r.Context(), contextKey{}, contextValue{name: entry.ValidatorName, cfg: entry.Config})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -120,8 +125,10 @@ func (a *Authenticator) isBanned(ip string) bool {
 	return true
 }
 
-// maybeSweep removes expired ban records if a full ban duration has elapsed since
-// the last cleanup. Must be called with a.mu held.
+// maybeSweep removes both expired bans and stale non-banned failure records if
+// a full ban duration has elapsed since the last cleanup. The latter bounds
+// map growth for flaky peers that accumulate a few failures then go quiet —
+// without this they'd live forever. Must be called with a.mu held.
 func (a *Authenticator) maybeSweep() {
 	if time.Since(a.lastCleanup) < a.banDuration {
 		return
@@ -129,6 +136,10 @@ func (a *Authenticator) maybeSweep() {
 	now := time.Now()
 	for ip, rec := range a.ips {
 		if !rec.banExpiry.IsZero() && now.After(rec.banExpiry) {
+			delete(a.ips, ip)
+			continue
+		}
+		if rec.banExpiry.IsZero() && now.Sub(rec.lastSeen) > a.banDuration {
 			delete(a.ips, ip)
 		}
 	}
@@ -144,10 +155,18 @@ func (a *Authenticator) recordFailure(ip string) {
 		a.ips[ip] = rec
 	}
 	rec.failures++
+	rec.lastSeen = time.Now()
 	if rec.failures >= a.banThreshold {
-		now := time.Now()
-		rec.banExpiry = now.Add(a.banDuration)
+		rec.banExpiry = rec.lastSeen.Add(a.banDuration)
 	}
+}
+
+// recordSuccess clears the failure record for ip. Called after a successful
+// auth so legitimate clients don't accumulate failures toward a self-ban.
+func (a *Authenticator) recordSuccess(ip string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	delete(a.ips, ip)
 }
 
 // bearerToken extracts the token from the Authorization: Bearer <token> header.
@@ -159,8 +178,30 @@ func bearerToken(r *http.Request) string {
 	return token
 }
 
-// remoteIP extracts the IP from r.RemoteAddr (host:port).
+// remoteIP returns the caller's IP for ban bookkeeping.
+//
+// The watchtower runs behind a trusted reverse proxy (Caddy in the reference
+// deploy) that terminates TLS and appends the connecting IP to
+// X-Forwarded-For. Without this extraction every sentinel would appear to
+// originate from Caddy's Docker-internal IP, collapsing the per-IP ban into a
+// single fleet-wide bucket — one bad validator could get everyone banned, or
+// nobody at all.
+//
+// We take the rightmost XFF entry because RFC-compliant proxies append their
+// view of the connecting IP as the last hop. A client-supplied XFF can prepend
+// arbitrary fakes at the front, but cannot tamper with the entry added by our
+// trusted proxy.
+//
+// Fallback: when no XFF header is present (direct connection, or a proxy that
+// doesn't set it), use r.RemoteAddr.
 func remoteIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		last := strings.TrimSpace(parts[len(parts)-1])
+		if last != "" {
+			return last
+		}
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr

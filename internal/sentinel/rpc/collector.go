@@ -17,28 +17,58 @@ type statusResult struct {
 	} `json:"sync_info"`
 }
 
+const (
+	defaultGenesisRefreshInterval    = 12 * time.Hour
+	defaultValidatorsRefreshInterval = 12 * time.Hour
+)
+
 // Collector polls gnoland RPC endpoints and emits RPCPayloads to out.
 // Unchanged responses (by hash) are omitted from the payload (delta).
-// /block and /block_results are always emitted when a new block is detected.
+// /block is always emitted when a new block is detected.
+// /genesis is re-fetched and re-emitted every genesisRefreshInterval.
+// /validators is re-emitted every validatorsRefreshInterval regardless of
+// delta, so dashboards with short staleness windows don't age out when the
+// validator set is stable.
+//
+// All fields (notably lastHeight, lastDump, lastGenesisSentAt,
+// lastValidatorsSentAt, genesisFailed) are read and written exclusively from
+// collect(), which is itself called from a single goroutine driven by Run's
+// ticker. No synchronisation needed; future readers must preserve this
+// invariant.
 type Collector struct {
-	client       *Client
-	delta        *delta.Delta
-	pollInterval time.Duration
-	dumpInterval time.Duration
-	out          chan<- protocol.RPCPayload
-	lastHeight   int64
-	lastDump     time.Time
-	log          *slog.Logger
+	client                    *Client
+	delta                     *delta.Delta
+	pollInterval              time.Duration
+	dumpInterval              time.Duration
+	genesisRefreshInterval    time.Duration
+	validatorsRefreshInterval time.Duration
+	out                       chan<- protocol.RPCPayload
+	lastHeight                int64
+	lastDump                  time.Time
+	lastGenesisSentAt         time.Time
+	lastValidatorsSentAt      time.Time
+	genesisFailed             int // # of consecutive failures; throttles log level
+	log                       *slog.Logger
 }
 
-func NewCollector(client *Client, pollInterval, dumpInterval time.Duration, out chan<- protocol.RPCPayload, log *slog.Logger) *Collector {
+func NewCollector(client *Client, pollInterval, dumpInterval, genesisRefreshInterval, validatorsRefreshInterval time.Duration, out chan<- protocol.RPCPayload, log *slog.Logger) *Collector {
+	gri := genesisRefreshInterval
+	if gri <= 0 {
+		gri = defaultGenesisRefreshInterval
+	}
+	vri := validatorsRefreshInterval
+	if vri <= 0 {
+		vri = defaultValidatorsRefreshInterval
+	}
 	return &Collector{
-		client:       client,
-		delta:        delta.NewDelta(),
-		pollInterval: pollInterval,
-		dumpInterval: dumpInterval,
-		out:          out,
-		log:          log.With("component", "rpc_collector"),
+		client:                    client,
+		delta:                     delta.NewDelta(),
+		pollInterval:              pollInterval,
+		dumpInterval:              dumpInterval,
+		genesisRefreshInterval:    gri,
+		validatorsRefreshInterval: vri,
+		out:                       out,
+		log:                       log.With("component", "rpc_collector"),
 	}
 }
 
@@ -113,6 +143,7 @@ func (c *Collector) collect(ctx context.Context) error {
 			if c.delta.Changed("validators", raw) {
 				payload.Data["validators"] = raw
 				changed = append(changed, "validators")
+				c.lastValidatorsSentAt = time.Now()
 			}
 		} else {
 			c.log.Warn("endpoint error", "endpoint", "validators", "err", err)
@@ -123,11 +154,39 @@ func (c *Collector) collect(ctx context.Context) error {
 		} else {
 			c.log.Warn("endpoint error", "endpoint", "block", "err", err)
 		}
-		if raw, err := c.client.BlockResults(ctx, currentHeight); err == nil {
-			payload.Data["block_results"] = raw
-			changed = append(changed, "block_results")
+	}
+
+	// Periodic validators re-emit: even when the validator set is stable (no
+	// delta change) and blocks advance frequently, staleness-based dashboard
+	// queries need a fresh sample within their lookback window.
+	if _, already := payload.Data["validators"]; !already && c.lastHeight > 0 &&
+		time.Since(c.lastValidatorsSentAt) >= c.validatorsRefreshInterval {
+		if raw, err := c.client.Validators(ctx, c.lastHeight); err == nil {
+			payload.Data["validators"] = raw
+			changed = append(changed, "validators")
+			c.lastValidatorsSentAt = time.Now()
 		} else {
-			c.log.Warn("endpoint error", "endpoint", "block_results", "err", err)
+			c.log.Warn("endpoint error", "endpoint", "validators", "err", err)
+		}
+	}
+
+	// /genesis is re-fetched and re-emitted every genesisRefreshInterval so
+	// the dashboard stat cards stay populated across restarts and long sessions.
+	// Transient failures retry each tick; log level throttles after the first.
+	if c.lastGenesisSentAt.IsZero() || time.Since(c.lastGenesisSentAt) >= c.genesisRefreshInterval {
+		raw, err := c.client.Genesis(ctx)
+		switch {
+		case err == nil:
+			payload.Data["genesis"] = raw
+			changed = append(changed, "genesis")
+			c.lastGenesisSentAt = time.Now()
+			c.genesisFailed = 0
+		case c.genesisFailed == 0:
+			c.log.Warn("endpoint error", "endpoint", "genesis", "err", err)
+			c.genesisFailed++
+		default:
+			c.log.Debug("endpoint error", "endpoint", "genesis", "err", err, "attempt", c.genesisFailed+1)
+			c.genesisFailed++
 		}
 	}
 
@@ -150,10 +209,12 @@ func (c *Collector) collect(ctx context.Context) error {
 func (c *Collector) parseHeight(raw json.RawMessage) int64 {
 	var s statusResult
 	if err := json.Unmarshal(raw, &s); err != nil {
+		c.log.Debug("parse status height: unmarshal failed", "err", err)
 		return 0
 	}
 	h, err := s.SyncInfo.LatestBlockHeight.Int64()
 	if err != nil {
+		c.log.Debug("parse status height: int64 conversion failed", "raw", string(s.SyncInfo.LatestBlockHeight), "err", err)
 		return 0
 	}
 	return h

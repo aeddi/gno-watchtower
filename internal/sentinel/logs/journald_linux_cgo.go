@@ -1,9 +1,14 @@
-// internal/sentinel/logs/journald_linux.go
+//go:build linux && cgo
+
+// internal/sentinel/logs/journald_linux_cgo.go — real journald source.
+//
+// Requires cgo + libsystemd headers at build time. Pure-Go builds (Docker
+// image, release archives for non-Linux, go install without libsystemd)
+// fall through to journald_stub.go which returns "not supported".
 package logs
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -71,10 +76,13 @@ func (s *JournaldSource) Tail(ctx context.Context, out chan<- LogLine) error {
 				continue
 			}
 
-			raw := json.RawMessage(msg)
-			level := ParseLevel(raw)
+			line := EnsureJSON([]byte(msg), time.Now())
+			if line == nil {
+				continue
+			}
+			level := ParseLevel(line)
 			select {
-			case out <- LogLine{Level: level, Raw: raw}:
+			case out <- LogLine{Level: level, Raw: line}:
 			case <-ctx.Done():
 				return ctx.Err()
 			}

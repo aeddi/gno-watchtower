@@ -3,19 +3,20 @@ package doctor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"time"
-
-	collectorpb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
-	"google.golang.org/grpc"
 )
 
 // otlpCheckDuration is how long CheckOTLP listens for an OTLP export.
 const otlpCheckDuration = 3 * time.Second
 
-// CheckOTLP starts a gRPC server on listenAddr and waits up to 3 seconds for gnoland to send
-// an OTLP metrics export. Green = received at least one export; Red = none received or port conflict.
+// CheckOTLP starts an HTTP server on listenAddr and waits up to 3 seconds for
+// gnoland to send an OTLP/HTTP metrics export to POST /v1/metrics. Mirrors the
+// production relay at internal/sentinel/otlp/relay.go — gnoland posts protobuf
+// over HTTP, not gRPC.
 func CheckOTLP(ctx context.Context, listenAddr string) CheckResult {
 	const name = "OTLP"
 
@@ -25,33 +26,39 @@ func CheckOTLP(ctx context.Context, listenAddr string) CheckResult {
 	}
 
 	received := make(chan struct{}, 1)
-	srv := grpc.NewServer()
-	collectorpb.RegisterMetricsServiceServer(srv, &otlpCheckServer{received: received})
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/metrics", func(w http.ResponseWriter, _ *http.Request) {
+		select {
+		case received <- struct{}{}:
+		default:
+		}
+		// Return a minimal 200 so gnoland's OTel SDK considers the push successful.
+		w.Header().Set("Content-Type", "application/x-protobuf")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv := &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 
 	go srv.Serve(lis) //nolint:errcheck
 
 	ctx, cancel := context.WithTimeout(ctx, otlpCheckDuration)
 	defer cancel()
-	defer srv.GracefulStop()
+	defer func() {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Second)
+		defer shutdownCancel()
+		_ = srv.Shutdown(shutdownCtx)
+	}()
 
 	select {
 	case <-received:
 		return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("export received on %s", listenAddr)}
 	case <-ctx.Done():
-		return CheckResult{Name: name, Status: StatusRed, Detail: fmt.Sprintf("no export received in %s on %s", otlpCheckDuration, listenAddr)}
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return CheckResult{Name: name, Status: StatusRed, Detail: fmt.Sprintf("no export received in %s on %s", otlpCheckDuration, listenAddr)}
+		}
+		return CheckResult{Name: name, Status: StatusRed, Detail: fmt.Sprintf("check cancelled: %v", ctx.Err())}
 	}
-}
-
-// otlpCheckServer signals received on the first Export call.
-type otlpCheckServer struct {
-	collectorpb.UnimplementedMetricsServiceServer
-	received chan struct{}
-}
-
-func (s *otlpCheckServer) Export(_ context.Context, _ *collectorpb.ExportMetricsServiceRequest) (*collectorpb.ExportMetricsServiceResponse, error) {
-	select {
-	case s.received <- struct{}{}:
-	default:
-	}
-	return &collectorpb.ExportMetricsServiceResponse{}, nil
 }

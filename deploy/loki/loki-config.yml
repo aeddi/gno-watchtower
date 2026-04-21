@@ -28,6 +28,35 @@ schema_config:
 
 limits_config:
   retention_period: ${LOGS_RETENTION}
+  allow_structured_metadata: true
+  # Loki 3.x auto-assigns a service_name label (defaulting to "unknown_service"
+  # when no well-known hint is present). Our push payloads don't carry one, so
+  # the auto-added label is pure noise in dashboards. Empty list disables it.
+  discover_service_name: []
+  # Clock-skew gates: a validator clock beyond these windows has its batch
+  # rejected in full. The watchtower also applies a receive-time fallback in
+  # toLokiPush when |now - ts| > creation_grace_period so typical drift
+  # never reaches Loki.
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  creation_grace_period: 10m
+  # Ingestion ceilings are sized as DoS guards, not routine back-pressure:
+  # gnoland in debug mode on a chatty chain peaks well below these. A
+  # breach surfaces as loki_discarded_samples_total{reason=...} (scraped by
+  # VictoriaMetrics from loki:3100/metrics) — visible on the watchtower
+  # pipeline dashboard.
+  #
+  # Tenant aggregate: 200 MB/s ≈ 720 GB/h. Fleet-wide ceiling.
+  ingestion_rate_mb: 200
+  ingestion_burst_size_mb: 400
+  # Per stream (label set: validator × level): 25 MB/s ≈ 90 GB/h per stream.
+  # Any chatty validator burst is absorbed.
+  per_stream_rate_limit: 25MB
+  per_stream_rate_limit_burst: 50MB
+  # Per-line cap matches the sentinel's bufio ceiling in
+  # internal/sentinel/logs/docker.go; lines above it are already truncated
+  # upstream, so this only catches pathological cases.
+  max_line_size: 1MB
 
 compactor:
   working_directory: /loki/retention
@@ -38,4 +67,13 @@ compactor:
   delete_request_store: filesystem
 
 ingester:
-  chunk_encoding: zstd
+  # Write-ahead log so a restart doesn't lose unflushed chunks. Directory lives
+  # under the same /loki volume as chunks/index, so retention follows the
+  # volume lifecycle.
+  wal:
+    enabled: true
+    dir: /loki/wal
+    flush_on_shutdown: true
+    checkpoint_duration: 5m
+  # chunk_encoding defaults to snappy in Loki 3.x; zstd is NOT a valid value
+  # (supported: none, gzip, lz4-*, snappy, flate). Leave unset to use snappy.

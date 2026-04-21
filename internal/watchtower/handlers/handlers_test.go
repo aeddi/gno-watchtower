@@ -16,6 +16,7 @@ import (
 	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/forwarder"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/handlers"
+	wtmetrics "github.com/aeddi/gno-watchtower/internal/watchtower/metrics"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/ratelimit"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/stats"
 	"github.com/aeddi/gno-watchtower/pkg/logger"
@@ -39,10 +40,10 @@ func makeServer(t *testing.T, vmURL, lokiURL string) *handlers.Server {
 		Validators: validators,
 	}
 	a := auth.New(validators, cfg.Security.BanThreshold, cfg.Security.BanDuration.Duration)
-	rl := ratelimit.New(cfg.Security.RateLimitRPS, 10)
-	fwd := forwarder.New(vmURL, lokiURL)
+	rl := ratelimit.New(cfg.Security.RateLimitRPS, 10, nil)
+	fwd := forwarder.New(vmURL, lokiURL, nil)
 	st := stats.New()
-	return handlers.NewServer(cfg, a, rl, fwd, st, logger.Noop())
+	return handlers.NewServer(cfg, a, rl, fwd, st, wtmetrics.New(), logger.Noop())
 }
 
 func authReq(method, path string, body io.Reader) *http.Request {
@@ -149,9 +150,9 @@ func TestHandler_PermissionDenied_Returns403(t *testing.T) {
 		Validators: validators,
 	}
 	a := auth.New(validators, 10, time.Minute)
-	rl := ratelimit.New(100, 10)
-	fwd := forwarder.New("http://vm:8428", "http://loki:3100")
-	srv := handlers.NewServer(cfg, a, rl, fwd, stats.New(), logger.Noop())
+	rl := ratelimit.New(100, 10, nil)
+	fwd := forwarder.New("http://vm:8428", "http://loki:3100", nil)
+	srv := handlers.NewServer(cfg, a, rl, fwd, stats.New(), wtmetrics.New(), logger.Noop())
 
 	req := httptest.NewRequest(http.MethodPost, "/logs", nil)
 	req.Header.Set("Authorization", "Bearer tok2")

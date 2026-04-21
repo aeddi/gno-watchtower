@@ -124,31 +124,6 @@ func TestClient_Validators(t *testing.T) {
 	}
 }
 
-func TestClient_BlockResults(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/block_results" {
-			http.NotFound(w, r)
-			return
-		}
-		if r.URL.Query().Get("height") != "7" {
-			http.Error(w, "bad height", http.StatusBadRequest)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(rpcResponse(map[string]any{"txs_results": nil}))
-	}))
-	defer srv.Close()
-
-	c := rpc.NewClient(srv.URL)
-	raw, err := c.BlockResults(context.Background(), 7)
-	if err != nil {
-		t.Fatalf("BlockResults: %v", err)
-	}
-	if len(raw) == 0 {
-		t.Fatal("expected non-empty result")
-	}
-}
-
 func TestClient_ContextCancellation(t *testing.T) {
 	unblock := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

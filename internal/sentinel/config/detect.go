@@ -37,9 +37,8 @@ type JournaldResult struct {
 
 // BinaryResult holds information about a detected gnoland binary on PATH.
 type BinaryResult struct {
-	Path        string
-	GenesisPath string // empty if not found near the binary
-	ConfigPath  string // empty if not found near the binary
+	Path       string
+	ConfigPath string // empty if not found near the binary
 }
 
 // Detect probes the environment for a gnoland setup and prints progress to w.
@@ -126,14 +125,6 @@ func probeBinary(w io.Writer) *BinaryResult {
 	result := &BinaryResult{Path: resolved}
 	dir := filepath.Dir(resolved)
 
-	genesisPath := filepath.Join(dir, "genesis.json")
-	if _, err := os.Stat(genesisPath); err == nil {
-		fmt.Fprintln(w, termstyle.SubOK("genesis.json", genesisPath))
-		result.GenesisPath = genesisPath
-	} else {
-		fmt.Fprintln(w, termstyle.SubFail("genesis.json", "not found"))
-	}
-
 	configPath := filepath.Join(dir, "gnoland-data", "config", "config.toml")
 	if _, err := os.Stat(configPath); err == nil {
 		fmt.Fprintln(w, termstyle.SubOK("config.toml", configPath))
@@ -155,9 +146,7 @@ func applyDetection(cfg *Config, env *Environment) {
 		if env.Docker.RPCPort != 0 {
 			cfg.RPC.RPCURL = fmt.Sprintf("http://localhost:%d", env.Docker.RPCPort)
 		}
-		// Docker mode: use cmd fields, clear path fields.
-		cfg.Metadata.BinaryVersionCmd = fmt.Sprintf("docker exec %s gnoland version", env.Docker.ContainerName)
-		cfg.Metadata.BinaryPath = ""
+		// Docker mode: read config via docker exec.
 		cfg.Metadata.ConfigGetCmd = fmt.Sprintf("docker exec %s gnoland config get %%s --raw", env.Docker.ContainerName)
 		cfg.Metadata.ConfigPath = ""
 	} else if env.Journald != nil {
@@ -169,13 +158,7 @@ func applyDetection(cfg *Config, env *Environment) {
 	}
 
 	// Binary probe results apply to path-mode metadata (when not in docker mode).
-	if env.Binary != nil && env.Docker == nil {
-		cfg.Metadata.BinaryPath = env.Binary.Path
-		if env.Binary.GenesisPath != "" {
-			cfg.Metadata.GenesisPath = env.Binary.GenesisPath
-		}
-		if env.Binary.ConfigPath != "" {
-			cfg.Metadata.ConfigPath = env.Binary.ConfigPath
-		}
+	if env.Binary != nil && env.Docker == nil && env.Binary.ConfigPath != "" {
+		cfg.Metadata.ConfigPath = env.Binary.ConfigPath
 	}
 }

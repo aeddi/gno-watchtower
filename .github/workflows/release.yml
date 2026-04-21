@@ -1,0 +1,121 @@
+# Tag-triggered release: build binaries (goreleaser) and Docker images (buildx).
+#
+# Fires on tag pushes matching v*.*.* — which happen automatically when a
+# release-please PR merges (see release-please.yml). The goreleaser and
+# docker jobs run in parallel: goreleaser attaches cross-platform binary
+# archives to the GitHub Release, docker pushes multi-arch watchtower,
+# sentinel and beacon images to ghcr.io/aeddi/gno-watchtower/<name>.
+# All three images are built from the root Dockerfile via --target.
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+# Deny by default; jobs opt in to the narrowest useful scope.
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write # attach archives + checksums to the Release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # goreleaser needs full history for changelog
+          # goreleaser authenticates to the GitHub API via $GITHUB_TOKEN
+          # (see the env: block below), not via git credential helpers —
+          # no reason to keep the persisted token on disk.
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read # read Dockerfile + source for build
+      packages: write # push to ghcr.io
+      id-token: write # required for Sigstore provenance attestation
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: sentinel
+            title: gno-watchtower sentinel
+            description: Sentinel sidecar for gno-watchtower monitoring.
+          - name: beacon
+            title: gno-watchtower beacon
+            description: Sentry-side Noise relay for gno-watchtower monitoring.
+          - name: watchtower
+            title: gno-watchtower
+            description: Central ingest/auth/forward service for gno-watchtower.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false # don't need git write access
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Compute image tags + labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/aeddi/gno-watchtower/${{ matrix.image.name }}
+          # Semver stripping: v0.2.0 → :0.2.0, :0.2, :latest, :sha-abcd123
+          # Retain the v-prefixed form too so `docker pull …:v0.2.0` works.
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image.title }}
+            org.opencontainers.image.description=${{ matrix.image.description }}
+            org.opencontainers.image.licenses=MIT
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: ${{ matrix.image.name }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+          cache-from: type=gha,scope=release-${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=release-${{ matrix.image.name }}
+          # Attach build provenance + SBOM so released images can be verified
+          # via `gh attestation verify` / cosign against this workflow.
+          provenance: mode=max
+          sbom: true

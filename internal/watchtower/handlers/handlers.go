@@ -12,6 +12,7 @@ import (
 	"github.com/aeddi/gno-watchtower/internal/watchtower/auth"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/forwarder"
+	wtmetrics "github.com/aeddi/gno-watchtower/internal/watchtower/metrics"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/ratelimit"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/stats"
 )
@@ -28,12 +29,13 @@ type AuthCheckResponse struct {
 
 // Server holds all dependencies and exposes the HTTP handler.
 type Server struct {
-	cfg   *config.Config
-	auth  *auth.Authenticator
-	rl    *ratelimit.Limiter
-	fwd   *forwarder.Forwarder
-	stats *stats.Stats
-	log   *slog.Logger
+	cfg     *config.Config
+	auth    *auth.Authenticator
+	rl      *ratelimit.Limiter
+	fwd     *forwarder.Forwarder
+	stats   *stats.Stats
+	metrics *wtmetrics.Metrics
+	log     *slog.Logger
 }
 
 // NewServer creates a Server.
@@ -43,13 +45,24 @@ func NewServer(
 	rl *ratelimit.Limiter,
 	fwd *forwarder.Forwarder,
 	st *stats.Stats,
+	m *wtmetrics.Metrics,
 	log *slog.Logger,
 ) *Server {
-	return &Server{cfg: cfg, auth: a, rl: rl, fwd: fwd, stats: st, log: log.With("component", "watchtower")}
+	return &Server{
+		cfg:     cfg,
+		auth:    a,
+		rl:      rl,
+		fwd:     fwd,
+		stats:   st,
+		metrics: m,
+		log:     log.With("component", "watchtower"),
+	}
 }
 
 // Handler returns the http.Handler with the full middleware chain.
-// GET /health is unauthenticated (used by Docker healthcheck).
+// GET /health and GET /metrics are unauthenticated: /health is hit by the
+// Docker healthcheck and /metrics is scraped by VictoriaMetrics over the
+// Docker-internal network (not reachable past Caddy).
 func (s *Server) Handler() http.Handler {
 	inner := http.NewServeMux()
 	inner.HandleFunc("POST /rpc", s.handleRPC)
@@ -62,6 +75,7 @@ func (s *Server) Handler() http.Handler {
 	outer.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+	outer.Handle("GET /metrics", s.metrics.Handler())
 	outer.Handle("/", s.auth.Middleware(s.rl.Middleware(inner)))
 	return outer
 }
@@ -88,11 +102,16 @@ func (s *Server) RunStatsLogger(ctx context.Context, ticker *time.Ticker) {
 	}
 }
 
+// payloadForwarder receives the full validator context alongside the body so
+// per-endpoint handlers (e.g. /logs needs min_level) can look up config
+// without re-parsing the request context.
+type payloadForwarder func(ctx context.Context, validator string, vcfg config.ValidatorConfig, body []byte) error
+
 func (s *Server) handlePayload(
 	w http.ResponseWriter,
 	r *http.Request,
 	perm string,
-	forward func(context.Context, string, []byte) error,
+	forward payloadForwarder,
 ) {
 	validator, vcfg, _ := auth.ValidatorFromContext(r.Context())
 	if !slices.Contains(vcfg.Permissions, perm) {
@@ -106,29 +125,38 @@ func (s *Server) handlePayload(
 		return
 	}
 	s.log.Info("received", "validator", validator, "type", perm, "bytes", len(body))
-	if err := forward(r.Context(), validator, body); err != nil {
+	if err := forward(r.Context(), validator, vcfg, body); err != nil {
 		s.log.Error("forward "+perm, "err", err)
 		http.Error(w, "forward failed", http.StatusBadGateway)
 		return
 	}
 	s.stats.Record(validator, perm, len(body))
+	s.metrics.RecordReceived(validator, perm, len(body))
 	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleRPC(w http.ResponseWriter, r *http.Request) {
-	s.handlePayload(w, r, "rpc", s.fwd.ForwardRPC)
+	s.handlePayload(w, r, "rpc", func(ctx context.Context, validator string, _ config.ValidatorConfig, body []byte) error {
+		return s.fwd.ForwardRPC(ctx, validator, body)
+	})
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
-	s.handlePayload(w, r, "metrics", s.fwd.ForwardMetrics)
+	s.handlePayload(w, r, "metrics", func(ctx context.Context, validator string, _ config.ValidatorConfig, body []byte) error {
+		return s.fwd.ForwardMetrics(ctx, validator, body)
+	})
 }
 
 func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
-	s.handlePayload(w, r, "logs", s.fwd.ForwardLogs)
+	s.handlePayload(w, r, "logs", func(ctx context.Context, validator string, vcfg config.ValidatorConfig, body []byte) error {
+		return s.fwd.ForwardLogs(ctx, validator, body, vcfg.LogsMinLevel)
+	})
 }
 
 func (s *Server) handleOTLP(w http.ResponseWriter, r *http.Request) {
-	s.handlePayload(w, r, "otlp", s.fwd.ForwardOTLP)
+	s.handlePayload(w, r, "otlp", func(ctx context.Context, validator string, _ config.ValidatorConfig, body []byte) error {
+		return s.fwd.ForwardOTLP(ctx, validator, body)
+	})
 }
 
 func (s *Server) handleAuthCheck(w http.ResponseWriter, r *http.Request) {
@@ -139,5 +167,11 @@ func (s *Server) handleAuthCheck(w http.ResponseWriter, r *http.Request) {
 		LogsMinLevel: vcfg.LogsMinLevel,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp) //nolint:errcheck
+	// Encode after the Content-Type header but before the response body:
+	// WriteHeader fires implicitly on the first Write, so we can't alter the
+	// status if encoding fails mid-stream. Log-only is the honest option —
+	// the client will see an incomplete body and retry.
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		s.log.Warn("auth check: encode response failed", "err", err)
+	}
 }

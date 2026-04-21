@@ -23,7 +23,7 @@ func injectValidator(name string) func(http.Handler) http.Handler {
 }
 
 func TestRateLimiter_AllowsUnderLimit(t *testing.T) {
-	lim := ratelimit.New(100, 10) // 100 rps — won't be hit in a single test request
+	lim := ratelimit.New(100, 10, nil) // 100 rps — won't be hit in a single test request
 	handler := injectValidator("val-01")(lim.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})))
@@ -38,7 +38,7 @@ func TestRateLimiter_AllowsUnderLimit(t *testing.T) {
 }
 
 func TestRateLimiter_BlocksOverLimit(t *testing.T) {
-	lim := ratelimit.New(0.001, 1) // ~1 request per 1000s — immediately exhausted
+	lim := ratelimit.New(0.001, 1, nil) // ~1 request per 1000s — immediately exhausted
 
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -61,7 +61,7 @@ func TestRateLimiter_BlocksOverLimit(t *testing.T) {
 }
 
 func TestLimiter_RateLimitedResponse_HasRetryAfterHeader(t *testing.T) {
-	rl := ratelimit.New(0.001, 1) // effectively zero RPS to trigger rate limit
+	rl := ratelimit.New(0.001, 1, nil) // effectively zero RPS to trigger rate limit
 
 	// Set validator in context.
 	ctx := auth.WithValidator(context.Background(), "val-01", config.ValidatorConfig{})
@@ -84,8 +84,28 @@ func TestLimiter_RateLimitedResponse_HasRetryAfterHeader(t *testing.T) {
 	}
 }
 
+func TestRateLimiter_InvokesOnLimitCallbackWithValidator(t *testing.T) {
+	var got []string
+	lim := ratelimit.New(0.001, 1, func(v string) { got = append(got, v) })
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := injectValidator("val-07")(lim.Middleware(inner))
+	req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+
+	// First request consumes the only token.
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	// Second and third are rate-limited.
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	if len(got) != 2 || got[0] != "val-07" || got[1] != "val-07" {
+		t.Errorf("onLimit callback invocations: got %v, want [val-07 val-07]", got)
+	}
+}
+
 func TestRateLimiter_IndependentPerValidator(t *testing.T) {
-	lim := ratelimit.New(0.001, 1) // immediately exhausted
+	lim := ratelimit.New(0.001, 1, nil) // immediately exhausted
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
