@@ -53,16 +53,17 @@ func extractMetrics(validator string, payload protocol.MetricsPayload) []vmLine 
 // selfTypeStats mirrors internal/sentinel/self.TypeStats. Duplicated here
 // because the watchtower must not import the sentinel's internal packages.
 type selfTypeStats struct {
-	UncompressedBytes int64 `json:"uncompressed_bytes"`
-	WireBytes         int64 `json:"wire_bytes"`
-	Drops             int64 `json:"drops"`
-	Retries           int64 `json:"retries"`
+	UncompressedBytes int64            `json:"uncompressed_bytes"`
+	WireBytes         int64            `json:"wire_bytes"`
+	Drops             map[string]int64 `json:"drops"`
 }
 
 // appendSelfStats expands the sentinel's per-type counters into Prometheus
 // counter series. The "encoding" label separates uncompressed (payload as
 // JSON-marshaled) from wire (post-zstd for logs, identical for other types),
 // letting the dashboard show compression ratio as `wire / uncompressed`.
+// Drops carry a reason label ("buffer_full", "retry_exhausted", ...) so
+// dashboards can distinguish transient backpressure from terminal failures.
 func appendSelfStats(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
 	var byType map[string]selfTypeStats
 	if err := json.Unmarshal(raw, &byType); err != nil {
@@ -72,13 +73,14 @@ func appendSelfStats(lines []vmLine, validator string, ts int64, raw json.RawMes
 	for typ, s := range byType {
 		uncompLabels := map[string]string{"validator": validator, "type": typ, "encoding": "uncompressed"}
 		wireLabels := map[string]string{"validator": validator, "type": typ, "encoding": "wire"}
-		dropLabels := map[string]string{"validator": validator, "type": typ}
 		lines = append(lines,
 			vmSample("sentinel_self_bytes_sent_total", uncompLabels, float64(s.UncompressedBytes), ts),
 			vmSample("sentinel_self_bytes_sent_total", wireLabels, float64(s.WireBytes), ts),
-			vmSample("sentinel_self_drops_total", dropLabels, float64(s.Drops), ts),
-			vmSample("sentinel_self_retries_total", dropLabels, float64(s.Retries), ts),
 		)
+		for reason, n := range s.Drops {
+			dropLabels := map[string]string{"validator": validator, "type": typ, "reason": reason}
+			lines = append(lines, vmSample("sentinel_self_drops_total", dropLabels, float64(n), ts))
+		}
 	}
 	return lines
 }

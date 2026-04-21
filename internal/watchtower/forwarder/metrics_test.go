@@ -295,17 +295,17 @@ func TestExtractMetrics_UnknownKey_Ignored(t *testing.T) {
 
 func TestExtractMetrics_SelfStats_EmitsCounterSeries(t *testing.T) {
 	const selfJSON = `{
-		"rpc":  {"uncompressed_bytes": 1000, "wire_bytes": 1000, "drops": 0, "retries": 2},
-		"logs": {"uncompressed_bytes": 5000, "wire_bytes": 1200, "drops": 3, "retries": 1}
+		"rpc":  {"uncompressed_bytes": 1000, "wire_bytes": 1000, "drops": {"retry_exhausted": 2}},
+		"logs": {"uncompressed_bytes": 5000, "wire_bytes": 1200, "drops": {"buffer_full": 3, "retry_exhausted": 1}}
 	}`
 	lines := extractMetrics("node-1", payload(map[string]string{"self_stats": selfJSON}))
 
-	// 4 series per type × 2 types = 8 lines.
-	if len(lines) != 8 {
-		t.Fatalf("self_stats: got %d lines, want 8", len(lines))
+	// 2 byte-sent series per type × 2 types = 4; plus one drop series per
+	// (type, reason): rpc has 1, logs has 2 → 7 total.
+	if len(lines) != 7 {
+		t.Fatalf("self_stats: got %d lines, want 7", len(lines))
 	}
 
-	// Per-type sanity checks.
 	rpcUncomp := findLine(t, lines, map[string]string{"__name__": "sentinel_self_bytes_sent_total", "type": "rpc", "encoding": "uncompressed"})
 	if rpcUncomp == nil || rpcUncomp.Values[0] != 1000 {
 		t.Errorf("rpc uncompressed bytes missing or wrong: %v", rpcUncomp)
@@ -314,13 +314,17 @@ func TestExtractMetrics_SelfStats_EmitsCounterSeries(t *testing.T) {
 	if logsWire == nil || logsWire.Values[0] != 1200 {
 		t.Errorf("logs wire bytes missing or wrong: %v", logsWire)
 	}
-	logsDrops := findLine(t, lines, map[string]string{"__name__": "sentinel_self_drops_total", "type": "logs"})
-	if logsDrops == nil || logsDrops.Values[0] != 3 {
-		t.Errorf("logs drops missing or wrong: %v", logsDrops)
+	logsBufferDrops := findLine(t, lines, map[string]string{"__name__": "sentinel_self_drops_total", "type": "logs", "reason": "buffer_full"})
+	if logsBufferDrops == nil || logsBufferDrops.Values[0] != 3 {
+		t.Errorf("logs drops[buffer_full] missing or wrong: %v", logsBufferDrops)
 	}
-	rpcRetries := findLine(t, lines, map[string]string{"__name__": "sentinel_self_retries_total", "type": "rpc"})
-	if rpcRetries == nil || rpcRetries.Values[0] != 2 {
-		t.Errorf("rpc retries missing or wrong: %v", rpcRetries)
+	logsRetryDrops := findLine(t, lines, map[string]string{"__name__": "sentinel_self_drops_total", "type": "logs", "reason": "retry_exhausted"})
+	if logsRetryDrops == nil || logsRetryDrops.Values[0] != 1 {
+		t.Errorf("logs drops[retry_exhausted] missing or wrong: %v", logsRetryDrops)
+	}
+	rpcRetryDrops := findLine(t, lines, map[string]string{"__name__": "sentinel_self_drops_total", "type": "rpc", "reason": "retry_exhausted"})
+	if rpcRetryDrops == nil || rpcRetryDrops.Values[0] != 2 {
+		t.Errorf("rpc drops[retry_exhausted] missing or wrong: %v", rpcRetryDrops)
 	}
 }
 

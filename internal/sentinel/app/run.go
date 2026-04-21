@@ -21,8 +21,12 @@ import (
 )
 
 const (
-	rpcBufferSize       = 100
-	logsBufferSize      = 50
+	// Per-collector bounded buffers. Sized so a few minutes of watchtower
+	// downtime doesn't drop data. Overflow drops oldest (Buffer[T]) and is
+	// recorded as sentinel_self_drops_total{reason="buffer_full"}.
+	// Logs and rpc are the high-throughput paths; the rest are infrequent.
+	rpcBufferSize       = 300
+	logsBufferSize      = 500
 	resourcesBufferSize = 20
 	metadataBufferSize  = 10
 	selfBufferSize      = 5
@@ -55,7 +59,7 @@ func wireBuffered[T any](ctx context.Context, wg *sync.WaitGroup, outCh <-chan T
 			case p := <-outCh:
 				if dropped := buf.Push(p); dropped {
 					log.Warn(name + " buffer full: oldest payload dropped")
-					st.RecordDrop(name)
+					st.RecordDrop(name, "buffer_full")
 				}
 			}
 		}
@@ -149,7 +153,8 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 	// OTLP bytes are forwarded immediately as received — no send ticker needed.
 	if cfg.OTLP.Enabled {
 		otlpOut := make(chan []byte, otlpChannelSize)
-		relay := otlp.NewRelay(cfg.OTLP.ListenAddr, otlpOut, log)
+		onOTLPDrop := func() { st.RecordDrop("otlp", "buffer_full") }
+		relay := otlp.NewRelay(cfg.OTLP.ListenAddr, otlpOut, onOTLPDrop, log)
 		wg.Go(func() {
 			if err := relay.Run(ctx); err != nil && ctx.Err() == nil {
 				appLog.Error("otlp relay stopped", "err", err)
@@ -164,6 +169,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 					senderLog.Debug("sending payload", "type", "otlp", "bytes", len(b))
 					if err := s.SendRawWithRetry(ctx, "/otlp", b, "application/x-protobuf", maxSendAttempts, initialBackoff); err != nil && ctx.Err() == nil {
 						senderLog.Error("send otlp payload", "err", err)
+						st.RecordDrop("otlp", "retry_exhausted")
 						continue
 					}
 					st.Record("otlp", len(b), len(b))
@@ -290,7 +296,7 @@ func flush(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protocol.RP
 				return
 			}
 			log.Error("send rpc payload", "err", err)
-			st.RecordRetry("rpc")
+			st.RecordDrop("rpc", "retry_exhausted")
 			continue
 		}
 		st.Record("rpc", len(b), len(b))
@@ -312,7 +318,7 @@ func flushLogs(ctx context.Context, s *sender.Sender, buf *sender.Buffer[protoco
 				return
 			}
 			log.Error("send log payload", "err", err)
-			st.RecordRetry("logs")
+			st.RecordDrop("logs", "retry_exhausted")
 			continue
 		}
 		st.Record("logs", len(b), len(compressed))
@@ -333,7 +339,7 @@ func flushMetrics(ctx context.Context, s *sender.Sender, buf *sender.Buffer[prot
 				return
 			}
 			log.Error("send metrics payload", "err", err, "type", typ)
-			st.RecordRetry(typ)
+			st.RecordDrop(typ, "retry_exhausted")
 			continue
 		}
 		st.Record(typ, len(b), len(b))
@@ -344,12 +350,16 @@ func logStats(log *slog.Logger, st *stats.Stats) {
 	snap, uptime := st.Snapshot()
 	args := []any{"uptime", uptime.Round(time.Second)}
 	for typ, s := range snap {
+		var lastDropTotal int64
+		for _, n := range s.LastSnapshotDrops {
+			lastDropTotal += n
+		}
 		args = append(args, slog.Group(typ,
 			"last_snapshot_bytes", s.LastSnapshotBytes,
 			"total_bytes", s.TotalBytes,
 			"total_wire_bytes", s.TotalWireBytes,
-			"last_snapshot_drops", s.LastSnapshotDrops,
-			"last_snapshot_retries", s.LastSnapshotRetries,
+			"last_snapshot_drops", lastDropTotal,
+			"last_snapshot_drops_by_reason", s.LastSnapshotDrops,
 		))
 	}
 	log.Info("stats", args...)

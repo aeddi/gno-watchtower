@@ -34,15 +34,19 @@ import (
 type Relay struct {
 	listenAddr string
 	out        chan<- []byte
+	onDrop     func()
 	log        *slog.Logger
 }
 
 // NewRelay creates a Relay that listens on listenAddr and sends raw metrics
-// protobuf bytes to out.
-func NewRelay(listenAddr string, out chan<- []byte, log *slog.Logger) *Relay {
+// protobuf bytes to out. onDrop (may be nil) is invoked whenever the relay
+// drops a payload because out is full — wire this to stats.Stats.RecordDrop
+// so drops surface as sentinel_self_drops_total{type="otlp",reason="buffer_full"}.
+func NewRelay(listenAddr string, out chan<- []byte, onDrop func(), log *slog.Logger) *Relay {
 	return &Relay{
 		listenAddr: listenAddr,
 		out:        out,
+		onDrop:     onDrop,
 		log:        log.With("component", "otlp_relay"),
 	}
 }
@@ -102,6 +106,9 @@ func (r *Relay) handleMetrics(w http.ResponseWriter, req *http.Request) {
 	case r.out <- out:
 	default:
 		r.log.Warn("otlp buffer full: payload dropped")
+		if r.onDrop != nil {
+			r.onDrop()
+		}
 	}
 	writeEmptyProtoResponse(w, &collectormetricspb.ExportMetricsServiceResponse{})
 }

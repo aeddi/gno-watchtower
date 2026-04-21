@@ -22,6 +22,13 @@ import (
 // registers a t.Cleanup hook that shuts it down and waits for Run to return.
 func startRelay(t *testing.T, out chan []byte) string {
 	t.Helper()
+	return startRelayWithDropHook(t, out, nil)
+}
+
+// startRelayWithDropHook is the explicit-drop-callback variant used by the
+// buffer-full test. onDrop may be nil when drops aren't asserted.
+func startRelayWithDropHook(t *testing.T, out chan []byte, onDrop func()) string {
+	t.Helper()
 	lis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
@@ -30,7 +37,7 @@ func startRelay(t *testing.T, out chan []byte) string {
 	lis.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	r := otlp.NewRelay(addr, out, logger.Noop())
+	r := otlp.NewRelay(addr, out, onDrop, logger.Noop())
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -126,6 +133,41 @@ func TestRelay_MetricsPost_MalformedBody_400(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestRelay_MetricsPost_BufferFull_InvokesOnDrop(t *testing.T) {
+	// Capacity-1 channel; leave one bytes slot filled so the next post's
+	// select-default path fires.
+	out := make(chan []byte, 1)
+	out <- []byte("filler")
+
+	dropped := make(chan struct{}, 1)
+	onDrop := func() {
+		select {
+		case dropped <- struct{}{}:
+		default:
+		}
+	}
+	base := startRelayWithDropHook(t, out, onDrop)
+
+	req := &collectormetricspb.ExportMetricsServiceRequest{
+		ResourceMetrics: []*metricspb.ResourceMetrics{{}},
+	}
+	body, err := proto.Marshal(req)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	resp, err := http.Post(base+"/v1/metrics", "application/x-protobuf", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	resp.Body.Close()
+
+	select {
+	case <-dropped:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("expected onDrop to fire within 500ms when out channel is full")
 	}
 }
 

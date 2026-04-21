@@ -17,8 +17,8 @@ func TestCollector_EmitsStatsPayload(t *testing.T) {
 	st := stats.New()
 	st.Record("rpc", 100, 100)
 	st.Record("logs", 500, 120)
-	st.RecordDrop("rpc")
-	st.RecordRetry("logs")
+	st.RecordDrop("rpc", "buffer_full")
+	st.RecordDrop("logs", "retry_exhausted")
 
 	out := make(chan protocol.MetricsPayload, 2)
 	cfg := config.SelfConfig{
@@ -58,8 +58,8 @@ func TestCollector_EmitsStatsPayload(t *testing.T) {
 	if rpcStats.WireBytes != 100 {
 		t.Errorf("rpc WireBytes: got %d, want 100", rpcStats.WireBytes)
 	}
-	if rpcStats.Drops != 1 {
-		t.Errorf("rpc Drops: got %d, want 1", rpcStats.Drops)
+	if got := rpcStats.Drops["buffer_full"]; got != 1 {
+		t.Errorf("rpc Drops[buffer_full]: got %d, want 1", got)
 	}
 
 	logsStats, ok := byType["logs"]
@@ -72,8 +72,8 @@ func TestCollector_EmitsStatsPayload(t *testing.T) {
 	if logsStats.WireBytes != 120 {
 		t.Errorf("logs WireBytes: got %d, want 120", logsStats.WireBytes)
 	}
-	if logsStats.Retries != 1 {
-		t.Errorf("logs Retries: got %d, want 1", logsStats.Retries)
+	if got := logsStats.Drops["retry_exhausted"]; got != 1 {
+		t.Errorf("logs Drops[retry_exhausted]: got %d, want 1", got)
 	}
 }
 

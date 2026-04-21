@@ -2,6 +2,7 @@
 package stats
 
 import (
+	"maps"
 	"sync"
 	"time"
 )
@@ -18,14 +19,16 @@ import (
 //
 // Wire vs uncompressed: for types that don't compress (rpc, metrics, otlp),
 // wire == uncompressed. For logs, wire is the zstd-compressed payload size.
+//
+// Drops are reason-labelled so operators can distinguish transient backpressure
+// (buffer_full) from terminal failures (retry_exhausted). The map is never
+// nil; absent reasons are just missing keys.
 type TypeSnapshot struct {
-	TotalBytes          int64
-	TotalWireBytes      int64
-	TotalDrops          int64
-	TotalRetries        int64
-	LastSnapshotBytes   int64
-	LastSnapshotDrops   int64
-	LastSnapshotRetries int64
+	TotalBytes        int64
+	TotalWireBytes    int64
+	TotalDrops        map[string]int64
+	LastSnapshotBytes int64
+	LastSnapshotDrops map[string]int64
 }
 
 // Stats accumulates bytes-sent counters per collector type for periodic logging
@@ -39,11 +42,9 @@ type Stats struct {
 type entry struct {
 	totalBytes     int64
 	totalWireBytes int64
-	totalDrops     int64
-	totalRetries   int64
+	totalDrops     map[string]int64
 	lastBytes      int64
-	lastDrops      int64
-	lastRetries    int64
+	lastDrops      map[string]int64
 }
 
 // New creates a new Stats accumulator. The start time is set to now.
@@ -57,7 +58,10 @@ func New() *Stats {
 func (s *Stats) getOrCreate(collectorType string) *entry {
 	e, ok := s.data[collectorType]
 	if !ok {
-		e = &entry{}
+		e = &entry{
+			totalDrops: make(map[string]int64),
+			lastDrops:  make(map[string]int64),
+		}
 		s.data[collectorType] = e
 	}
 	return e
@@ -75,22 +79,15 @@ func (s *Stats) Record(collectorType string, uncompressed, wire int) {
 	e.lastBytes += int64(uncompressed)
 }
 
-// RecordDrop increments the drop counter for the given collector type.
-func (s *Stats) RecordDrop(collectorType string) {
+// RecordDrop increments the drop counter for the given collector type and
+// reason. Reason is a short slug (e.g. "buffer_full", "retry_exhausted") that
+// becomes a Prometheus label in the watchtower-side export.
+func (s *Stats) RecordDrop(collectorType, reason string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	e := s.getOrCreate(collectorType)
-	e.totalDrops++
-	e.lastDrops++
-}
-
-// RecordRetry increments the retry counter for the given collector type.
-func (s *Stats) RecordRetry(collectorType string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	e := s.getOrCreate(collectorType)
-	e.totalRetries++
-	e.lastRetries++
+	e.totalDrops[reason]++
+	e.lastDrops[reason]++
 }
 
 // Snapshot returns a copy of current stats and resets per-snapshot counters.
@@ -102,17 +99,14 @@ func (s *Stats) Snapshot() (map[string]TypeSnapshot, time.Duration) {
 	snap := make(map[string]TypeSnapshot, len(s.data))
 	for k, e := range s.data {
 		snap[k] = TypeSnapshot{
-			TotalBytes:          e.totalBytes,
-			TotalWireBytes:      e.totalWireBytes,
-			TotalDrops:          e.totalDrops,
-			TotalRetries:        e.totalRetries,
-			LastSnapshotBytes:   e.lastBytes,
-			LastSnapshotDrops:   e.lastDrops,
-			LastSnapshotRetries: e.lastRetries,
+			TotalBytes:        e.totalBytes,
+			TotalWireBytes:    e.totalWireBytes,
+			TotalDrops:        maps.Clone(e.totalDrops),
+			LastSnapshotBytes: e.lastBytes,
+			LastSnapshotDrops: maps.Clone(e.lastDrops),
 		}
 		e.lastBytes = 0
-		e.lastDrops = 0
-		e.lastRetries = 0
+		e.lastDrops = make(map[string]int64)
 	}
 	return snap, time.Since(s.start)
 }

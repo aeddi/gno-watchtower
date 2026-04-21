@@ -40,11 +40,14 @@ func NewCollector(cfg config.SelfConfig, st *stats.Stats, out chan<- protocol.Me
 // "self_stats" entry of a MetricsPayload.
 // All fields are absolute counters — the backend applies rate()/increase()
 // to derive deltas.
+//
+// Drops is reason-labelled (e.g. "buffer_full" vs "retry_exhausted") so the
+// watchtower can emit the reason as a Prometheus label without forcing a
+// pipeline-wide schema change when new reasons are added.
 type TypeStats struct {
-	UncompressedBytes int64 `json:"uncompressed_bytes"`
-	WireBytes         int64 `json:"wire_bytes"`
-	Drops             int64 `json:"drops"`
-	Retries           int64 `json:"retries"`
+	UncompressedBytes int64            `json:"uncompressed_bytes"`
+	WireBytes         int64            `json:"wire_bytes"`
+	Drops             map[string]int64 `json:"drops"`
 }
 
 // Run ticks on cfg.ReportInterval, serialises the current stats snapshot, and
@@ -78,7 +81,6 @@ func (c *Collector) emit(ctx context.Context) {
 			UncompressedBytes: s.TotalBytes,
 			WireBytes:         s.TotalWireBytes,
 			Drops:             s.TotalDrops,
-			Retries:           s.TotalRetries,
 		}
 	}
 	raw, err := json.Marshal(byType)

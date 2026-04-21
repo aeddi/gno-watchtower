@@ -75,38 +75,39 @@ func TestStats_EmptySnapshot(t *testing.T) {
 	}
 }
 
-func TestStats_RecordDropAndRetry(t *testing.T) {
+func TestStats_RecordDropByReason(t *testing.T) {
 	s := stats.New()
-	s.RecordDrop("rpc")
-	s.RecordDrop("rpc")
-	s.RecordRetry("logs")
+	s.RecordDrop("rpc", "buffer_full")
+	s.RecordDrop("rpc", "buffer_full")
+	s.RecordDrop("rpc", "retry_exhausted")
+	s.RecordDrop("logs", "retry_exhausted")
 
 	snap, _ := s.Snapshot()
 
-	if snap["rpc"].LastSnapshotDrops != 2 {
-		t.Errorf("rpc LastSnapshotDrops: got %d, want 2", snap["rpc"].LastSnapshotDrops)
+	if got := snap["rpc"].LastSnapshotDrops["buffer_full"]; got != 2 {
+		t.Errorf("rpc LastSnapshotDrops[buffer_full]: got %d, want 2", got)
 	}
-	if snap["rpc"].TotalDrops != 2 {
-		t.Errorf("rpc TotalDrops: got %d, want 2", snap["rpc"].TotalDrops)
+	if got := snap["rpc"].LastSnapshotDrops["retry_exhausted"]; got != 1 {
+		t.Errorf("rpc LastSnapshotDrops[retry_exhausted]: got %d, want 1", got)
 	}
-	if snap["logs"].LastSnapshotRetries != 1 {
-		t.Errorf("logs LastSnapshotRetries: got %d, want 1", snap["logs"].LastSnapshotRetries)
+	if got := snap["rpc"].TotalDrops["buffer_full"]; got != 2 {
+		t.Errorf("rpc TotalDrops[buffer_full]: got %d, want 2", got)
 	}
-	if snap["logs"].TotalRetries != 1 {
-		t.Errorf("logs TotalRetries: got %d, want 1", snap["logs"].TotalRetries)
+	if got := snap["logs"].TotalDrops["retry_exhausted"]; got != 1 {
+		t.Errorf("logs TotalDrops[retry_exhausted]: got %d, want 1", got)
 	}
 }
 
-func TestStats_SnapshotResetsLastDropsRetriesButNotTotals(t *testing.T) {
+func TestStats_SnapshotResetsLastDropsButNotTotals(t *testing.T) {
 	s := stats.New()
-	s.RecordDrop("rpc")
+	s.RecordDrop("rpc", "buffer_full")
 	s.Snapshot() // resets LastSnapshot*
-	s.RecordDrop("rpc")
+	s.RecordDrop("rpc", "buffer_full")
 	snap, _ := s.Snapshot()
-	if snap["rpc"].LastSnapshotDrops != 1 {
-		t.Errorf("LastSnapshotDrops after reset: got %d, want 1", snap["rpc"].LastSnapshotDrops)
+	if got := snap["rpc"].LastSnapshotDrops["buffer_full"]; got != 1 {
+		t.Errorf("LastSnapshotDrops[buffer_full] after reset: got %d, want 1", got)
 	}
-	if snap["rpc"].TotalDrops != 2 {
-		t.Errorf("TotalDrops across snapshots: got %d, want 2", snap["rpc"].TotalDrops)
+	if got := snap["rpc"].TotalDrops["buffer_full"]; got != 2 {
+		t.Errorf("TotalDrops[buffer_full] across snapshots: got %d, want 2", got)
 	}
 }
