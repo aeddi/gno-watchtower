@@ -307,7 +307,7 @@
         {
           "datasource": { "type": "loki", "uid": "loki" },
           "editorMode": "code",
-          "expr": "sum by (level) (count_over_time({validator=~\"$validator\", level=~\"$level\", module=~\"$module\"}[$__auto]))",
+          "expr": "sum by (level) (count_over_time({validator=~\"$validator\", level=~\"$level\"} | module=~\"$module\"[$__auto]))",
           "legendFormat": "{{level}}",
           "queryType": "range",
           "refId": "A"
@@ -336,7 +336,7 @@
         {
           "datasource": { "type": "loki", "uid": "loki" },
           "editorMode": "code",
-          "expr": "{validator=~\"$validator\", level=~\"$level\", module=~\"$module\"} |~ \"(?i)$search\" | line_format \"{{regexReplaceAll \\\",\\\\\\\"(level|ts|module)\\\\\\\":(\\\\\\\"[^\\\\\\\"]*\\\\\\\"|[0-9.eE+-]+)\\\" (regexReplaceAll \\\"\\\\\\\"(level|ts|module)\\\\\\\":(\\\\\\\"[^\\\\\\\"]*\\\\\\\"|[0-9.eE+-]+),\\\" __line__ \\\"\\\") \\\"\\\"}}\" | drop detected_level",
+          "expr": "{validator=~\"$validator\", level=~\"$level\"} | module=~\"$module\" |~ \"(?i)$search\" | json | line_format \"{{if .msg}}{{.msg}}{{else}}{{__line__}}{{end}}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -396,25 +396,31 @@
       },
       {
         "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
-        "datasource": { "type": "loki", "uid": "loki" },
-        "definition": "label_values(module)",
+        "description": "gnoland module (carried as structured metadata on each log line, not a Loki stream label). Pick a subset to filter the logs panel.",
         "includeAll": true,
         "label": "Module",
         "multi": true,
         "name": "module",
-        "options": [],
-        "query": {
-          "refId": "LokiVariableQueryEditor-VariableQuery",
-          "type": 1,
-          "label": "module",
-          "stream": "",
-          "expr": "label_values(module)"
-        },
-        "refresh": 1,
-        "regex": "",
+        "options": [
+          { "selected": true, "text": "All", "value": "$__all" },
+          { "text": "abci", "value": "abci" },
+          { "text": "blockchain", "value": "blockchain" },
+          { "text": "consensus", "value": "consensus" },
+          { "text": "events", "value": "events" },
+          { "text": "mempool", "value": "mempool" },
+          { "text": "p2p", "value": "p2p" },
+          { "text": "privval", "value": "privval" },
+          { "text": "rpc", "value": "rpc" },
+          { "text": "rpc-server", "value": "rpc-server" },
+          { "text": "state", "value": "state" },
+          { "text": "txpool", "value": "txpool" },
+          { "text": "unknown", "value": "unknown" },
+          { "text": "sentinel-raw", "value": "sentinel-raw" }
+        ],
+        "query": "abci,blockchain,consensus,events,mempool,p2p,privval,rpc,rpc-server,state,txpool,unknown,sentinel-raw",
+        "queryValue": "",
         "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
+        "type": "custom"
       },
       {
         "current": { "selected": false, "text": "", "value": "" },

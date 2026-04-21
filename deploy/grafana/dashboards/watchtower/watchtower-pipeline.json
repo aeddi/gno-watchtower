@@ -205,17 +205,17 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "sum by (validator) (increase(sentinel_self_drops_total{validator=~\"$validator\"}[$__range]))",
-          "legendFormat": "{{validator}}",
+          "expr": "sum by (validator, reason) (increase(sentinel_self_drops_total{validator=~\"$validator\"}[$__range]))",
+          "legendFormat": "{{validator}} / {{reason}}",
           "refId": "A"
         }
       ],
-      "title": "Drops (range total)",
+      "title": "Sentinel drops by reason (range total)",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "description": "Send retries from the sentinel — counts attempts after a failed POST. Sustained retries indicate a flaky link or an overloaded watchtower.",
+      "description": "Downstream rejections (429s on the watchtower rate-limiter, log-level filter, and Loki discards). Any non-zero reading warrants a look; sustained readings mean traffic is being dropped on the receive side.",
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -224,7 +224,7 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "orange", "value": 5 },
+              { "color": "orange", "value": 1 },
               { "color": "red", "value": 50 }
             ]
           },
@@ -250,12 +250,24 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "sum by (validator) (increase(sentinel_self_retries_total{validator=~\"$validator\"}[$__range]))",
-          "legendFormat": "{{validator}}",
+          "expr": "sum by (validator) (increase(watchtower_rate_limited_total{validator=~\"$validator\"}[$__range]))",
+          "legendFormat": "rate-limited / {{validator}}",
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (validator) (increase(watchtower_logs_below_min_level_total{validator=~\"$validator\"}[$__range]))",
+          "legendFormat": "below min_level / {{validator}}",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (reason) (increase(loki_discarded_samples_total[$__range]))",
+          "legendFormat": "loki / {{reason}}",
+          "refId": "C"
         }
       ],
-      "title": "Retries (range total)",
+      "title": "Watchtower + Loki rejections (range total)",
       "type": "stat"
     },
     {
@@ -723,7 +735,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "sum(vm_data_size_bytes) + predict_linear(sum(vm_data_size_bytes)[7d:1h], watchtower_config_retention_seconds{backend=\"vm\"})",
+          "expr": "sum(vm_data_size_bytes) + predict_linear(sum(vm_data_size_bytes)[7d:1h], scalar(watchtower_config_retention_seconds{backend=\"vm\"}))",
           "legendFormat": "projected",
           "refId": "B"
         }
