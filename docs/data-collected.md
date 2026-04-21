@@ -89,10 +89,10 @@ Signals injected by the beacon's `/rpc` augmenter
 otherwise. All three carry the validator label like the rest of the
 catalogue.
 
-| Signal             | Source                                                        | Metric emitted                                                               | Rationale                                                                                                                |
-| ------------------ | ------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Sentry build info  | beacon fetches sentry's `/status.node_info` per RPC tick      | `sentinel_sentry_info{sentry_chain,sentry_moniker,sentry_version}` (value=1) | Lets metadata dashboards show the sentry's version alongside the validator's — drift between the two is a deploy smell. |
-| Sentry peer count  | beacon fetches sentry's `/net_info.n_peers` per RPC tick      | `sentinel_rpc_peers_via_sentry`                                              | On sentry-fronted setups the validator sees only the sentry; the real p2p surface is what the sentry reports.           |
+| Signal             | Source                                                         | Metric emitted                                                               | Rationale                                                                                                               |
+| ------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Sentry build info  | beacon fetches sentry's `/status.node_info` per RPC tick       | `sentinel_sentry_info{sentry_chain,sentry_moniker,sentry_version}` (value=1) | Lets metadata dashboards show the sentry's version alongside the validator's — drift between the two is a deploy smell. |
+| Sentry peer count  | beacon fetches sentry's `/net_info.n_peers` per RPC tick       | `sentinel_rpc_peers_via_sentry`                                              | On sentry-fronted setups the validator sees only the sentry; the real p2p surface is what the sentry reports.           |
 | Sentry config keys | beacon reads sentry's config (same `ConfigKeys` as `metadata`) | `sentinel_sentry_config{key,value}` (value=1)                                | Pair-wise drift check: compare `sentinel_node_config` against `sentinel_sentry_config` for the same validator.          |
 
 The beacon fails open: any fetch error logs a warning and forwards the
@@ -128,7 +128,7 @@ labels). The metadata dashboard pivots them to spot fleet drift.
 | -------------------------- | ---------------------------------------- | --------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------- |
 | Active validator count     | `/validators` list length (on new block) | `validator_count_hist` **denied** | **RPC**   | Denied at sentinel — RPC is a fresher gauge, simpler to query.                                                      |
 | Total voting power         | sum over `/validators`                   | `validator_vp_hist` **denied**    | **RPC**   | Same.                                                                                                               |
-| Per-validator voting power | `/validators[*].voting_power` (unused)   | —                                 | —         | Not extracted at block boundary; the genesis-time set is covered by `sentinel_genesis_validator`. See "Known gaps". |
+| Per-validator voting power | `/validators[*].{address,voting_power}` (on new block) | —                                 | **RPC**   | `sentinel_rpc_validator_set_power{address,validator}` — one series per (validator-in-set × reporter). Dashboards dedupe across reporters via `max by (address) (...)` and join on `sentinel_validator_online{address}` to compute active voting power. Cardinality bounded by validator-set size. |
 
 ### P2P
 
@@ -236,17 +236,13 @@ same dashboard slot.
 
 ## Known gaps and future work
 
-1. **Per-validator voting power (live).** `sentinel_genesis_validator` covers
-   the set at genesis. A per-block stake distribution (`sentinel_rpc_validator_voting_power{address=…}`)
-   is a natural extension when staking dynamics land — cardinality bounded by
-   validator-set size.
-2. **OTLP export period.** Gnoland hardcodes 60s at
+1. **OTLP export period.** Gnoland hardcodes 60s at
    `tm2/pkg/telemetry/metrics/metrics.go:138`. Making it configurable upstream
    would drop OTLP dashboard staleness to 10–15s. Nothing watchtower can do
    alone.
-3. **OTLP histogram buckets.** Default OTel SDK buckets are useless at gnoland
+2. **OTLP histogram buckets.** Default OTel SDK buckets are useless at gnoland
    scale. Per-histogram custom buckets are an upstream change.
-4. **Traces — accepted, not forwarded yet.** gnoland can emit OTel spans
+3. **Traces — accepted, not forwarded yet.** gnoland can emit OTel spans
    around every RPC handler call (`tm2/pkg/bft/rpc/core/*.go` — each handler
    wraps its body in a `traces.Tracer().Start(…)` span with `http.method`,
    `http.path`, `remoteAddr` attributes on the root). The sentinel's relay
@@ -254,29 +250,29 @@ same dashboard slot.
    crash-safe, but the bytes are discarded immediately — we have no trace
    backend.
 
-   **What adding a backend would unlock.** Primarily: per-request RPC drill-
-   down ("which caller is slamming /status at 10 req/s?" — aggregated
-   `http_request_time_hist` hides the `remoteAddr`). Individual slow-request
-   inspection instead of just the p99. A "service map" panel showing
-   callers → RPC server.
+    **What adding a backend would unlock.** Primarily: per-request RPC drill-
+    down ("which caller is slamming /status at 10 req/s?" — aggregated
+    `http_request_time_hist` hides the `remoteAddr`). Individual slow-request
+    inspection instead of just the p99. A "service map" panel showing
+    callers → RPC server.
 
-   **What it wouldn't unlock.** Block production internals, consensus state
-   transitions, mempool admission, VM execution, P2P — gnoland emits no
-   spans for any of these today. The interesting chain-internal work is
-   already covered by the OTLP histograms (`build_block_hist`,
-   `block_interval_hist`, `vm_*_hist`).
+    **What it wouldn't unlock.** Block production internals, consensus state
+    transitions, mempool admission, VM execution, P2P — gnoland emits no
+    spans for any of these today. The interesting chain-internal work is
+    already covered by the OTLP histograms (`build_block_hist`,
+    `block_interval_hist`, `vm_*_hist`).
 
-   **Cost to add.** Tempo (or equivalent) in the stack (~500 MB container
-   + object-store retention), a watchtower trace forwarder, a new Grafana
-   datasource, one dashboard. Gnoland doesn't need to change — the HTTP
-   relay is already spec-compliant.
+    **Cost to add.** Tempo (or equivalent) in the stack (~500 MB container
+    - object-store retention), a watchtower trace forwarder, a new Grafana
+      datasource, one dashboard. Gnoland doesn't need to change — the HTTP
+      relay is already spec-compliant.
 
-   **Why defer.** The one unique operator signal (who's calling the RPC
-   server) isn't worth a new storage backend today, and most chain-internal
-   observability is already handled elsewhere. When gnoland starts spanning
-   consensus/VM paths — or when we need external-caller auditing — this
-   flips; the relay side is already in place, so it's a pure stack
-   addition.
+    **Why defer.** The one unique operator signal (who's calling the RPC
+    server) isn't worth a new storage backend today, and most chain-internal
+    observability is already handled elsewhere. When gnoland starts spanning
+    consensus/VM paths — or when we need external-caller auditing — this
+    flips; the relay side is already in place, so it's a pure stack
+    addition.
 
 ## Consequences for dashboards
 
