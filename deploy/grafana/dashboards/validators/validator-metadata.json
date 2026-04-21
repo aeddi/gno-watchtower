@@ -844,7 +844,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "last_over_time(sentinel_node_config{validator=~\"$validator\"}[1h])",
+          "expr": "last_over_time(sentinel_node_config{validator=~\"$validator\"}[1d])",
           "format": "table",
           "instant": true,
           "refId": "A"
