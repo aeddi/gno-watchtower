@@ -64,6 +64,12 @@ func (c *Conn) Read(p []byte) (int, error) {
 	if len(c.readBuf) > 0 {
 		n := copy(p, c.readBuf)
 		c.readBuf = c.readBuf[n:]
+		// Release the backing array when fully drained so we don't pin up to
+		// ~64 KiB per connection after a large frame followed by many small
+		// reads.
+		if len(c.readBuf) == 0 {
+			c.readBuf = nil
+		}
 		return n, nil
 	}
 
@@ -75,9 +81,18 @@ func (c *Conn) Read(p []byte) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("noise decrypt: %w", err)
 	}
+	if len(plaintext) == 0 {
+		// A zero-byte plaintext is legal Noise but breaks io.Reader loops that
+		// retry on (0, nil). Treat it as a protocol error.
+		return 0, errors.New("noise: zero-length plaintext frame")
+	}
 	n := copy(p, plaintext)
 	if n < len(plaintext) {
-		c.readBuf = append(c.readBuf[:0], plaintext[n:]...)
+		// Allocate a fresh slice rather than reusing the previous readBuf so
+		// the old backing array (up to ~64 KiB) can be GC'd.
+		tail := make([]byte, len(plaintext)-n)
+		copy(tail, plaintext[n:])
+		c.readBuf = tail
 	}
 	return n, nil
 }

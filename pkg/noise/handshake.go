@@ -87,6 +87,3 @@ func finish(raw net.Conn, hs *noise.HandshakeState, cs1, cs2 *noise.CipherState,
 		recvCS:     recv,
 	}, nil
 }
-
-// Ensure errors package stays imported even if callers rearrange usage.
-var _ = errors.New

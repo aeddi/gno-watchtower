@@ -253,6 +253,67 @@ func TestNoise_PeerStatic_ReflectsActualKey(t *testing.T) {
 	}
 }
 
+// TestNoise_SlowPeerDoesNotBlockAccept verifies the listener handshakes off
+// the Accept goroutine: a peer that opens a TCP connection but never sends
+// any bytes must not prevent a concurrent well-behaved peer from being
+// accepted.
+func TestNoise_SlowPeerDoesNotBlockAccept(t *testing.T) {
+	cli := mustKey(t)
+	srv := mustKey(t)
+	// Short handshake timeout to keep the test snappy.
+	lis, err := noise.NewListener("tcp", "127.0.0.1:0", noise.Config{Static: srv}, 300*time.Millisecond, nil)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { lis.Close() })
+	addr := lis.Addr().String()
+
+	// Slow peer: raw TCP connect, never sends. The listener will try to
+	// handshake, the client will never respond, and the listener side will
+	// eventually time out. A synchronous-handshake implementation would block
+	// inside Accept for the full handshake timeout here.
+	slowConn, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatalf("slow dial: %v", err)
+	}
+	t.Cleanup(func() { slowConn.Close() })
+
+	// Give the accept loop a moment to hand off the slow conn to a handshake
+	// goroutine so Accept is actually racing against it.
+	time.Sleep(50 * time.Millisecond)
+
+	// Now a well-behaved peer should get through in well under the handshake
+	// timeout — proving Accept didn't serialize behind the slow peer.
+	acceptDone := make(chan net.Conn, 1)
+	acceptErr := make(chan error, 1)
+	go func() {
+		c, err := lis.Accept()
+		if err != nil {
+			acceptErr <- err
+			return
+		}
+		acceptDone <- c
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	cconn, err := noise.Dial(ctx, "tcp", addr, noise.Config{Static: cli})
+	if err != nil {
+		t.Fatalf("fast dial: %v", err)
+	}
+	defer cconn.Close()
+
+	select {
+	case c := <-acceptDone:
+		defer c.Close()
+		// Accept arrived well before the slow peer's 300ms handshake timeout.
+	case err := <-acceptErr:
+		t.Fatalf("unexpected accept error: %v", err)
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("fast peer blocked behind slow peer's handshake — async accept regression")
+	}
+}
+
 func bytesEq(a, b []byte) bool {
 	if len(a) != len(b) {
 		return false
