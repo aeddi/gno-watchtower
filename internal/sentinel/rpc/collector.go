@@ -17,44 +17,58 @@ type statusResult struct {
 	} `json:"sync_info"`
 }
 
-const defaultGenesisRefreshInterval = 12 * time.Hour
+const (
+	defaultGenesisRefreshInterval    = 12 * time.Hour
+	defaultValidatorsRefreshInterval = 12 * time.Hour
+)
 
 // Collector polls gnoland RPC endpoints and emits RPCPayloads to out.
 // Unchanged responses (by hash) are omitted from the payload (delta).
 // /block is always emitted when a new block is detected.
 // /genesis is re-fetched and re-emitted every genesisRefreshInterval.
+// /validators is re-emitted every validatorsRefreshInterval regardless of
+// delta, so dashboards with short staleness windows don't age out when the
+// validator set is stable.
 //
-// All fields (notably lastHeight, lastDump, lastGenesisSentAt, genesisFailed)
-// are read and written exclusively from collect(), which is itself called from
-// a single goroutine driven by Run's ticker. No synchronisation needed; future
-// readers must preserve this invariant.
+// All fields (notably lastHeight, lastDump, lastGenesisSentAt,
+// lastValidatorsSentAt, genesisFailed) are read and written exclusively from
+// collect(), which is itself called from a single goroutine driven by Run's
+// ticker. No synchronisation needed; future readers must preserve this
+// invariant.
 type Collector struct {
-	client                 *Client
-	delta                  *delta.Delta
-	pollInterval           time.Duration
-	dumpInterval           time.Duration
-	genesisRefreshInterval time.Duration
-	out                    chan<- protocol.RPCPayload
-	lastHeight             int64
-	lastDump               time.Time
-	lastGenesisSentAt      time.Time
-	genesisFailed          int // # of consecutive failures; throttles log level
-	log                    *slog.Logger
+	client                    *Client
+	delta                     *delta.Delta
+	pollInterval              time.Duration
+	dumpInterval              time.Duration
+	genesisRefreshInterval    time.Duration
+	validatorsRefreshInterval time.Duration
+	out                       chan<- protocol.RPCPayload
+	lastHeight                int64
+	lastDump                  time.Time
+	lastGenesisSentAt         time.Time
+	lastValidatorsSentAt      time.Time
+	genesisFailed             int // # of consecutive failures; throttles log level
+	log                       *slog.Logger
 }
 
-func NewCollector(client *Client, pollInterval, dumpInterval, genesisRefreshInterval time.Duration, out chan<- protocol.RPCPayload, log *slog.Logger) *Collector {
+func NewCollector(client *Client, pollInterval, dumpInterval, genesisRefreshInterval, validatorsRefreshInterval time.Duration, out chan<- protocol.RPCPayload, log *slog.Logger) *Collector {
 	gri := genesisRefreshInterval
 	if gri <= 0 {
 		gri = defaultGenesisRefreshInterval
 	}
+	vri := validatorsRefreshInterval
+	if vri <= 0 {
+		vri = defaultValidatorsRefreshInterval
+	}
 	return &Collector{
-		client:                 client,
-		delta:                  delta.NewDelta(),
-		pollInterval:           pollInterval,
-		dumpInterval:           dumpInterval,
-		genesisRefreshInterval: gri,
-		out:                    out,
-		log:                    log.With("component", "rpc_collector"),
+		client:                    client,
+		delta:                     delta.NewDelta(),
+		pollInterval:              pollInterval,
+		dumpInterval:              dumpInterval,
+		genesisRefreshInterval:    gri,
+		validatorsRefreshInterval: vri,
+		out:                       out,
+		log:                       log.With("component", "rpc_collector"),
 	}
 }
 
@@ -129,6 +143,7 @@ func (c *Collector) collect(ctx context.Context) error {
 			if c.delta.Changed("validators", raw) {
 				payload.Data["validators"] = raw
 				changed = append(changed, "validators")
+				c.lastValidatorsSentAt = time.Now()
 			}
 		} else {
 			c.log.Warn("endpoint error", "endpoint", "validators", "err", err)
@@ -138,6 +153,20 @@ func (c *Collector) collect(ctx context.Context) error {
 			changed = append(changed, "block")
 		} else {
 			c.log.Warn("endpoint error", "endpoint", "block", "err", err)
+		}
+	}
+
+	// Periodic validators re-emit: even when the validator set is stable (no
+	// delta change) and blocks advance frequently, staleness-based dashboard
+	// queries need a fresh sample within their lookback window.
+	if _, already := payload.Data["validators"]; !already && c.lastHeight > 0 &&
+		time.Since(c.lastValidatorsSentAt) >= c.validatorsRefreshInterval {
+		if raw, err := c.client.Validators(ctx, c.lastHeight); err == nil {
+			payload.Data["validators"] = raw
+			changed = append(changed, "validators")
+			c.lastValidatorsSentAt = time.Now()
+		} else {
+			c.log.Warn("endpoint error", "endpoint", "validators", "err", err)
 		}
 	}
 

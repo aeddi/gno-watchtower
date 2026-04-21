@@ -111,6 +111,7 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) {
 			cfg.RPC.PollInterval.Duration,
 			cfg.RPC.DumpConsensusStateInterval.Duration,
 			cfg.RPC.GenesisRefreshInterval.Duration,
+			cfg.RPC.ValidatorsRefreshInterval.Duration,
 			rpcOut,
 			log,
 		)

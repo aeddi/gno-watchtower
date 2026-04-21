@@ -65,7 +65,7 @@ func TestCollector_EmitsPayloads(t *testing.T) {
 	defer srv.Close()
 
 	out := make(chan protocol.RPCPayload, 10)
-	c := rpc.NewCollector(rpc.NewClient(srv.URL), 50*time.Millisecond, 1*time.Hour, 0, out, logger.Noop())
+	c := rpc.NewCollector(rpc.NewClient(srv.URL), 50*time.Millisecond, 1*time.Hour, 0, 0, out, logger.Noop())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
@@ -106,6 +106,7 @@ func TestCollector_GenesisRefreshInterval_ReEmitsGenesis(t *testing.T) {
 		20*time.Millisecond,
 		1*time.Hour,
 		50*time.Millisecond, // short genesis refresh for test
+		1*time.Hour,         // validators refresh (not under test here)
 		out,
 		logger.Noop(),
 	)
@@ -135,6 +136,46 @@ loop:
 	}
 }
 
+func TestCollector_ValidatorsRefreshInterval_ReEmitsValidators(t *testing.T) {
+	srv := buildMockNode(t)
+	defer srv.Close()
+
+	out := make(chan protocol.RPCPayload, 20)
+	c := rpc.NewCollector(
+		rpc.NewClient(srv.URL),
+		20*time.Millisecond,
+		1*time.Hour,
+		1*time.Hour,         // genesis refresh (not under test here)
+		50*time.Millisecond, // short validators refresh for test
+		out,
+		logger.Noop(),
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	go c.Run(ctx)
+
+	var validatorsCount int
+	deadline := time.After(400 * time.Millisecond)
+loop:
+	for {
+		select {
+		case p := <-out:
+			if _, ok := p.Data["validators"]; ok {
+				validatorsCount++
+				if validatorsCount >= 2 {
+					break loop
+				}
+			}
+		case <-deadline:
+			break loop
+		}
+	}
+	if validatorsCount < 2 {
+		t.Fatalf("expected validators to be re-emitted after refresh interval, got %d emissions", validatorsCount)
+	}
+}
+
 func TestCollector_DeltaSkipsUnchangedEndpoints(t *testing.T) {
 	// Server always returns the same net_info response.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -156,7 +197,7 @@ func TestCollector_DeltaSkipsUnchangedEndpoints(t *testing.T) {
 	defer srv.Close()
 
 	out := make(chan protocol.RPCPayload, 10)
-	c := rpc.NewCollector(rpc.NewClient(srv.URL), 50*time.Millisecond, 1*time.Hour, 0, out, logger.Noop())
+	c := rpc.NewCollector(rpc.NewClient(srv.URL), 50*time.Millisecond, 1*time.Hour, 0, 0, out, logger.Noop())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()

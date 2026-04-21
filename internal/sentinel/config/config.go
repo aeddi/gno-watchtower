@@ -146,6 +146,7 @@ type RPCConfig struct {
 	RPCURL                     string   `toml:"rpc_url"`
 	DumpConsensusStateInterval Duration `toml:"dump_consensus_state_interval"`
 	GenesisRefreshInterval     Duration `toml:"genesis_refresh_interval" comment:"re-fetch and re-emit /genesis at this interval (0 = 12h default)"`
+	ValidatorsRefreshInterval  Duration `toml:"validators_refresh_interval" comment:"re-emit /validators at this interval regardless of delta (0 = 12h default)"`
 }
 
 // LogsConfig holds log collector settings.
