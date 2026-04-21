@@ -29,33 +29,33 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build \
-        -trimpath \
-        -ldflags "-s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION" \
-        -o /out/sentinel \
-        ./cmd/sentinel
+  go build \
+  -trimpath \
+  -ldflags "-s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION" \
+  -o /out/sentinel \
+  ./cmd/sentinel
 
 FROM base AS builder-beacon
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build \
-        -trimpath \
-        -ldflags "-s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION" \
-        -o /out/beacon \
-        ./cmd/beacon
+  go build \
+  -trimpath \
+  -ldflags "-s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION" \
+  -o /out/beacon \
+  ./cmd/beacon
 
 FROM base AS builder-watchtower
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build \
-        -trimpath \
-        -ldflags "-s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION" \
-        -o /out/watchtower \
-        ./cmd/watchtower
+  go build \
+  -trimpath \
+  -ldflags "-s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION" \
+  -o /out/watchtower \
+  ./cmd/watchtower
 
 # ---- Runtime: sentinel
 #
@@ -65,52 +65,51 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 FROM alpine:3.21 AS sentinel
 RUN apk add --no-cache ca-certificates wget
 COPY --from=builder-sentinel /out/sentinel /usr/local/bin/sentinel
+COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/entrypoint.sh
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="gno-watchtower sentinel" \
-      org.opencontainers.image.description="Sentinel sidecar for gno-watchtower monitoring — collects gnoland RPC / logs / OTLP / resources and ships them to the watchtower." \
-      org.opencontainers.image.source="https://github.com/aeddi/gno-watchtower" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.version="$VERSION"
+  org.opencontainers.image.description="Sentinel sidecar for gno-watchtower monitoring — collects gnoland RPC / logs / OTLP / resources and ships them to the watchtower." \
+  org.opencontainers.image.source="https://github.com/aeddi/gno-watchtower" \
+  org.opencontainers.image.licenses="MIT" \
+  org.opencontainers.image.version="$VERSION"
 # OTLP relay (gnoland → sentinel) and the optional health endpoint.
 EXPOSE 4318 8081
 # HEALTHCHECK assumes [health] enabled = true in config.toml (the default).
 # Override in docker-compose.yml if health is disabled.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://127.0.0.1:8081/health || exit 1
-ENTRYPOINT ["/usr/local/bin/sentinel"]
+  CMD wget -qO- http://127.0.0.1:8081/health || exit 1
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh", "sentinel"]
 CMD ["run", "/etc/sentinel/config.toml"]
 
 # ---- Runtime: beacon
 FROM alpine:3.21 AS beacon
 RUN apk add --no-cache ca-certificates
 COPY --from=builder-beacon /out/beacon /usr/local/bin/beacon
+COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/entrypoint.sh
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="gno-watchtower beacon" \
-      org.opencontainers.image.description="Sentry-side Noise relay for gno-watchtower monitoring — forwards sentinel traffic to the central watchtower and augments /rpc payloads with the sentry's own view of the network." \
-      org.opencontainers.image.source="https://github.com/aeddi/gno-watchtower" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.version="$VERSION"
+  org.opencontainers.image.description="Sentry-side Noise relay for gno-watchtower monitoring — forwards sentinel traffic to the central watchtower and augments /rpc payloads with the sentry's own view of the network." \
+  org.opencontainers.image.source="https://github.com/aeddi/gno-watchtower" \
+  org.opencontainers.image.licenses="MIT" \
+  org.opencontainers.image.version="$VERSION"
 # Noise listener accepting sentinel connections.
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/beacon"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh", "beacon"]
 CMD ["run", "/etc/beacon/config.toml"]
 
 # ---- Runtime: watchtower
-#
-# Built locally by deploy/docker-compose.yml; not published to GHCR. The
-# watchtower is the central ingest/auth/forward service and runs exclusively
-# inside the self-hosted server stack.
 FROM alpine:3.21 AS watchtower
 RUN apk add --no-cache ca-certificates wget
 COPY --from=builder-watchtower /out/watchtower /usr/local/bin/watchtower
+COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/entrypoint.sh
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="gno-watchtower" \
-      org.opencontainers.image.description="Central ingest/auth/forward service for gno-watchtower." \
-      org.opencontainers.image.source="https://github.com/aeddi/gno-watchtower" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.version="$VERSION"
+  org.opencontainers.image.description="Central ingest/auth/forward service for gno-watchtower." \
+  org.opencontainers.image.source="https://github.com/aeddi/gno-watchtower" \
+  org.opencontainers.image.licenses="MIT" \
+  org.opencontainers.image.version="$VERSION"
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
-    CMD wget -qO- http://127.0.0.1:8080/health || exit 1
-ENTRYPOINT ["/usr/local/bin/watchtower"]
+  CMD wget -qO- http://127.0.0.1:8080/health || exit 1
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh", "watchtower"]
 CMD ["run", "/etc/watchtower/config.toml"]
