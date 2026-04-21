@@ -83,6 +83,45 @@ func TestCollector_ConfigPath_EmitsConfigValues(t *testing.T) {
 	}
 }
 
+func TestCollector_ForceInterval_ReEmitsConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(sampleConfigTOML), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.MetadataConfig{
+		Enabled:       true,
+		CheckInterval: config.Duration{Duration: 200 * time.Millisecond},
+		ForceInterval: config.Duration{Duration: 50 * time.Millisecond},
+		ConfigPath:    path,
+	}
+	out := make(chan protocol.MetricsPayload, 10)
+	c := metadata.NewCollector(cfg, out, logger.Noop())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	go c.Run(ctx)
+
+	var configPayloads int
+	deadline := time.After(400 * time.Millisecond)
+loop:
+	for {
+		select {
+		case p := <-out:
+			if _, ok := p.Data["config"]; ok {
+				configPayloads++
+				if configPayloads >= 2 {
+					break loop
+				}
+			}
+		case <-deadline:
+			break loop
+		}
+	}
+	if configPayloads < 2 {
+		t.Fatalf("expected at least 2 config payloads from force re-emit, got %d", configPayloads)
+	}
+}
+
 func TestReadConfigKey(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte(sampleConfigTOML), 0644); err != nil {

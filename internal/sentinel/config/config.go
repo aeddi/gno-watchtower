@@ -145,6 +145,7 @@ type RPCConfig struct {
 	PollInterval               Duration `toml:"poll_interval"`
 	RPCURL                     string   `toml:"rpc_url"`
 	DumpConsensusStateInterval Duration `toml:"dump_consensus_state_interval"`
+	GenesisRefreshInterval     Duration `toml:"genesis_refresh_interval" comment:"re-fetch and re-emit /genesis at this interval (0 = 12h default)"`
 }
 
 // LogsConfig holds log collector settings.
@@ -181,6 +182,7 @@ type ResourcesConfig struct {
 type MetadataConfig struct {
 	Enabled       bool     `toml:"enabled"`
 	CheckInterval Duration `toml:"check_interval"`
+	ForceInterval Duration `toml:"force_interval" comment:"re-emit config regardless of changes at this interval (0 = 12h default)"`
 
 	ConfigPath   string `toml:"config_path,omitempty"`
 	ConfigGetCmd string `toml:"config_get_cmd,omitempty" comment:"use %s as placeholder for the config key name"`

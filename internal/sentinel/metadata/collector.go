@@ -39,24 +39,33 @@ var ConfigKeys = []string{
 //
 // Config uses either a file path or a shell command. Setting both is an error.
 type Collector struct {
-	cfg   config.MetadataConfig
-	delta *delta.Delta
-	out   chan<- protocol.MetricsPayload
-	log   *slog.Logger
+	cfg           config.MetadataConfig
+	delta         *delta.Delta
+	forceInterval time.Duration
+	out           chan<- protocol.MetricsPayload
+	log           *slog.Logger
 }
+
+const defaultForceInterval = 12 * time.Hour
 
 // NewCollector creates a metadata Collector.
 func NewCollector(cfg config.MetadataConfig, out chan<- protocol.MetricsPayload, log *slog.Logger) *Collector {
+	fi := cfg.ForceInterval.Duration
+	if fi <= 0 {
+		fi = defaultForceInterval
+	}
 	return &Collector{
-		cfg:   cfg,
-		delta: delta.NewDelta(),
-		out:   out,
-		log:   log.With("component", "metadata_collector"),
+		cfg:           cfg,
+		delta:         delta.NewDelta(),
+		forceInterval: fi,
+		out:           out,
+		log:           log.With("component", "metadata_collector"),
 	}
 }
 
 // Run performs an initial collection, then watches the config file for changes
 // (file mode) and polls on check_interval (cmd mode). Blocks until ctx is cancelled.
+// A separate force ticker re-emits config every forceInterval regardless of delta.
 func (c *Collector) Run(ctx context.Context) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -70,17 +79,22 @@ func (c *Collector) Run(ctx context.Context) error {
 		}
 	}
 
-	c.collectAndSend(ctx)
+	c.collectAndSend(ctx, false)
 
 	ticker := time.NewTicker(c.cfg.CheckInterval.Duration)
 	defer ticker.Stop()
+
+	forceTicker := time.NewTicker(c.forceInterval)
+	defer forceTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			c.collectAndSend(ctx)
+			c.collectAndSend(ctx, false)
+		case <-forceTicker.C:
+			c.collectAndSend(ctx, true)
 		case event, ok := <-watcher.Events:
 			if !ok {
 				c.log.Warn("watcher events channel closed unexpectedly")
@@ -88,7 +102,7 @@ func (c *Collector) Run(ctx context.Context) error {
 			}
 			if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) {
 				c.log.Debug("file changed", "path", event.Name)
-				c.collectAndSend(ctx)
+				c.collectAndSend(ctx, false)
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -108,12 +122,12 @@ func (c *Collector) watchedPaths() []string {
 	return nil
 }
 
-func (c *Collector) collectAndSend(ctx context.Context) {
+func (c *Collector) collectAndSend(ctx context.Context, force bool) {
 	payload := protocol.MetricsPayload{
 		CollectedAt: time.Now().UTC(),
 		Data:        make(map[string]json.RawMessage),
 	}
-	c.collectConfig(ctx, payload.Data)
+	c.collectConfig(ctx, payload.Data, force)
 	if len(payload.Data) == 0 {
 		return
 	}
@@ -123,7 +137,7 @@ func (c *Collector) collectAndSend(ctx context.Context) {
 	}
 }
 
-func (c *Collector) collectConfig(ctx context.Context, data map[string]json.RawMessage) {
+func (c *Collector) collectConfig(ctx context.Context, data map[string]json.RawMessage, force bool) {
 	if c.cfg.ConfigPath == "" && c.cfg.ConfigGetCmd == "" {
 		return
 	}
@@ -151,7 +165,7 @@ func (c *Collector) collectConfig(ctx context.Context, data map[string]json.RawM
 		c.log.Warn("config marshal error", "err", err)
 		return
 	}
-	if c.delta.Changed("config", b) {
+	if force || c.delta.Changed("config", b) {
 		data["config"] = b
 	}
 }
