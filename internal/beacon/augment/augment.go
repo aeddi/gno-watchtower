@@ -14,11 +14,17 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/aeddi/gno-watchtower/internal/beacon/config"
 	"github.com/aeddi/gno-watchtower/internal/sentinel/metadata"
 	"github.com/aeddi/gno-watchtower/internal/sentinel/rpc"
 )
+
+// augmentDeadline bounds the time we'll spend augmenting a single /rpc tick
+// before giving up and passing the original body through. Sized so a stuck
+// sentry RPC never stalls the sentinel ingest path longer than one tick.
+const augmentDeadline = 2 * time.Second
 
 // Augmenter holds references to the sentry's RPC client and metadata config
 // for per-request fetching.
@@ -86,6 +92,11 @@ func (a *Augmenter) augmentRPC(ctx context.Context, body []byte) ([]byte, error)
 		return nil, nil
 	}
 
+	// Bound the whole augment step; a stalled sentry RPC must not hold up
+	// the sentinel's ingest path indefinitely.
+	ctx, cancel := context.WithTimeout(ctx, augmentDeadline)
+	defer cancel()
+
 	// Run the three fetches in parallel; any failure aborts and the caller
 	// falls back to passing through. 1-2 ms latency added per augmented tick.
 	var (
@@ -95,12 +106,10 @@ func (a *Augmenter) augmentRPC(ctx context.Context, body []byte) ([]byte, error)
 		statusErr, netErr error
 		configErr         error
 	)
-	wg.Add(2)
-	go func() { defer wg.Done(); statusRaw, statusErr = a.rpc.Status(ctx) }()
-	go func() { defer wg.Done(); netRaw, netErr = a.rpc.NetInfo(ctx) }()
+	wg.Go(func() { statusRaw, statusErr = a.rpc.Status(ctx) })
+	wg.Go(func() { netRaw, netErr = a.rpc.NetInfo(ctx) })
 	if a.metaCfg.ConfigPath != "" || a.metaCfg.ConfigGetCmd != "" {
-		wg.Add(1)
-		go func() { defer wg.Done(); configRaw, configErr = a.fetchConfig(ctx) }()
+		wg.Go(func() { configRaw, configErr = a.fetchConfig(ctx) })
 	}
 	wg.Wait()
 

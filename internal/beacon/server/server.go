@@ -29,6 +29,12 @@ import (
 // (already buffered into memory). When nil is returned, forward the original.
 type BodyTransform func(ctx context.Context, path string, body []byte) []byte
 
+// maxBeaconBodyBytes bounds the sentinel→beacon request body we'll buffer
+// before forwarding upstream. Matches the watchtower's own
+// handlers.maxBodyBytes (50 MiB) so a body that passes the beacon also passes
+// the watchtower, and neither side buffers more than the other accepts.
+const maxBeaconBodyBytes = 50 << 20
+
 // Server is the beacon's Noise-listening HTTP server.
 type Server struct {
 	upstream   *url.URL
@@ -37,9 +43,10 @@ type Server struct {
 	handshakeT time.Duration
 	transform  BodyTransform // optional; called per incoming request
 
-	log *slog.Logger
-	lis *noise.Listen
-	srv *http.Server
+	log      *slog.Logger
+	lis      *noise.Listen
+	srv      *http.Server
+	upClient *http.Client // upstream HTTP client — configured, never http.DefaultClient
 }
 
 // Config collects the parameters Server needs.
@@ -75,6 +82,16 @@ func New(cfg Config) (*Server, error) {
 		handshakeT: cfg.HandshakeTimeout,
 		transform:  cfg.Transform,
 		log:        log.With("component", "beacon_server"),
+		// A dedicated client so we don't inherit http.DefaultClient's
+		// (lack of) timeout or redirect policy. Redirects are refused
+		// outright — preserving Authorization across a 3xx to another
+		// host would leak the bearer token.
+		upClient: &http.Client{
+			Timeout: 30 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 	}, nil
 }
 
@@ -95,6 +112,9 @@ func (s *Server) Run(ctx context.Context) error {
 	s.srv = &http.Server{
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       120 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	// Shutdown goroutine: when ctx is cancelled, drain the server with a
@@ -117,6 +137,7 @@ func (s *Server) Run(ctx context.Context) error {
 // reverse-proxies every request to the upstream unchanged (optionally
 // running the body through Transform first).
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBeaconBodyBytes)
 	body, err := io.ReadAll(r.Body)
 	_ = r.Body.Close()
 	if err != nil {
@@ -150,7 +171,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	// Content-Encoding, User-Agent, etc. Remove hop-by-hop ones per RFC 7230.
 	copyHeaders(req.Header, r.Header)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.upClient.Do(req)
 	if err != nil {
 		s.log.Error("forward to upstream", "path", r.URL.Path, "err", err)
 		http.Error(w, "upstream unreachable", http.StatusBadGateway)
