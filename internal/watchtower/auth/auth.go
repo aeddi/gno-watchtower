@@ -37,6 +37,14 @@ type ipRecord struct {
 	lastSeen  time.Time
 }
 
+// MetricsSink is the narrow interface the Authenticator uses to report
+// auth-layer rejections. Kept as an interface so the metrics package is
+// injected at wire-up time (avoiding an auth→metrics import dependency while
+// still letting tests pass the real *metrics.Metrics).
+type MetricsSink interface {
+	RecordAuthFailure(reason string)
+}
+
 // Authenticator validates Bearer tokens and manages per-IP failure tracking.
 type Authenticator struct {
 	tokensMu     sync.RWMutex
@@ -46,6 +54,7 @@ type Authenticator struct {
 	mu           sync.Mutex
 	ips          map[string]*ipRecord
 	lastCleanup  time.Time
+	metrics      MetricsSink
 }
 
 // New creates an Authenticator from the token index in cfg.Validators.
@@ -60,6 +69,14 @@ func New(validators map[string]config.ValidatorConfig, banThreshold int, banDura
 		banDuration:  banDuration,
 		ips:          make(map[string]*ipRecord),
 	}
+}
+
+// SetMetrics installs a metrics sink for auth-failure counters. Optional: when
+// unset (tests, standalone smoke runs), counters silently no-op. Kept as a
+// setter rather than a New() parameter to keep the existing test constructors
+// short — the wire-up site in cmd/watchtower pays the extra line.
+func (a *Authenticator) SetMetrics(m MetricsSink) {
+	a.metrics = m
 }
 
 // Reload atomically replaces the validator token map.
@@ -84,6 +101,9 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 		// auth-side decision about a specific client, not global back-pressure —
 		// clients must not treat it as a signal to retry with backoff.
 		if a.isBanned(ip) {
+			if a.metrics != nil {
+				a.metrics.RecordAuthFailure("banned")
+			}
 			http.Error(w, "banned", http.StatusForbidden)
 			return
 		}
@@ -95,6 +115,9 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 		a.tokensMu.RUnlock()
 		if !ok {
 			a.recordFailure(ip)
+			if a.metrics != nil {
+				a.metrics.RecordAuthFailure("invalid_token")
+			}
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}

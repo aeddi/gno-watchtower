@@ -32,6 +32,7 @@ type Metrics struct {
 	receivedPayloads  *prometheus.CounterVec
 	rateLimited       *prometheus.CounterVec
 	logsBelowMinLevel *prometheus.CounterVec
+	authFailures      *prometheus.CounterVec
 	retention         *prometheus.GaugeVec
 }
 
@@ -57,12 +58,16 @@ func New() *Metrics {
 			Name: "watchtower_logs_below_min_level_total",
 			Help: "Log payloads dropped because their level was below the validator's configured logs_min_level.",
 		}, []string{"validator"}),
+		authFailures: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "watchtower_auth_failures_total",
+			Help: "Auth-middleware rejections broken down by reason (invalid_token, banned). Not keyed on validator because rejected requests carry no trusted validator identity.",
+		}, []string{"reason"}),
 		retention: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "watchtower_config_retention_seconds",
 			Help: "Configured retention window per storage backend, in seconds.",
 		}, []string{"backend"}),
 	}
-	reg.MustRegister(m.receivedBytes, m.receivedPayloads, m.rateLimited, m.logsBelowMinLevel, m.retention)
+	reg.MustRegister(m.receivedBytes, m.receivedPayloads, m.rateLimited, m.logsBelowMinLevel, m.authFailures, m.retention)
 	// Register Go + process metrics so we also get go_goroutines, process_cpu_seconds_total, etc.
 	reg.MustRegister(
 		prometheus.NewGoCollector(),
@@ -91,6 +96,13 @@ func (m *Metrics) RecordRateLimited(validator string) {
 // see at a glance that an aggressive min_level is eating traffic.
 func (m *Metrics) RecordLogsBelowMinLevel(validator string) {
 	m.logsBelowMinLevel.WithLabelValues(validator).Inc()
+}
+
+// RecordAuthFailure bumps the per-reason counter for an auth-middleware
+// rejection. Reason is a short slug (e.g. "invalid_token", "banned"). No
+// validator label — rejected requests carry no trusted validator identity.
+func (m *Metrics) RecordAuthFailure(reason string) {
+	m.authFailures.WithLabelValues(reason).Inc()
 }
 
 // SetRetention publishes the retention window for a backend as a gauge.

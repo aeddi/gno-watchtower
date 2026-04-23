@@ -16,6 +16,9 @@ func TestMetrics_RecordAndScrape(t *testing.T) {
 	m.RecordReceived("node-1", "rpc", 500)
 	m.RecordReceived("node-1", "rpc", 200)
 	m.RecordReceived("node-2", "logs", 1000)
+	m.RecordAuthFailure("invalid_token")
+	m.RecordAuthFailure("invalid_token")
+	m.RecordAuthFailure("banned")
 	m.SetRetention(metrics.BackendLoki, 90*24*time.Hour, logger.Noop())
 	m.SetRetention(metrics.BackendVM, 180*24*time.Hour, logger.Noop())
 
@@ -35,6 +38,8 @@ func TestMetrics_RecordAndScrape(t *testing.T) {
 		`watchtower_received_bytes_total{type="rpc",validator="node-1"} 700`,
 		`watchtower_received_bytes_total{type="logs",validator="node-2"} 1000`,
 		`watchtower_received_payloads_total{type="rpc",validator="node-1"} 2`,
+		`watchtower_auth_failures_total{reason="invalid_token"} 2`,
+		`watchtower_auth_failures_total{reason="banned"} 1`,
 		`watchtower_config_retention_seconds{backend="loki"} 7.776e+06`,
 		`watchtower_config_retention_seconds{backend="vm"} 1.5552e+07`,
 	}

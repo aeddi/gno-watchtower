@@ -1,13 +1,16 @@
 package auth_test
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/aeddi/gno-watchtower/internal/watchtower/auth"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
+	wtmetrics "github.com/aeddi/gno-watchtower/internal/watchtower/metrics"
 )
 
 func makeAuth(t *testing.T) *auth.Authenticator {
@@ -316,5 +319,57 @@ func TestAuth_MissingAuthHeader_Returns401(t *testing.T) {
 
 	if rr.Code != http.StatusUnauthorized {
 		t.Errorf("want 401, got %d", rr.Code)
+	}
+}
+
+func TestAuth_RecordsMetricsOnFailureAndBan(t *testing.T) {
+	// Integration test: wire a real *metrics.Metrics into the Authenticator,
+	// trip the ban (banThreshold=3) via three bad-token requests, send one more
+	// from the now-banned IP, then scrape /metrics and assert both reason
+	// variants. Using the real counters (not a spy) exercises the label values
+	// the operator dashboard actually sees.
+	a := auth.New(map[string]config.ValidatorConfig{
+		"val-01": {Token: "good-token"},
+	}, 3, time.Minute)
+	m := wtmetrics.New()
+	a.SetMetrics(m)
+
+	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Three bad-token requests from the same IP — all 401, ban arms on #3.
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+		req.Header.Set("Authorization", "Bearer bad-token")
+		req.RemoteAddr = "9.9.9.9:1234"
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	// Fourth request from the banned IP — 403 banned, reason=banned.
+	reqBanned := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+	reqBanned.Header.Set("Authorization", "Bearer good-token")
+	reqBanned.RemoteAddr = "9.9.9.9:1234"
+	handler.ServeHTTP(httptest.NewRecorder(), reqBanned)
+
+	// Scrape /metrics and check both label variants.
+	srv := httptest.NewServer(m.Handler())
+	defer srv.Close()
+	resp, err := srv.Client().Get(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	text := string(body)
+
+	wants := []string{
+		`watchtower_auth_failures_total{reason="invalid_token"} 3`,
+		`watchtower_auth_failures_total{reason="banned"} 1`,
+	}
+	for _, w := range wants {
+		if !strings.Contains(text, w) {
+			t.Errorf("missing line:\n  want: %s\n\nscrape:\n%s", w, text)
+		}
 	}
 }
