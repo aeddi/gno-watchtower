@@ -23,6 +23,10 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: watchtower
+      args:
+        VERSION: '${VERSION:-dev}'
+        COMMIT: '${COMMIT:-}'
+        BUILD_TIME: '${BUILD_TIME:-}'
     command: ['run', '/etc/watchtower/config.toml']
     volumes:
       - ./watchtower.toml:/etc/watchtower/config.toml:ro

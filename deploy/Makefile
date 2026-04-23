@@ -8,7 +8,9 @@ help:  ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 up:  ## Start the monitoring stack (docker compose up -d)
-	$(COMPOSE) up -d
+	@export COMMIT=$$(git -C .. rev-parse HEAD 2>/dev/null || echo "") \
+	 && export BUILD_TIME=$$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+	 && $(COMPOSE) up -d --build
 
 down:  ## Stop the stack
 	$(COMPOSE) down
