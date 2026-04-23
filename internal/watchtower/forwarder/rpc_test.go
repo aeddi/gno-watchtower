@@ -193,11 +193,6 @@ func TestExtractRPC_MultipleKeys(t *testing.T) {
 		t.Errorf("got %d lines, want 17", len(lines))
 	}
 	for _, l := range lines {
-		// sentinel_validator_online is keyed purely by address (presence
-		// signal for consensus-quorum joins) — no validator label.
-		if l.Metric["__name__"] == "sentinel_validator_online" {
-			continue
-		}
 		if l.Metric["validator"] != "node-1" {
 			t.Errorf("%s: validator = %q, want node-1", l.Metric["__name__"], l.Metric["validator"])
 		}
@@ -222,8 +217,10 @@ func TestExtractRPC_MalformedJSON_SkipsKey(t *testing.T) {
 
 func TestExtractRPC_Status_OnlineEmittedWhenCaughtUp(t *testing.T) {
 	// When catching_up=false AND validator_info.address is present, the
-	// forwarder emits sentinel_validator_online{address} 1 — the dashboard's
-	// "who's live right now" presence signal.
+	// forwarder emits sentinel_validator_online{validator,address} 1 — the
+	// dashboard's "who's live right now" presence signal. The address label
+	// feeds consensus-quorum joins (on address); the validator label feeds
+	// per-validator panels that key by reporter.
 	lines := extractRPC("node-1", rpcPayload(map[string]string{"status": statusJSON}))
 	online := findLine(t, lines, map[string]string{"__name__": "sentinel_validator_online", "address": "g1self"})
 	if online == nil {
@@ -232,8 +229,8 @@ func TestExtractRPC_Status_OnlineEmittedWhenCaughtUp(t *testing.T) {
 	if online.Values[0] != 1 {
 		t.Errorf("online value = %v, want 1", online.Values[0])
 	}
-	if _, ok := online.Metric["validator"]; ok {
-		t.Errorf("online should not carry a validator label (it's an address-keyed presence signal); got %v", online.Metric)
+	if online.Metric["validator"] != "node-1" {
+		t.Errorf("online.validator = %q, want node-1 (needed for per-validator joins)", online.Metric["validator"])
 	}
 }
 

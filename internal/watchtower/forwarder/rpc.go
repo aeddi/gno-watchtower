@@ -137,7 +137,7 @@ func appendRPCStatus(lines []vmLine, validator string, ts int64, raw json.RawMes
 		// compute the live active voting power.
 		if r.ValidatorInfo.Address != "" && !r.SyncInfo.CatchingUp {
 			lines = append(lines, vmSample("sentinel_validator_online",
-				map[string]string{"address": r.ValidatorInfo.Address}, 1, ts))
+				map[string]string{"validator": validator, "address": r.ValidatorInfo.Address}, 1, ts))
 		}
 	}
 
