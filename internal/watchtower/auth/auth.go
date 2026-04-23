@@ -150,6 +150,22 @@ func (a *Authenticator) isBanned(ip string) bool {
 	return true
 }
 
+// BannedCount reports the number of IPs currently under an active ban.
+// Intended as the source for the watchtower_banned_ips gauge; reads cheaply
+// under the same lock that guards the ban map.
+func (a *Authenticator) BannedCount() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	now := time.Now()
+	n := 0
+	for _, rec := range a.ips {
+		if !rec.banExpiry.IsZero() && now.Before(rec.banExpiry) {
+			n++
+		}
+	}
+	return n
+}
+
 // maybeSweep removes both expired bans and stale non-banned failure records if
 // a full ban duration has elapsed since the last cleanup. The latter bounds
 // map growth for flaky peers that accumulate a few failures then go quiet —

@@ -127,6 +127,19 @@ func (m *Metrics) SetRetention(backend Backend, d time.Duration, log *slog.Logge
 	m.retention.WithLabelValues(string(backend)).Set(d.Seconds())
 }
 
+// SetBannedCountSource registers a GaugeFunc that reports the number of IPs
+// currently under an active ban. The source closure is evaluated on every
+// Prometheus scrape — callers should hand off a cheap, lock-friendly accessor
+// (e.g. Authenticator.BannedCount). Intentionally a setter rather than a New()
+// param so wire-up stays optional: tests and standalone runs can skip it and
+// the gauge simply won't appear in /metrics.
+func (m *Metrics) SetBannedCountSource(src func() int) {
+	m.registry.MustRegister(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "watchtower_banned_ips",
+		Help: "Count of IPs currently under an active ban. Sampled at scrape time from the auth layer's live ban map.",
+	}, func() float64 { return float64(src()) }))
+}
+
 // Handler returns the http.Handler for Prometheus scrapes.
 func (m *Metrics) Handler() http.Handler {
 	return promhttp.HandlerFor(m.registry, promhttp.HandlerOpts{})

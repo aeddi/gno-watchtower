@@ -145,6 +145,7 @@ func runCmd(args []string) {
 	m.SetRetention(wtmetrics.BackendLoki, parseLokiRetention(os.Getenv("LOGS_RETENTION"), logger), logger)
 	m.SetRetention(wtmetrics.BackendVM, parseVMRetention(os.Getenv("METRICS_RETENTION"), logger), logger)
 	a.SetMetrics(m)
+	m.SetBannedCountSource(a.BannedCount)
 
 	rl := ratelimit.New(cfg.Security.RateLimitRPS, cfg.Security.RateLimitBurst, m.RecordRateLimited)
 	fwd := forwarder.New(cfg.VictoriaMetrics.URL, cfg.Loki.URL, m.RecordLogsBelowMinLevel)

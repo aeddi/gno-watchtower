@@ -50,6 +50,36 @@ func TestMetrics_RecordAndScrape(t *testing.T) {
 	}
 }
 
+func TestMetrics_BannedIPsGauge_ReportsSourceValue(t *testing.T) {
+	// watchtower_banned_ips is a GaugeFunc wired to the Authenticator's live
+	// ban count. Rather than stub the whole auth package, the metrics layer
+	// accepts a func() int and reports whatever it returns.
+	m := metrics.New()
+	count := 0
+	m.SetBannedCountSource(func() int { return count })
+
+	srv := httptest.NewServer(m.Handler())
+	defer srv.Close()
+	scrape := func(want string) {
+		t.Helper()
+		resp, err := srv.Client().Get(srv.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		if !strings.Contains(string(body), want) {
+			t.Errorf("missing line in /metrics output:\n  want: %s\n\nactual output:\n%s", want, string(body))
+		}
+	}
+
+	scrape(`watchtower_banned_ips 0`)
+	count = 3
+	scrape(`watchtower_banned_ips 3`)
+	count = 0
+	scrape(`watchtower_banned_ips 0`)
+}
+
 func TestMetrics_ZeroRetention_EmitsWarnOnly(t *testing.T) {
 	m := metrics.New()
 	m.SetRetention(metrics.BackendLoki, 0, logger.Noop())

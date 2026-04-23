@@ -322,6 +322,41 @@ func TestAuth_MissingAuthHeader_Returns401(t *testing.T) {
 	}
 }
 
+func TestAuth_BannedCount_ReflectsActiveBans(t *testing.T) {
+	// BannedCount must only count IPs currently under an active ban —
+	// expired bans and non-banned failure records don't contribute. The
+	// watchtower_banned_ips gauge hinges on this accuracy.
+	a := auth.New(map[string]config.ValidatorConfig{
+		"val-01": {Token: "good-token"},
+	}, 1, 200*time.Millisecond) // ban on first failure, 200ms duration
+
+	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Empty ban set at start.
+	if got := a.BannedCount(); got != 0 {
+		t.Fatalf("BannedCount at start: got %d, want 0", got)
+	}
+
+	// Two different IPs both trigger a ban.
+	for _, ip := range []string{"1.1.1.1", "2.2.2.2"} {
+		req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+		req.Header.Set("Authorization", "Bearer bad-token")
+		req.RemoteAddr = ip + ":1234"
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	if got := a.BannedCount(); got != 2 {
+		t.Fatalf("BannedCount after 2 bans: got %d, want 2", got)
+	}
+
+	// After the ban duration expires, the count must drop.
+	time.Sleep(250 * time.Millisecond)
+	if got := a.BannedCount(); got != 0 {
+		t.Errorf("BannedCount after expiry: got %d, want 0", got)
+	}
+}
+
 func TestAuth_RecordsMetricsOnFailureAndBan(t *testing.T) {
 	// Integration test: wire a real *metrics.Metrics into the Authenticator,
 	// trip the ban (banThreshold=3) via three bad-token requests, send one more
