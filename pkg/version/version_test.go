@@ -55,3 +55,41 @@ func TestLong_ContainsVersionAndGo(t *testing.T) {
 		t.Errorf("Long output missing go line:\n%s", out)
 	}
 }
+
+func TestResolve_UsesLdflagsCommitWhenSet(t *testing.T) {
+	saved := Commit
+	t.Cleanup(func() { Commit = saved })
+	Commit = "abc1234"
+
+	i := Resolve()
+	if i.Commit != "abc1234" {
+		t.Errorf("Commit: got %q, want %q", i.Commit, "abc1234")
+	}
+}
+
+func TestResolve_UsesLdflagsBuiltWhenSet(t *testing.T) {
+	saved := Built
+	t.Cleanup(func() { Built = saved })
+	Built = "2026-04-22T10:00:00Z"
+
+	i := Resolve()
+	if i.Built != "2026-04-22T10:00:00Z" {
+		t.Errorf("Built: got %q, want %q", i.Built, "2026-04-22T10:00:00Z")
+	}
+}
+
+func TestLong_IncludesLdflagsCommitAndBuilt(t *testing.T) {
+	savedV, savedC, savedB := Version, Commit, Built
+	t.Cleanup(func() { Version, Commit, Built = savedV, savedC, savedB })
+	Version = "v1.0.0"
+	Commit = "deadbeef"
+	Built = "2026-04-22T10:00:00Z"
+
+	out := Long()
+	if !strings.Contains(out, "commit:   deadbeef") {
+		t.Errorf("Long output missing commit line:\n%s", out)
+	}
+	if !strings.Contains(out, "built:    2026-04-22T10:00:00Z") {
+		t.Errorf("Long output missing built line:\n%s", out)
+	}
+}
