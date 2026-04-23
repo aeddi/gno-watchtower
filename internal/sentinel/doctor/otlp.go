@@ -13,12 +13,27 @@ import (
 // otlpCheckDuration is how long CheckOTLP listens for an OTLP export.
 const otlpCheckDuration = 3 * time.Second
 
-// CheckOTLP starts an HTTP server on listenAddr and waits up to 3 seconds for
-// gnoland to send an OTLP/HTTP metrics export to POST /v1/metrics. Mirrors the
-// production relay at internal/sentinel/otlp/relay.go — gnoland posts protobuf
-// over HTTP, not gRPC.
+// otlpDialTimeout is how long CheckOTLP waits for a TCP handshake when probing
+// whether something is already bound to the OTLP listen address (e.g. a running
+// sentinel's OTLP relay).
+const otlpDialTimeout = 500 * time.Millisecond
+
+// CheckOTLP verifies the OTLP relay address. If something is already listening
+// on listenAddr (the sentinel is running) it returns Green via a TCP dial
+// probe, avoiding an "address already in use" bind error. Otherwise it starts
+// its own HTTP server on listenAddr and waits up to 3 seconds for gnoland to
+// send an OTLP/HTTP metrics export to POST /v1/metrics, mirroring the
+// production relay at internal/sentinel/otlp/relay.go.
 func CheckOTLP(ctx context.Context, listenAddr string) CheckResult {
 	const name = "OTLP"
+
+	// Dial probe: if the port is already bound (live sentinel), report Green
+	// immediately rather than failing to re-bind. A successful TCP handshake
+	// only proves *something* is listening — we don't verify it's the sentinel.
+	if conn, err := net.DialTimeout("tcp", listenAddr, otlpDialTimeout); err == nil {
+		conn.Close()
+		return CheckResult{Name: name, Status: StatusGreen, Detail: fmt.Sprintf("relay reachable on %s", listenAddr)}
+	}
 
 	lis, err := net.Listen("tcp", listenAddr)
 	if err != nil {
