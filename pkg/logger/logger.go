@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 
 	slogjournal "github.com/systemd/slog-journal"
 )
@@ -29,13 +30,58 @@ func New(format Format, level slog.Level) (*slog.Logger, error) {
 	case FormatJSON:
 		return slog.New(slog.NewJSONHandler(os.Stderr, opts)), nil
 	case FormatJournal:
-		h, err := slogjournal.NewHandler(&slogjournal.Options{Level: level})
+		// Without ReplaceAttr the journal silently drops every structured attr
+		// we emit because our keys are lowercase (validator, total_bytes, …)
+		// and the journal only accepts ^[A-Z_][A-Z0-9_]*$.
+		h, err := slogjournal.NewHandler(&slogjournal.Options{
+			Level: level,
+			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+				a.Key = JournalKey(groups, a.Key)
+				return a
+			},
+		})
 		if err != nil {
 			return nil, fmt.Errorf("journal handler: %w", err)
 		}
 		return slog.New(h), nil
 	default:
 		return nil, fmt.Errorf("unknown log format %q: must be console, json, or journal", format)
+	}
+}
+
+// JournalKey rewrites an slog attr key (with its group path) into a form the
+// systemd journal accepts: ^[A-Z_][A-Z0-9_]*$. Non-alphanumeric characters
+// collapse to '_'; lowercase letters uppercase; a leading underscore gets an
+// 'X' prefix (journal reserves leading underscores for its own fields); a
+// leading digit gets an 'X_' prefix. Nested groups are joined with '_' so
+// slog.Group("rpc", "latency_ms", ...) surfaces as RPC_LATENCY_MS.
+func JournalKey(groups []string, key string) string {
+	var b strings.Builder
+	for _, g := range groups {
+		writeSanitized(&b, g)
+		b.WriteByte('_')
+	}
+	writeSanitized(&b, key)
+	out := b.String()
+	if strings.HasPrefix(out, "_") {
+		return "X" + out
+	}
+	if len(out) > 0 && out[0] >= '0' && out[0] <= '9' {
+		return "X_" + out
+	}
+	return out
+}
+
+func writeSanitized(b *strings.Builder, s string) {
+	for _, r := range s {
+		switch {
+		case r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '_':
+			b.WriteRune(r)
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r - 'a' + 'A')
+		default:
+			b.WriteByte('_')
+		}
 	}
 }
 
