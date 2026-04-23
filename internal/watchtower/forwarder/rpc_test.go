@@ -447,3 +447,34 @@ func TestExtractRPC_SentryConfig_MalformedSkipped(t *testing.T) {
 		t.Errorf("malformed sentry_config produced %d lines, want 0", len(lines))
 	}
 }
+
+func TestExtractRPC_Reachable_EmitsGauge(t *testing.T) {
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"rpc_reachable": `1`}))
+	if got := metricNames(t, lines); len(got) != 1 || got[0] != "sentinel_rpc_reachable" {
+		t.Fatalf("metric names = %v, want [sentinel_rpc_reachable]", got)
+	}
+	line := lines[0]
+	if line.Values[0] != 1 {
+		t.Errorf("value = %v, want 1 (reachable)", line.Values[0])
+	}
+	if line.Metric["validator"] != "node-1" {
+		t.Errorf("validator = %q, want node-1", line.Metric["validator"])
+	}
+}
+
+func TestExtractRPC_Reachable_ZeroWhenUnreachable(t *testing.T) {
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"rpc_reachable": `0`}))
+	if len(lines) != 1 {
+		t.Fatalf("got %d lines, want 1", len(lines))
+	}
+	if lines[0].Values[0] != 0 {
+		t.Errorf("value = %v, want 0 (unreachable)", lines[0].Values[0])
+	}
+}
+
+func TestExtractRPC_Reachable_MalformedDroppedSilently(t *testing.T) {
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"rpc_reachable": `"nope"`}))
+	if len(lines) != 0 {
+		t.Errorf("malformed rpc_reachable produced %d lines, want 0", len(lines))
+	}
+}

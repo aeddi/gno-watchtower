@@ -60,6 +60,8 @@ func extractRPC(validator string, payload protocol.RPCPayload) []vmLine {
 			lines = appendRPCSentryNetInfo(lines, validator, ts, raw, log)
 		case "sentry_config":
 			lines = appendRPCSentryConfig(lines, validator, ts, raw, log)
+		case "rpc_reachable":
+			lines = appendRPCReachable(lines, validator, ts, raw, log)
 		}
 	}
 	return lines
@@ -337,6 +339,19 @@ func appendRPCSentryConfig(lines []vmLine, validator string, ts int64, raw json.
 		}, 1, ts))
 	}
 	return lines
+}
+
+// appendRPCReachable turns the sentinel's scalar 0/1 signal — which the RPC
+// collector synthesizes after each poll — into a per-validator gauge. The
+// sentinel emits it even when nothing else in the payload changed, so
+// dashboards with short staleness windows get a fresh sample every poll.
+func appendRPCReachable(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	var v float64
+	if err := json.Unmarshal(raw, &v); err != nil {
+		log.Debug("rpc: rpc_reachable unmarshal failed", "validator", validator, "err", err)
+		return lines
+	}
+	return append(lines, vmSample("sentinel_rpc_reachable", map[string]string{"validator": validator}, v, ts))
 }
 
 // boolToFloat maps bool → 0/1 for gauge emission of boolean health flags.
