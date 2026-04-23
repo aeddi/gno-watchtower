@@ -88,14 +88,16 @@ func TestAuth_BansIPAfterThreshold(t *testing.T) {
 	}
 
 	// Third request — IP should now be banned (even with a valid token).
+	// 403 distinguishes an auth-side ban (client misbehavior) from a 429
+	// rate-limit signal (global back-pressure). Clients should not retry on 403.
 	req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
 	req.Header.Set("Authorization", "Bearer good-token")
 	req.RemoteAddr = "1.2.3.4:9999"
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusTooManyRequests {
-		t.Errorf("want 429 for banned IP, got %d", rr.Code)
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("want 403 for banned IP, got %d", rr.Code)
 	}
 }
 
@@ -141,8 +143,8 @@ func TestAuth_BanIsKeyedOnXForwardedForRightmost(t *testing.T) {
 	reqBanned.RemoteAddr = proxyAddr
 	rrBanned := httptest.NewRecorder()
 	handler.ServeHTTP(rrBanned, reqBanned)
-	if rrBanned.Code != http.StatusTooManyRequests {
-		t.Errorf("want 429 for banned client, got %d", rrBanned.Code)
+	if rrBanned.Code != http.StatusForbidden {
+		t.Errorf("want 403 for banned client, got %d", rrBanned.Code)
 	}
 }
 
@@ -176,8 +178,8 @@ func TestAuth_XForwardedFor_TakesRightmostEntry(t *testing.T) {
 	req.RemoteAddr = "172.18.0.2:1234"
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTooManyRequests {
-		t.Errorf("want 429 keyed on rightmost XFF, got %d", rr.Code)
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("want 403 keyed on rightmost XFF, got %d", rr.Code)
 	}
 }
 

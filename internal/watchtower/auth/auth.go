@@ -80,9 +80,11 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := remoteIP(r)
 
-		// Check IP ban before anything else.
+		// Check IP ban before anything else. 403 (not 429) because this is an
+		// auth-side decision about a specific client, not global back-pressure —
+		// clients must not treat it as a signal to retry with backoff.
 		if a.isBanned(ip) {
-			http.Error(w, "banned", http.StatusTooManyRequests)
+			http.Error(w, "banned", http.StatusForbidden)
 			return
 		}
 
