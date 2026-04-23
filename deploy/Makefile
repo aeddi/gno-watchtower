@@ -1,6 +1,6 @@
 .PHONY: up down restart logs add-validator remove-validator
 
-COMPOSE = docker compose -f docker-compose.yml --env-file config.env
+COMPOSE = docker compose -f docker-compose.yml
 
 up:
 	$(COMPOSE) up -d
