@@ -109,3 +109,37 @@ func TestMarshalDefaultConfig_ValidTOML(t *testing.T) {
 		t.Error("missing comment for logs.source")
 	}
 }
+
+func TestDefaultConfig_GenesisAndValidatorsRefresh_Non_Zero(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.RPC.GenesisRefreshInterval.Duration == 0 {
+		t.Error("GenesisRefreshInterval is zero; generate-config would write '0s'")
+	}
+	if cfg.RPC.ValidatorsRefreshInterval.Duration == 0 {
+		t.Error("ValidatorsRefreshInterval is zero; generate-config would write '0s'")
+	}
+	if cfg.Metadata.ForceInterval.Duration == 0 {
+		t.Error("Metadata.ForceInterval is zero; generate-config would write '0s'")
+	}
+}
+
+func TestMarshalDefaultConfig_WritesRealRefreshIntervals(t *testing.T) {
+	cfg := DefaultConfig()
+	data, err := toml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	output := string(data)
+	if !strings.Contains(output, "genesis_refresh_interval = '12h0m0s'") {
+		t.Errorf("expected genesis_refresh_interval = '12h0m0s' in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "validators_refresh_interval = '12h0m0s'") {
+		t.Errorf("expected validators_refresh_interval = '12h0m0s' in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "force_interval = '12h0m0s'") {
+		t.Errorf("expected force_interval = '12h0m0s' in output, got:\n%s", output)
+	}
+	if strings.Contains(output, "= '0s'") {
+		t.Errorf("generate-config should not emit zero durations, got:\n%s", output)
+	}
+}
