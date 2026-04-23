@@ -385,7 +385,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (validator, chain_id, genesis_time, app_hash) (last_over_time(sentinel_genesis_info{validator=~\"$validator\"}[1h]))",
+          "expr": "max by (validator, chain_id, genesis_time, app_hash) (last_over_time(sentinel_genesis_info{validator=~\"$validator\"}[1d]))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -432,7 +432,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (validator, param, value) (last_over_time(sentinel_genesis_consensus_param{validator=~\"$validator\"}[1h]))",
+          "expr": "max by (validator, param, value) (last_over_time(sentinel_genesis_consensus_param{validator=~\"$validator\"}[1d]))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -473,7 +473,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (validator, address, pub_key, power, name) (last_over_time(sentinel_genesis_validator{validator=~\"$validator\"}[1h]))",
+          "expr": "max by (validator, address, pub_key, power, name) (last_over_time(sentinel_genesis_validator{validator=~\"$validator\"}[1d]))",
           "format": "table",
           "instant": true,
           "refId": "A"
