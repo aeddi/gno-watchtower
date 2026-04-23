@@ -1117,6 +1117,17 @@
           "instant": true,
           "legendFormat": "",
           "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "max by (address, pub_key_bech32) (last_over_time(sentinel_rpc_validator_set_power{pub_key_bech32!=\"\"}[1d]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "refId": "E"
         }
       ],
       "title": "Per-validator voting power",
@@ -1143,21 +1154,27 @@
               "instance 2": true,
               "instance 3": true,
               "Value #D": true,
+              "Value #E": true,
               "Time 4": true,
+              "Time 5": true,
               "job 4": true,
-              "instance 4": true
+              "job 5": true,
+              "instance 4": true,
+              "instance 5": true
             },
             "renameByName": {
               "Value #A": "power",
               "Value #B": "online",
-              "Value #C": "can_lose"
+              "Value #C": "can_lose",
+              "pub_key_bech32": "pub_key"
             },
             "indexByName": {
-              "address": 0,
-              "validator": 1,
-              "power": 2,
-              "online": 3,
-              "can_lose": 4
+              "validator": 0,
+              "address": 1,
+              "pub_key_bech32": 2,
+              "power": 3,
+              "online": 4,
+              "can_lose": 5
             }
           }
         },
@@ -1165,7 +1182,14 @@
           "id": "filterFieldsByName",
           "options": {
             "include": {
-              "names": ["address", "validator", "power", "online", "can_lose"]
+              "names": [
+                "validator",
+                "address",
+                "pub_key",
+                "power",
+                "online",
+                "can_lose"
+              ]
             }
           }
         }
