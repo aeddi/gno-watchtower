@@ -37,6 +37,11 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
+// BaseURL returns the RPC endpoint the client talks to. Exposed so callers
+// (e.g. collector log sites) can include the endpoint URL in structured logs
+// when a request fails.
+func (c *Client) BaseURL() string { return c.baseURL }
+
 func (c *Client) get(ctx context.Context, path string) (json.RawMessage, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {

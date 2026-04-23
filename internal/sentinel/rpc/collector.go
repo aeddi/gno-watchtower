@@ -108,7 +108,7 @@ func (c *Collector) collect(ctx context.Context) error {
 	for _, p := range polled {
 		raw, err := p.call()
 		if err != nil {
-			c.log.Warn("endpoint error", "endpoint", p.key, "err", err)
+			c.log.Warn("endpoint error", "endpoint", p.key, "url", c.client.BaseURL(), "err", err)
 			continue
 		}
 		if p.key == "status" {
@@ -131,7 +131,7 @@ func (c *Collector) collect(ctx context.Context) error {
 			}
 			c.lastDump = time.Now()
 		} else {
-			c.log.Warn("endpoint error", "endpoint", "dump_consensus_state", "err", err)
+			c.log.Warn("endpoint error", "endpoint", "dump_consensus_state", "url", c.client.BaseURL(), "err", err)
 		}
 	}
 
@@ -146,13 +146,13 @@ func (c *Collector) collect(ctx context.Context) error {
 				c.lastValidatorsSentAt = time.Now()
 			}
 		} else {
-			c.log.Warn("endpoint error", "endpoint", "validators", "err", err)
+			c.log.Warn("endpoint error", "endpoint", "validators", "url", c.client.BaseURL(), "err", err)
 		}
 		if raw, err := c.client.Block(ctx, currentHeight); err == nil {
 			payload.Data["block"] = raw
 			changed = append(changed, "block")
 		} else {
-			c.log.Warn("endpoint error", "endpoint", "block", "err", err)
+			c.log.Warn("endpoint error", "endpoint", "block", "url", c.client.BaseURL(), "err", err)
 		}
 	}
 
@@ -166,7 +166,7 @@ func (c *Collector) collect(ctx context.Context) error {
 			changed = append(changed, "validators")
 			c.lastValidatorsSentAt = time.Now()
 		} else {
-			c.log.Warn("endpoint error", "endpoint", "validators", "err", err)
+			c.log.Warn("endpoint error", "endpoint", "validators", "url", c.client.BaseURL(), "err", err)
 		}
 	}
 
@@ -182,10 +182,10 @@ func (c *Collector) collect(ctx context.Context) error {
 			c.lastGenesisSentAt = time.Now()
 			c.genesisFailed = 0
 		case c.genesisFailed == 0:
-			c.log.Warn("endpoint error", "endpoint", "genesis", "err", err)
+			c.log.Warn("endpoint error", "endpoint", "genesis", "url", c.client.BaseURL(), "err", err)
 			c.genesisFailed++
 		default:
-			c.log.Debug("endpoint error", "endpoint", "genesis", "err", err, "attempt", c.genesisFailed+1)
+			c.log.Debug("endpoint error", "endpoint", "genesis", "url", c.client.BaseURL(), "err", err, "attempt", c.genesisFailed+1)
 			c.genesisFailed++
 		}
 	}

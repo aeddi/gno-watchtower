@@ -2,11 +2,14 @@
 package rpc_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -173,6 +176,53 @@ loop:
 	}
 	if validatorsCount < 2 {
 		t.Fatalf("expected validators to be re-emitted after refresh interval, got %d emissions", validatorsCount)
+	}
+}
+
+func TestCollector_EndpointErrorLog_IncludesURL(t *testing.T) {
+	// Mock node returns 500 on every path so every endpoint call fails and
+	// the collector emits "endpoint error" warnings. We then scan the JSON
+	// log output and assert both `url` and `err` attrs are present.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "broken", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	var buf bytes.Buffer
+	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	out := make(chan protocol.RPCPayload, 10)
+	c := rpc.NewCollector(rpc.NewClient(srv.URL), 20*time.Millisecond, 1*time.Hour, 1*time.Hour, 1*time.Hour, out, log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	go c.Run(ctx)
+	<-ctx.Done()
+
+	// Scan every JSON log line for msg=="endpoint error".
+	found := false
+	for _, line := range strings.Split(buf.String(), "\n") {
+		if line == "" {
+			continue
+		}
+		var record map[string]any
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			t.Fatalf("parse log line %q: %v", line, err)
+		}
+		if record["msg"] != "endpoint error" {
+			continue
+		}
+		found = true
+		url, _ := record["url"].(string)
+		if !strings.HasPrefix(url, srv.URL) {
+			t.Errorf("endpoint error log: url=%q, want prefix %q", url, srv.URL)
+		}
+		if record["err"] == nil || record["err"] == "" {
+			t.Errorf("endpoint error log: err attr missing or empty (record=%v)", record)
+		}
+	}
+	if !found {
+		t.Fatalf("no 'endpoint error' log line found in:\n%s", buf.String())
 	}
 }
 
