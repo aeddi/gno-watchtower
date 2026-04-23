@@ -33,6 +33,7 @@ type Metrics struct {
 	rateLimited       *prometheus.CounterVec
 	logsBelowMinLevel *prometheus.CounterVec
 	authFailures      *prometheus.CounterVec
+	permissionDenied  *prometheus.CounterVec
 	retention         *prometheus.GaugeVec
 }
 
@@ -62,12 +63,16 @@ func New() *Metrics {
 			Name: "watchtower_auth_failures_total",
 			Help: "Auth-middleware rejections broken down by reason (invalid_token, banned). Not keyed on validator because rejected requests carry no trusted validator identity.",
 		}, []string{"reason"}),
+		permissionDenied: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "watchtower_permission_denied_total",
+			Help: "Per-validator 403 counts, labelled by the permission that was missing. Useful to spot sentinels sending data the operator never authorised them for.",
+		}, []string{"validator", "permission"}),
 		retention: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "watchtower_config_retention_seconds",
 			Help: "Configured retention window per storage backend, in seconds.",
 		}, []string{"backend"}),
 	}
-	reg.MustRegister(m.receivedBytes, m.receivedPayloads, m.rateLimited, m.logsBelowMinLevel, m.authFailures, m.retention)
+	reg.MustRegister(m.receivedBytes, m.receivedPayloads, m.rateLimited, m.logsBelowMinLevel, m.authFailures, m.permissionDenied, m.retention)
 	// Register Go + process metrics so we also get go_goroutines, process_cpu_seconds_total, etc.
 	reg.MustRegister(
 		prometheus.NewGoCollector(),
@@ -103,6 +108,13 @@ func (m *Metrics) RecordLogsBelowMinLevel(validator string) {
 // validator label — rejected requests carry no trusted validator identity.
 func (m *Metrics) RecordAuthFailure(reason string) {
 	m.authFailures.WithLabelValues(reason).Inc()
+}
+
+// RecordPermissionDenied bumps the counter for a 403 that was issued because
+// the authenticated validator lacks the permission required by the endpoint.
+// Unlike auth failures, the validator IS known here (auth already passed).
+func (m *Metrics) RecordPermissionDenied(validator, permission string) {
+	m.permissionDenied.WithLabelValues(validator, permission).Inc()
 }
 
 // SetRetention publishes the retention window for a backend as a gauge.

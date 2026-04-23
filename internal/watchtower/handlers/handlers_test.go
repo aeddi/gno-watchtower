@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -133,7 +134,8 @@ func TestHandler_NoAuth_Returns401(t *testing.T) {
 }
 
 func TestHandler_PermissionDenied_Returns403(t *testing.T) {
-	// val-02 has only rpc+metrics permissions; trying /logs should return 403.
+	// val-02 has only rpc+metrics permissions; trying /logs should return 403
+	// AND increment watchtower_permission_denied_total{validator,permission}.
 	validators := map[string]config.ValidatorConfig{
 		"val-02": {
 			Token:        "tok2",
@@ -152,7 +154,8 @@ func TestHandler_PermissionDenied_Returns403(t *testing.T) {
 	a := auth.New(validators, 10, time.Minute)
 	rl := ratelimit.New(100, 10, nil)
 	fwd := forwarder.New("http://vm:8428", "http://loki:3100", nil)
-	srv := handlers.NewServer(cfg, a, rl, fwd, stats.New(), wtmetrics.New(), logger.Noop())
+	m := wtmetrics.New()
+	srv := handlers.NewServer(cfg, a, rl, fwd, stats.New(), m, logger.Noop())
 
 	req := httptest.NewRequest(http.MethodPost, "/logs", nil)
 	req.Header.Set("Authorization", "Bearer tok2")
@@ -161,6 +164,21 @@ func TestHandler_PermissionDenied_Returns403(t *testing.T) {
 	srv.Handler().ServeHTTP(rr, req)
 	if rr.Code != http.StatusForbidden {
 		t.Errorf("want 403, got %d", rr.Code)
+	}
+
+	// Scrape /metrics and assert the per-validator/per-permission counter
+	// increment reached Prometheus.
+	scrape := httptest.NewServer(m.Handler())
+	defer scrape.Close()
+	resp, err := scrape.Client().Get(scrape.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	want := `watchtower_permission_denied_total{permission="logs",validator="val-02"} 1`
+	if !strings.Contains(string(body), want) {
+		t.Errorf("missing metric:\n  want: %s\n\nscrape:\n%s", want, string(body))
 	}
 }
 
