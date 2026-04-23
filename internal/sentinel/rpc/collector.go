@@ -105,12 +105,14 @@ func (c *Collector) collect(ctx context.Context) error {
 
 	var currentHeight int64
 	var changed []string
+	reachable := false
 	for _, p := range polled {
 		raw, err := p.call()
 		if err != nil {
 			c.log.Warn("endpoint error", "endpoint", p.key, "url", c.client.BaseURL(), "err", err)
 			continue
 		}
+		reachable = true
 		if p.key == "status" {
 			currentHeight = c.parseHeight(raw)
 		}
@@ -190,12 +192,18 @@ func (c *Collector) collect(ctx context.Context) error {
 		}
 	}
 
+	// rpc_reachable is a scalar 0/1 synthesized on every poll so the dashboard
+	// always has a fresh per-validator liveness sample within its staleness
+	// window, independent of the delta filter. "1" means at least one endpoint
+	// call succeeded this tick; "0" means every call failed (host unreachable).
+	reachByte := "0"
+	if reachable {
+		reachByte = "1"
+	}
+	payload.Data["rpc_reachable"] = json.RawMessage(reachByte)
+
 	if len(changed) > 0 {
 		c.log.Debug("poll", "changed", changed)
-	}
-
-	if len(payload.Data) == 0 {
-		return nil
 	}
 
 	select {

@@ -179,6 +179,76 @@ loop:
 	}
 }
 
+func TestCollector_EmitsRPCReachable_OneWhenHealthy(t *testing.T) {
+	srv := buildMockNode(t)
+	defer srv.Close()
+
+	out := make(chan protocol.RPCPayload, 10)
+	c := rpc.NewCollector(rpc.NewClient(srv.URL), 30*time.Millisecond, 1*time.Hour, 1*time.Hour, 1*time.Hour, out, logger.Noop())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	go c.Run(ctx)
+
+	// Wait for at least one payload and check it carries rpc_reachable=1.
+	select {
+	case p := <-out:
+		raw, ok := p.Data["rpc_reachable"]
+		if !ok {
+			t.Fatalf("payload missing rpc_reachable key; keys=%v", payloadKeys(p))
+		}
+		var v float64
+		if err := json.Unmarshal(raw, &v); err != nil {
+			t.Fatalf("rpc_reachable unmarshal: %v (raw=%s)", err, string(raw))
+		}
+		if v != 1 {
+			t.Errorf("rpc_reachable = %v, want 1 (healthy mock node)", v)
+		}
+	case <-ctx.Done():
+		t.Fatal("no payload received within timeout")
+	}
+}
+
+func TestCollector_EmitsRPCReachable_ZeroWhenUnreachable(t *testing.T) {
+	// Mock node returns 500 on every path — every endpoint call fails.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "broken", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	out := make(chan protocol.RPCPayload, 10)
+	c := rpc.NewCollector(rpc.NewClient(srv.URL), 30*time.Millisecond, 1*time.Hour, 1*time.Hour, 1*time.Hour, out, logger.Noop())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	go c.Run(ctx)
+
+	select {
+	case p := <-out:
+		raw, ok := p.Data["rpc_reachable"]
+		if !ok {
+			t.Fatalf("payload missing rpc_reachable key; keys=%v", payloadKeys(p))
+		}
+		var v float64
+		if err := json.Unmarshal(raw, &v); err != nil {
+			t.Fatalf("rpc_reachable unmarshal: %v (raw=%s)", err, string(raw))
+		}
+		if v != 0 {
+			t.Errorf("rpc_reachable = %v, want 0 (unreachable)", v)
+		}
+	case <-ctx.Done():
+		t.Fatal("no payload received while node was unreachable; expected rpc_reachable=0")
+	}
+}
+
+func payloadKeys(p protocol.RPCPayload) []string {
+	keys := make([]string, 0, len(p.Data))
+	for k := range p.Data {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 func TestCollector_EndpointErrorLog_IncludesURL(t *testing.T) {
 	// Mock node returns 500 on every path so every endpoint call fails and
 	// the collector emits "endpoint error" warnings. We then scan the JSON
@@ -260,15 +330,16 @@ func TestCollector_DeltaSkipsUnchangedEndpoints(t *testing.T) {
 		payloads = append(payloads, <-out)
 	}
 
-	// num_unconfirmed_txs bypasses the delta and is always included, so multiple
-	// payloads are expected (one per poll tick).  Verify that subsequent payloads
-	// contain only num_unconfirmed_txs and no other keys (delta still filters those).
+	// num_unconfirmed_txs and rpc_reachable both bypass the delta (the first is
+	// sampled each tick so idle mempools still produce a series; the second is
+	// a per-poll liveness signal). All other endpoints still honor the delta,
+	// so subsequent payloads must carry only those two keys.
 	if len(payloads) < 1 {
 		t.Fatal("expected at least one payload")
 	}
 	for i, p := range payloads[1:] {
 		for key := range p.Data {
-			if key != "num_unconfirmed_txs" {
+			if key != "num_unconfirmed_txs" && key != "rpc_reachable" {
 				t.Errorf("payload[%d]: unexpected key %q — delta should have filtered it", i+1, key)
 			}
 		}
