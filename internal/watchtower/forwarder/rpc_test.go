@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/aeddi/gno-watchtower/pkg/gpub"
 	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
@@ -23,15 +24,19 @@ const (
 		"sync_info":{"latest_block_height":"100","catching_up":true},
 		"validator_info":{"address":"g1self","voting_power":"1"}
 	}`
-	netInfoJSON    = `{"n_peers":"3"}`
-	mempoolJSON    = `{"n_txs":"2","total":"2","total_bytes":"512"}`
-	consensusJSON  = `{"round_state":{"height":"4478","round":0,"step":1}}`
+	netInfoJSON   = `{"n_peers":"3"}`
+	mempoolJSON   = `{"n_txs":"2","total":"2","total_bytes":"512"}`
+	consensusJSON = `{"round_state":{"height":"4478","round":0,"step":1}}`
+	// 32-byte ed25519 payloads chosen so the expected gpub bech32 strings can
+	// be computed deterministically by pkg/gpub in the test — see
+	// TestExtractRPC_Validators_PubKeyBech32Label. Real /validators responses
+	// carry the same shape: pub_key.{@type,value} with the raw key base64-encoded.
 	validatorsJSON = `{
 		"block_height":"4478",
 		"validators":[
-			{"address":"g1a","voting_power":"1"},
-			{"address":"g1b","voting_power":"2"},
-			{"address":"g1c","voting_power":"5"}
+			{"address":"g1a","pub_key":{"@type":"/tm.PubKeyEd25519","value":"mKsg1XPxANeixURll0tm+FdymdT7qyOMs8h0lliCK6w="},"voting_power":"1"},
+			{"address":"g1b","pub_key":{"@type":"/tm.PubKeyEd25519","value":"FPseTktiYHImHBZ1wC0Gv9ifZ9hASDjUlKqNDh2jS+I="},"voting_power":"2"},
+			{"address":"g1c","pub_key":{"@type":"/tm.PubKeyEd25519","value":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"voting_power":"5"}
 		]
 	}`
 	blockJSON = `{"block":{"header":{"height":"4478","num_txs":"3","time":"2026-04-19T21:00:00Z","proposer_address":"g1a"}}}`
@@ -164,6 +169,58 @@ func TestExtractRPC_Validators(t *testing.T) {
 	}
 	if pb != nil && pb.Metric["validator"] != "node-1" {
 		t.Errorf("set_power reporter label = %q, want node-1", pb.Metric["validator"])
+	}
+}
+
+// TestExtractRPC_Validators_PubKeyBech32Label asserts that each set_power
+// series carries pub_key_bech32 with the canonical `gpub1...` encoding of
+// the validator's pub_key.value — what `gnoland secrets get
+// validator_key.pub_key -raw` would print for the same key. The dashboard's
+// voting-power panel surfaces this as the identity column; the encoding
+// itself is pinned by pkg/gpub so this test only checks the integration.
+func TestExtractRPC_Validators_PubKeyBech32Label(t *testing.T) {
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"validators": validatorsJSON}))
+	// g1b: pub_key value matches node-1 from cluster fixture.
+	wantB, err := gpub.EncodeEd25519FromBase64("FPseTktiYHImHBZ1wC0Gv9ifZ9hASDjUlKqNDh2jS+I=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pb := findLine(t, lines, map[string]string{"__name__": "sentinel_rpc_validator_set_power", "address": "g1b"})
+	if pb == nil {
+		t.Fatal("set_power{address=g1b} missing")
+	}
+	if pb.Metric["pub_key_bech32"] != wantB {
+		t.Errorf("set_power{g1b}.pub_key_bech32 = %q, want %q", pb.Metric["pub_key_bech32"], wantB)
+	}
+	// Every set_power line should carry pub_key_bech32 non-empty (fixture
+	// gives pub_key on all entries).
+	for _, l := range lines {
+		if l.Metric["__name__"] != "sentinel_rpc_validator_set_power" {
+			continue
+		}
+		if l.Metric["pub_key_bech32"] == "" {
+			t.Errorf("set_power{address=%s}: pub_key_bech32 label missing", l.Metric["address"])
+		}
+	}
+}
+
+// TestExtractRPC_Validators_PubKeyBech32Omitted_WhenMissing covers the
+// forward-compat case: if a gnoland /validators response drops pub_key (or
+// the type isn't ed25519), the set_power line is still emitted without the
+// pub_key_bech32 label — we never fabricate an empty-string label.
+func TestExtractRPC_Validators_PubKeyBech32Omitted_WhenMissing(t *testing.T) {
+	const noPubKey = `{
+		"validators":[
+			{"address":"g1x","voting_power":"1"}
+		]
+	}`
+	lines := extractRPC("node-1", rpcPayload(map[string]string{"validators": noPubKey}))
+	p := findLine(t, lines, map[string]string{"__name__": "sentinel_rpc_validator_set_power", "address": "g1x"})
+	if p == nil {
+		t.Fatal("set_power{address=g1x} missing — aggregate should still emit")
+	}
+	if _, has := p.Metric["pub_key_bech32"]; has {
+		t.Errorf("pub_key_bech32 label should be absent when pub_key missing; got %v", p.Metric)
 	}
 }
 
