@@ -39,7 +39,7 @@ services:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/health']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/health']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -63,7 +63,7 @@ services:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:8428/health']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8428/health']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -110,7 +110,7 @@ services:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:3100/ready']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3100/ready']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -130,7 +130,7 @@ services:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/health']
       interval: 10s
       timeout: 5s
       retries: 3
