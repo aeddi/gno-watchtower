@@ -30,11 +30,16 @@ func TestApplyDetection_DockerFound(t *testing.T) {
 	if cfg.RPC.RPCURL != "http://localhost:26657" {
 		t.Errorf("RPC.RPCURL: got %q", cfg.RPC.RPCURL)
 	}
-	if cfg.Metadata.ConfigGetCmd == "" {
-		t.Error("Metadata.ConfigGetCmd should be set in docker mode")
+	// Docker mode defaults to config_path (file-based, works for both host and
+	// containerised sentinels when the config dir is bind-mounted). config_get_cmd
+	// stays available as a commented alternative — but only works when a docker
+	// CLI is reachable from the sentinel's environment, which isn't true when
+	// the sentinel itself runs inside a slim container image.
+	if cfg.Metadata.ConfigPath != placeholderConfigPath {
+		t.Errorf("Metadata.ConfigPath: got %q, want placeholder", cfg.Metadata.ConfigPath)
 	}
-	if cfg.Metadata.ConfigPath != "" {
-		t.Error("Metadata.ConfigPath should be empty in docker mode")
+	if cfg.Metadata.ConfigGetCmd != "" {
+		t.Errorf("Metadata.ConfigGetCmd should be empty in docker mode, got %q", cfg.Metadata.ConfigGetCmd)
 	}
 }
 

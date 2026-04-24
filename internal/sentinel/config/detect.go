@@ -146,9 +146,10 @@ func applyDetection(cfg *Config, env *Environment) {
 		if env.Docker.RPCPort != 0 {
 			cfg.RPC.RPCURL = fmt.Sprintf("http://localhost:%d", env.Docker.RPCPort)
 		}
-		// Docker mode: read config via docker exec.
-		cfg.Metadata.ConfigGetCmd = fmt.Sprintf("docker exec %s gnoland config get %%s --raw", env.Docker.ContainerName)
-		cfg.Metadata.ConfigPath = ""
+		// Docker mode still defaults to config_path — config_get_cmd needs a
+		// docker CLI in the sentinel's PATH, which containerised sentinels
+		// typically don't ship. The placeholder stays; operators replace it
+		// with the bind-mounted path (see the config_path field comment).
 	} else if env.Journald != nil {
 		cfg.Logs.Source = LogSourceJournald
 		cfg.Logs.JournaldUnit = env.Journald.UnitName
