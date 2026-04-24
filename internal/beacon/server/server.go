@@ -96,12 +96,23 @@ func New(cfg Config) (*Server, error) {
 	}, nil
 }
 
+// rejectLogLevel classifies a handshake rejection error. EOF (both io.EOF
+// and io.ErrUnexpectedEOF) is common and benign after a beacon restart —
+// the running sentinel's first retry arrives before the noise handshake
+// completes. Everything else (bad keys, wrong protocol) still gets WARN.
+func rejectLogLevel(err error) slog.Level {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return slog.LevelDebug
+	}
+	return slog.LevelWarn
+}
+
 // Run starts the Noise listener + HTTP server and blocks until ctx is
 // cancelled, then performs a graceful shutdown with a short deadline.
 func (s *Server) Run(ctx context.Context) error {
 	lis, err := noise.NewListener("tcp", s.listenAddr, *s.noiseCfg, s.handshakeT,
 		func(remote net.Addr, err error) {
-			s.log.Warn("handshake rejected", "remote", remote, "err", err)
+			s.log.Log(ctx, rejectLogLevel(err), "handshake rejected", "remote", remote, "err", err)
 		})
 	if err != nil {
 		return fmt.Errorf("noise listen: %w", err)
