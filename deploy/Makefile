@@ -10,7 +10,8 @@ help:  ## Show this help
 up:  ## Start the monitoring stack (docker compose up -d)
 	@export COMMIT=$$(git -C .. rev-parse HEAD 2>/dev/null || echo "") \
 	 && export BUILD_TIME=$$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-	 && $(COMPOSE) up -d --build
+	 && $(COMPOSE) build --no-cache watchtower \
+	 && $(COMPOSE) up -d
 
 down:  ## Stop the stack
 	$(COMPOSE) down
