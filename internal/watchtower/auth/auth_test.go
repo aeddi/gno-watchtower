@@ -1,13 +1,19 @@
 package auth_test
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/aeddi/gno-watchtower/internal/watchtower/auth"
 	"github.com/aeddi/gno-watchtower/internal/watchtower/config"
+	wtmetrics "github.com/aeddi/gno-watchtower/internal/watchtower/metrics"
 )
 
 func makeAuth(t *testing.T) *auth.Authenticator {
@@ -88,14 +94,16 @@ func TestAuth_BansIPAfterThreshold(t *testing.T) {
 	}
 
 	// Third request — IP should now be banned (even with a valid token).
+	// 403 distinguishes an auth-side ban (client misbehavior) from a 429
+	// rate-limit signal (global back-pressure). Clients should not retry on 403.
 	req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
 	req.Header.Set("Authorization", "Bearer good-token")
 	req.RemoteAddr = "1.2.3.4:9999"
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusTooManyRequests {
-		t.Errorf("want 429 for banned IP, got %d", rr.Code)
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("want 403 for banned IP, got %d", rr.Code)
 	}
 }
 
@@ -141,8 +149,8 @@ func TestAuth_BanIsKeyedOnXForwardedForRightmost(t *testing.T) {
 	reqBanned.RemoteAddr = proxyAddr
 	rrBanned := httptest.NewRecorder()
 	handler.ServeHTTP(rrBanned, reqBanned)
-	if rrBanned.Code != http.StatusTooManyRequests {
-		t.Errorf("want 429 for banned client, got %d", rrBanned.Code)
+	if rrBanned.Code != http.StatusForbidden {
+		t.Errorf("want 403 for banned client, got %d", rrBanned.Code)
 	}
 }
 
@@ -176,8 +184,8 @@ func TestAuth_XForwardedFor_TakesRightmostEntry(t *testing.T) {
 	req.RemoteAddr = "172.18.0.2:1234"
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTooManyRequests {
-		t.Errorf("want 429 keyed on rightmost XFF, got %d", rr.Code)
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("want 403 keyed on rightmost XFF, got %d", rr.Code)
 	}
 }
 
@@ -314,5 +322,167 @@ func TestAuth_MissingAuthHeader_Returns401(t *testing.T) {
 
 	if rr.Code != http.StatusUnauthorized {
 		t.Errorf("want 401, got %d", rr.Code)
+	}
+}
+
+func TestAuth_BannedCount_ReflectsActiveBans(t *testing.T) {
+	// BannedCount must only count IPs currently under an active ban —
+	// expired bans and non-banned failure records don't contribute. The
+	// watchtower_banned_ips gauge hinges on this accuracy.
+	a := auth.New(map[string]config.ValidatorConfig{
+		"val-01": {Token: "good-token"},
+	}, 1, 200*time.Millisecond) // ban on first failure, 200ms duration
+
+	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Empty ban set at start.
+	if got := a.BannedCount(); got != 0 {
+		t.Fatalf("BannedCount at start: got %d, want 0", got)
+	}
+
+	// Two different IPs both trigger a ban.
+	for _, ip := range []string{"1.1.1.1", "2.2.2.2"} {
+		req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+		req.Header.Set("Authorization", "Bearer bad-token")
+		req.RemoteAddr = ip + ":1234"
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	if got := a.BannedCount(); got != 2 {
+		t.Fatalf("BannedCount after 2 bans: got %d, want 2", got)
+	}
+
+	// After the ban duration expires, the count must drop.
+	time.Sleep(250 * time.Millisecond)
+	if got := a.BannedCount(); got != 0 {
+		t.Errorf("BannedCount after expiry: got %d, want 0", got)
+	}
+}
+
+func TestAuth_RecordsMetricsOnFailureAndBan(t *testing.T) {
+	// Integration test: wire a real *metrics.Metrics into the Authenticator,
+	// trip the ban (banThreshold=3) via three bad-token requests, send one more
+	// from the now-banned IP, then scrape /metrics and assert both reason
+	// variants. Using the real counters (not a spy) exercises the label values
+	// the operator dashboard actually sees.
+	a := auth.New(map[string]config.ValidatorConfig{
+		"val-01": {Token: "good-token"},
+	}, 3, time.Minute)
+	m := wtmetrics.New()
+	a.SetMetrics(m)
+
+	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Three bad-token requests from the same IP — all 401, ban arms on #3.
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+		req.Header.Set("Authorization", "Bearer bad-token")
+		req.RemoteAddr = "9.9.9.9:1234"
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	// Fourth request from the banned IP — 403 banned, reason=banned.
+	reqBanned := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+	reqBanned.Header.Set("Authorization", "Bearer good-token")
+	reqBanned.RemoteAddr = "9.9.9.9:1234"
+	handler.ServeHTTP(httptest.NewRecorder(), reqBanned)
+
+	// Scrape /metrics and check both label variants.
+	srv := httptest.NewServer(m.Handler())
+	defer srv.Close()
+	resp, err := srv.Client().Get(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	text := string(body)
+
+	wants := []string{
+		`watchtower_auth_failures_total{reason="invalid_token"} 3`,
+		`watchtower_auth_failures_total{reason="banned"} 1`,
+	}
+	for _, w := range wants {
+		if !strings.Contains(text, w) {
+			t.Errorf("missing line:\n  want: %s\n\nscrape:\n%s", w, text)
+		}
+	}
+}
+
+func TestAuth_LogsInvalidTokenAtInfo_BannedAtWarn(t *testing.T) {
+	// Auth failures with no stdout trail are a blind spot: operators learn of
+	// rejections only via /metrics counters. The middleware must emit a
+	// structured log line per failure — INFO for invalid_token (routine, but
+	// auditable) and WARN for banned (loud enough to notice).
+	a := auth.New(map[string]config.ValidatorConfig{
+		"val-01": {Token: "good-token"},
+	}, 1, time.Minute) // ban on first failure → second request is banned path
+
+	buf := &bytes.Buffer{}
+	a.SetLogger(slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+
+	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Request 1: invalid token → INFO log; also arms the ban (threshold=1).
+	req1 := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+	req1.Header.Set("Authorization", "Bearer abcdef1234567890")
+	req1.RemoteAddr = "7.7.7.7:1234"
+	handler.ServeHTTP(httptest.NewRecorder(), req1)
+
+	// Request 2: banned IP → WARN log (reason=banned).
+	req2 := httptest.NewRequest(http.MethodPost, "/metrics", nil)
+	req2.Header.Set("Authorization", "Bearer good-token") // valid token, but IP is banned
+	req2.RemoteAddr = "7.7.7.7:1234"
+	handler.ServeHTTP(httptest.NewRecorder(), req2)
+
+	var entries []map[string]any
+	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		var e map[string]any
+		if err := json.Unmarshal([]byte(line), &e); err != nil {
+			t.Fatalf("bad JSON log line %q: %v", line, err)
+		}
+		entries = append(entries, e)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("want 2 log entries, got %d: %s", len(entries), buf.String())
+	}
+
+	// Entry 1: invalid_token at INFO.
+	if entries[0]["level"] != "INFO" {
+		t.Errorf("entry 1 level: got %v, want INFO", entries[0]["level"])
+	}
+	if entries[0]["reason"] != "invalid_token" {
+		t.Errorf("entry 1 reason: got %v, want invalid_token", entries[0]["reason"])
+	}
+	if entries[0]["ip"] != "7.7.7.7" {
+		t.Errorf("entry 1 ip: got %v, want 7.7.7.7", entries[0]["ip"])
+	}
+	if entries[0]["path"] != "/rpc" {
+		t.Errorf("entry 1 path: got %v, want /rpc", entries[0]["path"])
+	}
+	if entries[0]["token_prefix"] != "abcdef12" {
+		t.Errorf("entry 1 token_prefix: got %v, want abcdef12", entries[0]["token_prefix"])
+	}
+
+	// Entry 2: banned at WARN.
+	if entries[1]["level"] != "WARN" {
+		t.Errorf("entry 2 level: got %v, want WARN", entries[1]["level"])
+	}
+	if entries[1]["reason"] != "banned" {
+		t.Errorf("entry 2 reason: got %v, want banned", entries[1]["reason"])
+	}
+	if entries[1]["ip"] != "7.7.7.7" {
+		t.Errorf("entry 2 ip: got %v, want 7.7.7.7", entries[1]["ip"])
+	}
+	if entries[1]["path"] != "/metrics" {
+		t.Errorf("entry 2 path: got %v, want /metrics", entries[1]["path"])
 	}
 }

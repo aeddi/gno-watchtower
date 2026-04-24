@@ -130,7 +130,8 @@ func (c *Config) validate() error {
 	if c.Server.URL == "" {
 		return fmt.Errorf("server.url is required")
 	}
-	if !strings.HasPrefix(c.Server.URL, "http://") && !strings.HasPrefix(c.Server.URL, "https://") {
+	if !IsPlaceholder(c.Server.URL) &&
+		!strings.HasPrefix(c.Server.URL, "http://") && !strings.HasPrefix(c.Server.URL, "https://") {
 		return fmt.Errorf("server.url must be http:// or https://, got %q", c.Server.URL)
 	}
 	if c.Beacon.ListenAddr == "" {

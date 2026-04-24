@@ -32,6 +32,8 @@ type Metrics struct {
 	receivedPayloads  *prometheus.CounterVec
 	rateLimited       *prometheus.CounterVec
 	logsBelowMinLevel *prometheus.CounterVec
+	authFailures      *prometheus.CounterVec
+	permissionDenied  *prometheus.CounterVec
 	retention         *prometheus.GaugeVec
 }
 
@@ -57,12 +59,20 @@ func New() *Metrics {
 			Name: "watchtower_logs_below_min_level_total",
 			Help: "Log payloads dropped because their level was below the validator's configured logs_min_level.",
 		}, []string{"validator"}),
+		authFailures: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "watchtower_auth_failures_total",
+			Help: "Auth-middleware rejections broken down by reason (invalid_token, banned). Not keyed on validator because rejected requests carry no trusted validator identity.",
+		}, []string{"reason"}),
+		permissionDenied: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "watchtower_permission_denied_total",
+			Help: "Per-validator 403 counts, labelled by the permission that was missing. Useful to spot sentinels sending data the operator never authorised them for.",
+		}, []string{"validator", "permission"}),
 		retention: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "watchtower_config_retention_seconds",
 			Help: "Configured retention window per storage backend, in seconds.",
 		}, []string{"backend"}),
 	}
-	reg.MustRegister(m.receivedBytes, m.receivedPayloads, m.rateLimited, m.logsBelowMinLevel, m.retention)
+	reg.MustRegister(m.receivedBytes, m.receivedPayloads, m.rateLimited, m.logsBelowMinLevel, m.authFailures, m.permissionDenied, m.retention)
 	// Register Go + process metrics so we also get go_goroutines, process_cpu_seconds_total, etc.
 	reg.MustRegister(
 		prometheus.NewGoCollector(),
@@ -93,6 +103,20 @@ func (m *Metrics) RecordLogsBelowMinLevel(validator string) {
 	m.logsBelowMinLevel.WithLabelValues(validator).Inc()
 }
 
+// RecordAuthFailure bumps the per-reason counter for an auth-middleware
+// rejection. Reason is a short slug (e.g. "invalid_token", "banned"). No
+// validator label — rejected requests carry no trusted validator identity.
+func (m *Metrics) RecordAuthFailure(reason string) {
+	m.authFailures.WithLabelValues(reason).Inc()
+}
+
+// RecordPermissionDenied bumps the counter for a 403 that was issued because
+// the authenticated validator lacks the permission required by the endpoint.
+// Unlike auth failures, the validator IS known here (auth already passed).
+func (m *Metrics) RecordPermissionDenied(validator, permission string) {
+	m.permissionDenied.WithLabelValues(validator, permission).Inc()
+}
+
 // SetRetention publishes the retention window for a backend as a gauge.
 // Called at startup from parsed config. A zero duration leaves the gauge unset
 // rather than at 0, so dashboards can tell "not configured" from "zero retention".
@@ -101,6 +125,19 @@ func (m *Metrics) SetRetention(backend Backend, d time.Duration, log *slog.Logge
 		log.Warn("retention not set — gauge will report 0", "backend", backend)
 	}
 	m.retention.WithLabelValues(string(backend)).Set(d.Seconds())
+}
+
+// SetBannedCountSource registers a GaugeFunc that reports the number of IPs
+// currently under an active ban. The source closure is evaluated on every
+// Prometheus scrape — callers should hand off a cheap, lock-friendly accessor
+// (e.g. Authenticator.BannedCount). Intentionally a setter rather than a New()
+// param so wire-up stays optional: tests and standalone runs can skip it and
+// the gauge simply won't appear in /metrics.
+func (m *Metrics) SetBannedCountSource(src func() int) {
+	m.registry.MustRegister(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "watchtower_banned_ips",
+		Help: "Count of IPs currently under an active ban. Sampled at scrape time from the auth layer's live ban map.",
+	}, func() float64 { return float64(src()) }))
 }
 
 // Handler returns the http.Handler for Prometheus scrapes.

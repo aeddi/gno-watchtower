@@ -199,6 +199,66 @@ func TestForwardLogs_EmptyMinLevelMeansNoFilter(t *testing.T) {
 	}
 }
 
+// TestForwardLogs_StripsPromotedFieldsFromBody asserts the JSON body pushed
+// to Loki no longer carries "ts" or "level" — both are promoted elsewhere
+// (ts → Loki entry timestamp; level → stream label). Keeping them in the
+// body yields noise in Grafana: a "ts" chip and a "level_extracted" field
+// alongside the real level label.
+func TestForwardLogs_StripsPromotedFieldsFromBody(t *testing.T) {
+	var lokiBody []byte
+	lokiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lokiBody, _ = io.ReadAll(r.Body)
+	}))
+	defer lokiSrv.Close()
+
+	payload := protocol.LogPayload{
+		Level: "info",
+		Lines: []json.RawMessage{
+			json.RawMessage(`{"ts":1776544197.2256565,"level":"info","msg":"hi","module":"foo","caller":"x.go:1"}`),
+		},
+	}
+	body, _ := json.Marshal(payload)
+	compressed, _ := zstdCompress(body)
+
+	f := forwarder.New("http://vm-unused:8428", lokiSrv.URL, nil)
+	if err := f.ForwardLogs(context.Background(), "val-01", compressed, ""); err != nil {
+		t.Fatalf("ForwardLogs: %v", err)
+	}
+
+	var push struct {
+		Streams []struct {
+			Stream map[string]string   `json:"stream"`
+			Values [][]json.RawMessage `json:"values"`
+		} `json:"streams"`
+	}
+	if err := json.Unmarshal(lokiBody, &push); err != nil {
+		t.Fatalf("parse loki body: %v", err)
+	}
+	if len(push.Streams) == 0 || len(push.Streams[0].Values) == 0 {
+		t.Fatal("no values pushed to loki")
+	}
+
+	var pushedLine string
+	if err := json.Unmarshal(push.Streams[0].Values[0][1], &pushedLine); err != nil {
+		t.Fatalf("unmarshal line body: %v", err)
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(pushedLine), &obj); err != nil {
+		t.Fatalf("parse line body %q: %v", pushedLine, err)
+	}
+	if _, has := obj["ts"]; has {
+		t.Errorf(`"ts" should have been stripped from the body; got %q`, pushedLine)
+	}
+	if _, has := obj["level"]; has {
+		t.Errorf(`"level" should have been stripped from the body; got %q`, pushedLine)
+	}
+	for _, k := range []string{"msg", "module", "caller"} {
+		if _, has := obj[k]; !has {
+			t.Errorf("body should have preserved %q; got %q", k, pushedLine)
+		}
+	}
+}
+
 func TestForwardMetrics_PostsSentinelMetricsToVM(t *testing.T) {
 	var received []byte
 	var path string

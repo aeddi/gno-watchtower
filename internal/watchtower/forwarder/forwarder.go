@@ -210,7 +210,11 @@ func toLokiPush(validator string, payload protocol.LogPayload) (*lokiPush, error
 		if ts.Before(now.Add(-maxLogsTsPastSkew)) || ts.After(now.Add(maxLogsTsFutureSkew)) {
 			ts = now
 		}
-		entries = append(entries, entry{nano: ts.UnixNano(), raw: string(raw), module: mod})
+		// "ts" and "level" are promoted: ts becomes the Loki entry timestamp,
+		// level becomes a stream label below. Leaving them in the body makes
+		// Grafana surface them as noisy duplicates ("ts" chip,
+		// "level_extracted" alongside the real level label).
+		entries = append(entries, entry{nano: ts.UnixNano(), raw: string(stripBodyFields(raw, "ts", "level")), module: mod})
 	}
 	// Loki rejects out-of-order entries per stream with 400. Upstream sentinel
 	// batches preserve order from docker, but sort defensively. Sort
@@ -271,6 +275,26 @@ func extractModuleAndTS(raw json.RawMessage, fallback time.Time) (string, time.T
 		}
 	}
 	return mod, ts
+}
+
+// stripBodyFields removes top-level keys from a JSON-object body and returns
+// the re-marshaled result. Used to drop fields that have been promoted out
+// of the body (ts → entry timestamp, level → stream label) so Grafana doesn't
+// surface them as duplicate chips. Non-object input is passed through
+// untouched; downstream readers see the original bytes.
+func stripBodyFields(raw json.RawMessage, keys ...string) json.RawMessage {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil || obj == nil {
+		return raw
+	}
+	for _, k := range keys {
+		delete(obj, k)
+	}
+	out, err := json.Marshal(obj)
+	if err != nil {
+		return raw
+	}
+	return out
 }
 
 func (f *Forwarder) post(ctx context.Context, url string, body []byte, contentType string) error {

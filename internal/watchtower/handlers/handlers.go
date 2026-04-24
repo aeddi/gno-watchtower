@@ -115,6 +115,7 @@ func (s *Server) handlePayload(
 ) {
 	validator, vcfg, _ := auth.ValidatorFromContext(r.Context())
 	if !slices.Contains(vcfg.Permissions, perm) {
+		s.metrics.RecordPermissionDenied(validator, perm)
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}

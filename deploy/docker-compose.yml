@@ -8,7 +8,7 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    env_file: config.env
+    env_file: .env
     networks:
       - monitoring
     restart: unless-stopped
@@ -23,19 +23,23 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: watchtower
+      args:
+        VERSION: '${VERSION:-dev}'
+        COMMIT: '${COMMIT:-}'
+        BUILD_TIME: '${BUILD_TIME:-}'
     command: ['run', '/etc/watchtower/config.toml']
     volumes:
       - ./watchtower.toml:/etc/watchtower/config.toml:ro
     environment:
       # Surface retention windows via /metrics so dashboards can show
-      # "used / limit" panels without reparsing config.env at query time.
+      # "used / limit" panels without reparsing .env at query time.
       LOGS_RETENTION: '${LOGS_RETENTION}'
       METRICS_RETENTION: '${METRICS_RETENTION}'
     networks:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/health']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/health']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -59,7 +63,7 @@ services:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:8428/health']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8428/health']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -101,12 +105,12 @@ services:
     volumes:
       - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki_data:/loki
-    env_file: config.env
+    env_file: .env
     networks:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:3100/ready']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3100/ready']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -121,12 +125,12 @@ services:
       - grafana_data:/var/lib/grafana
       - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
       - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-    env_file: config.env
+    env_file: .env
     networks:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/health']
       interval: 10s
       timeout: 5s
       retries: 3

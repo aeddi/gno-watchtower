@@ -2,6 +2,9 @@
 /sentinel
 /watchtower
 
+# Local deploy secrets (copied from deploy/.env.example)
+deploy/.env
+
 # Go build artifacts
 *.test
 *.out

@@ -1,4 +1,9 @@
 {$DOMAIN} {
+    log {
+        output stdout
+        format json
+    }
+
     # Watchtower API
     handle_path /watchtower/* {
         reverse_proxy watchtower:8080

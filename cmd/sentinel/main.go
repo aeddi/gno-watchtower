@@ -157,8 +157,9 @@ func runCmd(args []string) {
 
 func doctorCmd(args []string) {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
+	format := fs.String("format", "styled", "output format: styled (default, TTY-friendly) or plain (ASCII [STATUS] tags, grep-friendly)")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: sentinel doctor <config-file>")
+		fmt.Fprintln(os.Stderr, "Usage: sentinel doctor [--format=styled|plain] <config-file>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -166,6 +167,17 @@ func doctorCmd(args []string) {
 	}
 	if fs.NArg() < 1 {
 		fs.Usage()
+		os.Exit(1)
+	}
+
+	var doctorFormat doctor.Format
+	switch *format {
+	case "styled":
+		doctorFormat = doctor.FormatStyled
+	case "plain":
+		doctorFormat = doctor.FormatPlain
+	default:
+		fmt.Fprintf(os.Stderr, "invalid --format %q (want styled or plain)\n", *format)
 		os.Exit(1)
 	}
 
@@ -177,7 +189,7 @@ func doctorCmd(args []string) {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	code := doctor.Run(ctx, cfg, fs.Arg(0), os.Stdout)
+	code := doctor.Run(ctx, cfg, fs.Arg(0), os.Stdout, doctorFormat)
 	os.Exit(code)
 }
 

@@ -33,6 +33,11 @@ limits_config:
   # when no well-known hint is present). Our push payloads don't carry one, so
   # the auto-added label is pure noise in dashboards. Empty list disables it.
   discover_service_name: []
+  # Loki 3.x also auto-extracts a level from the JSON body and exposes it as
+  # the structured_metadata field "detected_level". The watchtower already
+  # promotes level to a stream label, so detected_level is a redundant
+  # duplicate in Grafana's Fields panel.
+  discover_log_levels: false
   # Clock-skew gates: a validator clock beyond these windows has its batch
   # rejected in full. The watchtower also applies a receive-time fallback in
   # toLokiPush when |now - ts| > creation_grace_period so typical drift

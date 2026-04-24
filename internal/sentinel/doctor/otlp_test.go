@@ -57,3 +57,27 @@ func TestCheckOTLP_Red_WhenNoExport(t *testing.T) {
 		t.Errorf("want RED, got %s: %s", r.Status, r.Detail)
 	}
 }
+
+func TestCheckOTLP_Green_WhenPortAlreadyListening(t *testing.T) {
+	// Simulate a running sentinel: the OTLP relay port is already bound.
+	// Doctor must not try to re-bind — it should dial, see the port is
+	// responding, and return Green without waiting 3s for an export.
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { lis.Close() })
+	addr := lis.Addr().String()
+
+	start := time.Now()
+	r := doctor.CheckOTLP(context.Background(), addr)
+	elapsed := time.Since(start)
+
+	if r.Status != doctor.StatusGreen {
+		t.Errorf("want GREEN, got %s: %s", r.Status, r.Detail)
+	}
+	// Dial path must be fast — nowhere near the 3s listen+wait timeout.
+	if elapsed > time.Second {
+		t.Errorf("dial path too slow (%s); looks like listen+wait ran instead", elapsed)
+	}
+}

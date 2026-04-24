@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/aeddi/gno-watchtower/pkg/gpub"
 	"github.com/aeddi/gno-watchtower/pkg/protocol"
 )
 
@@ -60,6 +61,8 @@ func extractRPC(validator string, payload protocol.RPCPayload) []vmLine {
 			lines = appendRPCSentryNetInfo(lines, validator, ts, raw, log)
 		case "sentry_config":
 			lines = appendRPCSentryConfig(lines, validator, ts, raw, log)
+		case "rpc_reachable":
+			lines = appendRPCReachable(lines, validator, ts, raw, log)
 		}
 	}
 	return lines
@@ -135,7 +138,7 @@ func appendRPCStatus(lines []vmLine, validator string, ts int64, raw json.RawMes
 		// compute the live active voting power.
 		if r.ValidatorInfo.Address != "" && !r.SyncInfo.CatchingUp {
 			lines = append(lines, vmSample("sentinel_validator_online",
-				map[string]string{"address": r.ValidatorInfo.Address}, 1, ts))
+				map[string]string{"validator": validator, "address": r.ValidatorInfo.Address}, 1, ts))
 		}
 	}
 
@@ -219,8 +222,18 @@ type rpcValidators struct {
 	Validators []struct {
 		Address     string      `json:"address"`
 		VotingPower json.Number `json:"voting_power"`
+		PubKey      struct {
+			Type  string `json:"@type"`
+			Value string `json:"value"`
+		} `json:"pub_key"`
 	} `json:"validators"`
 }
+
+// pubKeyTypeEd25519 is the tendermint/gnoland Any type URL tagged on every
+// ed25519 validator pub_key. Other schemes (secp256k1) aren't currently
+// emitted by any gnoland validator and would need a different Any wrapping,
+// so we only bech32-encode when the tag matches exactly.
+const pubKeyTypeEd25519 = "/tm.PubKeyEd25519"
 
 func appendRPCValidators(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
 	r, ok := decodeResult[rpcValidators](raw, "validators", validator, log)
@@ -232,8 +245,9 @@ func appendRPCValidators(lines []vmLine, validator string, ts int64, raw json.Ra
 	// Collect per-member powers alongside the aggregate so we can emit both
 	// in lockstep if every entry parses.
 	type member struct {
-		address string
-		power   int64
+		address   string
+		power     int64
+		pubKeyB32 string
 	}
 	members := make([]member, 0, len(r.Validators))
 	var total int64
@@ -244,7 +258,19 @@ func appendRPCValidators(lines []vmLine, validator string, ts int64, raw json.Ra
 				"validator", validator, "err", err)
 			return lines
 		}
-		members = append(members, member{address: v.Address, power: p})
+		m := member{address: v.Address, power: p}
+		// Encode pub_key to canonical gpub1... bech32 when the Any wrapping
+		// matches ed25519. Encode failure (wrong length, bad base64) degrades
+		// to an unlabelled set_power — the aggregate still emits.
+		if v.PubKey.Type == pubKeyTypeEd25519 && v.PubKey.Value != "" {
+			if b32, err := gpub.EncodeEd25519FromBase64(v.PubKey.Value); err == nil {
+				m.pubKeyB32 = b32
+			} else {
+				log.Debug("rpc: validator pub_key bech32 encode failed",
+					"validator", validator, "address", v.Address, "err", err)
+			}
+		}
+		members = append(members, m)
 		total += p
 	}
 	base := map[string]string{"validator": validator}
@@ -259,9 +285,12 @@ func appendRPCValidators(lines []vmLine, validator string, ts int64, raw json.Ra
 		if m.address == "" {
 			continue
 		}
+		labels := map[string]string{"validator": validator, "address": m.address}
+		if m.pubKeyB32 != "" {
+			labels["pub_key_bech32"] = m.pubKeyB32
+		}
 		lines = append(lines, vmSample("sentinel_rpc_validator_set_power",
-			map[string]string{"validator": validator, "address": m.address},
-			float64(m.power), ts))
+			labels, float64(m.power), ts))
 	}
 	return lines
 }
@@ -337,6 +366,19 @@ func appendRPCSentryConfig(lines []vmLine, validator string, ts int64, raw json.
 		}, 1, ts))
 	}
 	return lines
+}
+
+// appendRPCReachable turns the sentinel's scalar 0/1 signal — which the RPC
+// collector synthesizes after each poll — into a per-validator gauge. The
+// sentinel emits it even when nothing else in the payload changed, so
+// dashboards with short staleness windows get a fresh sample every poll.
+func appendRPCReachable(lines []vmLine, validator string, ts int64, raw json.RawMessage, log *slog.Logger) []vmLine {
+	var v float64
+	if err := json.Unmarshal(raw, &v); err != nil {
+		log.Debug("rpc: rpc_reachable unmarshal failed", "validator", validator, "err", err)
+		return lines
+	}
+	return append(lines, vmSample("sentinel_rpc_reachable", map[string]string{"validator": validator}, v, ts))
 }
 
 // boolToFloat maps bool → 0/1 for gauge emission of boolean health flags.

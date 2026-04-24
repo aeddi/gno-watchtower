@@ -13,9 +13,12 @@
 # binary; `docker build --target <name>` picks the binary and its runtime.
 #
 # Local builds:
-#   docker build --target sentinel   --build-arg VERSION=dev -t sentinel:dev .
-#   docker build --target beacon     --build-arg VERSION=dev -t beacon:dev .
-#   docker build --target watchtower --build-arg VERSION=dev -t watchtower:dev .
+#   docker build --target sentinel \
+#     --build-arg VERSION=dev \
+#     --build-arg COMMIT=$(git rev-parse HEAD) \
+#     --build-arg BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+#     -t sentinel:dev .
+#   (same pattern for --target beacon / watchtower)
 
 # ---- Shared base (source + go mod cache)
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS base
@@ -29,10 +32,15 @@ FROM base AS builder-sentinel
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION=dev
+ARG COMMIT=""
+ARG BUILD_TIME=""
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
   go build \
   -trimpath \
-  -ldflags "-s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION" \
+  -ldflags "-s -w \
+    -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION \
+    -X github.com/aeddi/gno-watchtower/pkg/version.Commit=$COMMIT \
+    -X github.com/aeddi/gno-watchtower/pkg/version.Built=$BUILD_TIME" \
   -o /out/sentinel \
   ./cmd/sentinel
 
@@ -40,10 +48,15 @@ FROM base AS builder-beacon
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION=dev
+ARG COMMIT=""
+ARG BUILD_TIME=""
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
   go build \
   -trimpath \
-  -ldflags "-s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION" \
+  -ldflags "-s -w \
+    -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION \
+    -X github.com/aeddi/gno-watchtower/pkg/version.Commit=$COMMIT \
+    -X github.com/aeddi/gno-watchtower/pkg/version.Built=$BUILD_TIME" \
   -o /out/beacon \
   ./cmd/beacon
 
@@ -51,10 +64,15 @@ FROM base AS builder-watchtower
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION=dev
+ARG COMMIT=""
+ARG BUILD_TIME=""
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
   go build \
   -trimpath \
-  -ldflags "-s -w -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION" \
+  -ldflags "-s -w \
+    -X github.com/aeddi/gno-watchtower/pkg/version.Version=$VERSION \
+    -X github.com/aeddi/gno-watchtower/pkg/version.Commit=$COMMIT \
+    -X github.com/aeddi/gno-watchtower/pkg/version.Built=$BUILD_TIME" \
   -o /out/watchtower \
   ./cmd/watchtower
 

@@ -214,8 +214,8 @@ Run from `deploy/`:
 2. Copy and edit the environment file:
 
     ```sh
-    cp config.env.example config.env
-    $EDITOR config.env   # set DOMAIN, GRAFANA_ADMIN_PASSWORD
+    cp .env.example .env
+    $EDITOR .env   # set DOMAIN, GRAFANA_ADMIN_PASSWORD
     ```
 
 3. Create the initial watchtower config. The deploy stack mounts `watchtower.toml` read-only from the host, so you must create it before `make up`. The defaults below wire watchtower to the in-stack VictoriaMetrics and Loki services and pick sane rate-limit values; override only what you need (see [Watchtower config](#watchtowertoml-server-and-security) for the full schema):
@@ -247,7 +247,7 @@ Run from `deploy/`:
     make up
     ```
 
-5. Grafana is available at `https://<DOMAIN>`. Log in with the admin credentials from `config.env`.
+5. Grafana is available at `https://<DOMAIN>`. Log in with the admin credentials from `.env`.
 
 Caddy serves Grafana at `https://<DOMAIN>/` and reverse-proxies `https://<DOMAIN>/watchtower` to the watchtower API — that's why sentinels point their `[server] url` at the `/watchtower` path.
 
@@ -354,7 +354,7 @@ One `[validators.<name>]` block per sentinel:
 | `permissions`    | Allowed data types: any subset of `["rpc", "metrics", "logs", "otlp"]` |
 | `logs_min_level` | Minimum log level forwarded to Loki: `debug`, `info`, `warn`, `error`  |
 
-### `deploy/config.env`
+### `deploy/.env`
 
 | Variable                 | Description                                        | Default                  |
 | ------------------------ | -------------------------------------------------- | ------------------------ |

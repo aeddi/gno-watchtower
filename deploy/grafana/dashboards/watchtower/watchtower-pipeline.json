@@ -95,11 +95,7 @@
       "id": 1,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -156,11 +152,7 @@
       "id": 2,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -215,10 +207,7 @@
       "id": 3,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean"
-          ],
+          "calcs": ["last", "mean"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -269,6 +258,15 @@
               }
             ]
           },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": { "text": "0", "color": "green" }
+              }
+            }
+          ],
           "color": {
             "mode": "thresholds"
           }
@@ -288,9 +286,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -338,6 +334,15 @@
               }
             ]
           },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": { "text": "0", "color": "green" }
+              }
+            }
+          ],
           "color": {
             "mode": "thresholds"
           }
@@ -357,9 +362,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -444,11 +447,7 @@
       "id": 6,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -505,11 +504,7 @@
       "id": 7,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean",
-            "max"
-          ],
+          "calcs": ["last", "mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -562,10 +557,7 @@
       "id": 8,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean"
-          ],
+          "calcs": ["last", "mean"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -860,9 +852,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -928,9 +918,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -981,9 +969,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1034,9 +1020,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1085,10 +1069,7 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [
-                    10,
-                    10
-                  ],
+                  "dash": [10, 10],
                   "fill": "dash"
                 }
               },
@@ -1109,9 +1090,7 @@
       "id": 14,
       "options": {
         "legend": {
-          "calcs": [
-            "last"
-          ],
+          "calcs": ["last"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1174,10 +1153,7 @@
       "id": 15,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean"
-          ],
+          "calcs": ["last", "mean"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1244,10 +1220,7 @@
       "id": 16,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean"
-          ],
+          "calcs": ["last", "mean"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1310,10 +1283,7 @@
       "id": 17,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "mean"
-          ],
+          "calcs": ["last", "mean"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1336,26 +1306,237 @@
       ],
       "title": "Watchtower: container NIC out",
       "type": "timeseries"
+    },
+    {
+      "type": "row",
+      "title": "Auth events",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 66
+      },
+      "id": 1005,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "description": "Auth-middleware rejections per second, by reason. `invalid_token` = bearer didn't match any validator; `banned` = request from an IP already under a ban. Source: watchtower_auth_failures_total counter (scraped from watchtower:8080/metrics every 15s).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 1
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 67
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "all",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum by (reason) (rate(watchtower_auth_failures_total[$__rate_interval]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Auth failures by reason",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "description": "Number of IPs currently under an active ban. Source: watchtower_banned_ips gauge (recomputed at scrape time from auth.Authenticator.BannedCount).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": { "text": "0", "color": "green" }
+              }
+            }
+          ],
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 67
+      },
+      "id": 19,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "watchtower_banned_ips",
+          "legendFormat": "banned",
+          "refId": "A"
+        }
+      ],
+      "title": "Currently banned IPs",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "description": "Rate-limiter 429s per validator over the selected range. Non-zero readings mean the sentinel's sustained rate exceeded security.rate_limit_rps (or its first-tick fan-out exceeded rate_limit_burst).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": { "text": "0", "color": "green" }
+              }
+            }
+          ],
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 67
+      },
+      "id": 20,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum by (validator) (increase(watchtower_rate_limited_total{validator=~\"$validator\"}[$__range]))",
+          "legendFormat": "rate-limited / {{validator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Rate-limited (range total)",
+      "type": "stat"
     }
   ],
   "refresh": "10s",
   "schemaVersion": 39,
-  "tags": [
-    "storage",
-    "traffic",
-    "watchtower"
-  ],
+  "tags": ["storage", "traffic", "watchtower"],
   "templating": {
     "list": [
       {
         "current": {
           "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": ["All"],
+          "value": ["$__all"]
         },
         "datasource": {
           "type": "prometheus",

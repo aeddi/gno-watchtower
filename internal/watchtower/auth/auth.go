@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -37,6 +38,14 @@ type ipRecord struct {
 	lastSeen  time.Time
 }
 
+// MetricsSink is the narrow interface the Authenticator uses to report
+// auth-layer rejections. Kept as an interface so the metrics package is
+// injected at wire-up time (avoiding an auth→metrics import dependency while
+// still letting tests pass the real *metrics.Metrics).
+type MetricsSink interface {
+	RecordAuthFailure(reason string)
+}
+
 // Authenticator validates Bearer tokens and manages per-IP failure tracking.
 type Authenticator struct {
 	tokensMu     sync.RWMutex
@@ -46,6 +55,8 @@ type Authenticator struct {
 	mu           sync.Mutex
 	ips          map[string]*ipRecord
 	lastCleanup  time.Time
+	metrics      MetricsSink
+	log          *slog.Logger
 }
 
 // New creates an Authenticator from the token index in cfg.Validators.
@@ -59,7 +70,23 @@ func New(validators map[string]config.ValidatorConfig, banThreshold int, banDura
 		banThreshold: banThreshold,
 		banDuration:  banDuration,
 		ips:          make(map[string]*ipRecord),
+		log:          slog.New(slog.DiscardHandler),
 	}
+}
+
+// SetMetrics installs a metrics sink for auth-failure counters. Optional: when
+// unset (tests, standalone smoke runs), counters silently no-op. Kept as a
+// setter rather than a New() parameter to keep the existing test constructors
+// short — the wire-up site in cmd/watchtower pays the extra line.
+func (a *Authenticator) SetMetrics(m MetricsSink) {
+	a.metrics = m
+}
+
+// SetLogger installs a slog.Logger for auth-rejection structured logs. Optional:
+// unset Authenticators (tests, pre-wire-up) get a discard logger from New() so
+// the middleware can call a.log.* unconditionally without nil checks.
+func (a *Authenticator) SetLogger(l *slog.Logger) {
+	a.log = l
 }
 
 // Reload atomically replaces the validator token map.
@@ -80,9 +107,20 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := remoteIP(r)
 
-		// Check IP ban before anything else.
+		// Check IP ban before anything else. 403 (not 429) because this is an
+		// auth-side decision about a specific client, not global back-pressure —
+		// clients must not treat it as a signal to retry with backoff.
 		if a.isBanned(ip) {
-			http.Error(w, "banned", http.StatusTooManyRequests)
+			if a.metrics != nil {
+				a.metrics.RecordAuthFailure("banned")
+			}
+			a.log.Warn("auth rejected",
+				"reason", "banned",
+				"ip", ip,
+				"path", r.URL.Path,
+				"token_prefix", tokenPrefix(bearerToken(r)),
+			)
+			http.Error(w, "banned", http.StatusForbidden)
 			return
 		}
 
@@ -93,6 +131,15 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 		a.tokensMu.RUnlock()
 		if !ok {
 			a.recordFailure(ip)
+			if a.metrics != nil {
+				a.metrics.RecordAuthFailure("invalid_token")
+			}
+			a.log.Info("auth rejected",
+				"reason", "invalid_token",
+				"ip", ip,
+				"path", r.URL.Path,
+				"token_prefix", tokenPrefix(token),
+			)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -123,6 +170,22 @@ func (a *Authenticator) isBanned(ip string) bool {
 		return false
 	}
 	return true
+}
+
+// BannedCount reports the number of IPs currently under an active ban.
+// Intended as the source for the watchtower_banned_ips gauge; reads cheaply
+// under the same lock that guards the ban map.
+func (a *Authenticator) BannedCount() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	now := time.Now()
+	n := 0
+	for _, rec := range a.ips {
+		if !rec.banExpiry.IsZero() && now.Before(rec.banExpiry) {
+			n++
+		}
+	}
+	return n
 }
 
 // maybeSweep removes both expired bans and stale non-banned failure records if
@@ -176,6 +239,16 @@ func bearerToken(r *http.Request) string {
 		return ""
 	}
 	return token
+}
+
+// tokenPrefix returns up to the first 8 characters of s. Logged on auth
+// rejection to give operators enough signal to correlate a specific client
+// without leaking the full bearer token into Loki.
+func tokenPrefix(s string) string {
+	if len(s) > 8 {
+		return s[:8]
+	}
+	return s
 }
 
 // remoteIP returns the caller's IP for ban bookkeeping.

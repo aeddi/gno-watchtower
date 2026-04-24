@@ -145,8 +145,8 @@ type RPCConfig struct {
 	PollInterval               Duration `toml:"poll_interval"`
 	RPCURL                     string   `toml:"rpc_url"`
 	DumpConsensusStateInterval Duration `toml:"dump_consensus_state_interval"`
-	GenesisRefreshInterval     Duration `toml:"genesis_refresh_interval" comment:"re-fetch and re-emit /genesis at this interval (0 = 12h default)"`
-	ValidatorsRefreshInterval  Duration `toml:"validators_refresh_interval" comment:"re-emit /validators at this interval regardless of delta (0 = 12h default)"`
+	GenesisRefreshInterval     Duration `toml:"genesis_refresh_interval" comment:"re-fetch and re-emit /genesis at this interval"`
+	ValidatorsRefreshInterval  Duration `toml:"validators_refresh_interval" comment:"re-emit /validators at this interval regardless of delta"`
 }
 
 // LogsConfig holds log collector settings.
@@ -183,7 +183,7 @@ type ResourcesConfig struct {
 type MetadataConfig struct {
 	Enabled       bool     `toml:"enabled"`
 	CheckInterval Duration `toml:"check_interval"`
-	ForceInterval Duration `toml:"force_interval" comment:"re-emit config regardless of changes at this interval (0 = 12h default)"`
+	ForceInterval Duration `toml:"force_interval" comment:"re-emit config regardless of changes at this interval"`
 
 	ConfigPath   string `toml:"config_path,omitempty"`
 	ConfigGetCmd string `toml:"config_get_cmd,omitempty" comment:"use %s as placeholder for the config key name"`
@@ -231,6 +231,8 @@ func DefaultConfig() *Config {
 			PollInterval:               Duration{Duration: 3 * time.Second},
 			RPCURL:                     "http://localhost:26657",
 			DumpConsensusStateInterval: Duration{Duration: 30 * time.Second},
+			GenesisRefreshInterval:     Duration{Duration: 12 * time.Hour},
+			ValidatorsRefreshInterval:  Duration{Duration: 12 * time.Hour},
 		},
 		Logs: LogsConfig{
 			Enabled:        true,
@@ -254,6 +256,7 @@ func DefaultConfig() *Config {
 		Metadata: MetadataConfig{
 			Enabled:       true,
 			CheckInterval: Duration{Duration: 10 * time.Minute},
+			ForceInterval: Duration{Duration: 12 * time.Hour},
 			ConfigPath:    placeholderConfigPath,
 		},
 		Self: SelfConfig{

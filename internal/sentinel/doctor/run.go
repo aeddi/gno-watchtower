@@ -14,13 +14,14 @@ import (
 
 // Run executes all doctor checks, printing each result as it completes.
 // Exit code 0 = no Red results. Exit code 1 = at least one Red result.
-func Run(ctx context.Context, cfg *config.Config, configPath string, w io.Writer) int {
+// Pass FormatStyled for TTY output or FormatPlain for grep-friendly ASCII.
+func Run(ctx context.Context, cfg *config.Config, configPath string, w io.Writer, format Format) int {
 	fmt.Fprintf(w, "Validating sentinel config: %s\n", configPath)
 	hasRed := false
 
 	emit := func(results ...CheckResult) {
 		for _, r := range results {
-			fmt.Fprintln(w, formatResult(r))
+			fmt.Fprintln(w, formatResult(r, format))
 			if r.Status == StatusRed {
 				hasRed = true
 			}

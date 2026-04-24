@@ -1,9 +1,12 @@
 // Package self implements a sentinel-side self-stats collector. It reads the
 // shared stats.Stats accumulator on a ticker and emits a MetricsPayload with
 // a "self_stats" key that the watchtower's metrics forwarder extracts into
-// Prometheus counters (sentinel_self_bytes_sent_total, sentinel_self_drops_total,
-// sentinel_self_retries_total). Gives operators per-validator pipeline health
-// that would otherwise be invisible beyond the sentinel's own stdout log.
+// Prometheus counters (sentinel_self_bytes_sent_total and
+// sentinel_self_drops_total). The drops series carries a reason label —
+// including "retry_exhausted" — which is how the retry-give-up signal reaches
+// operators, so a dedicated retries counter would duplicate that with no new
+// information. Gives operators per-validator pipeline health that would
+// otherwise be invisible beyond the sentinel's own stdout log.
 package self
 
 import (

@@ -10,6 +10,7 @@
 //
 //	run <config>              Start the beacon
 //	generate-config <file>    Write an annotated example config to <file>
+//	doctor <config>           Validate config + probe watchtower/RPC reachability
 //	keygen <keys-dir>         Generate a Noise keypair (writes privkey+pubkey)
 //	version [-v]              Print the build version
 package main
@@ -25,6 +26,7 @@ import (
 
 	"github.com/aeddi/gno-watchtower/internal/beacon/app"
 	"github.com/aeddi/gno-watchtower/internal/beacon/config"
+	"github.com/aeddi/gno-watchtower/internal/beacon/doctor"
 	pkglogger "github.com/aeddi/gno-watchtower/pkg/logger"
 	"github.com/aeddi/gno-watchtower/pkg/noise"
 	"github.com/aeddi/gno-watchtower/pkg/version"
@@ -40,6 +42,8 @@ func main() {
 		runCmd(os.Args[2:])
 	case "generate-config":
 		generateConfigCmd(os.Args[2:])
+	case "doctor":
+		doctorCmd(os.Args[2:])
 	case "keygen":
 		keygenCmd(os.Args[2:])
 	case "version":
@@ -98,6 +102,32 @@ func generateConfigCmd(args []string) {
 	fmt.Printf("Config written to %s — open it to finish configuring your beacon.\n", path)
 }
 
+func doctorCmd(args []string) {
+	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "Usage: beacon doctor <config-file>")
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	if fs.NArg() < 1 {
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	cfg, err := config.Load(fs.Arg(0))
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	code := doctor.Run(ctx, cfg, fs.Arg(0), os.Stdout)
+	os.Exit(code)
+}
+
 func keygenCmd(args []string) {
 	fs := flag.NewFlagSet("keygen", flag.ExitOnError)
 	fs.Usage = func() {
@@ -149,6 +179,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "Commands:")
 	fmt.Fprintln(os.Stderr, "  run [--log-format=...] [--log-level=...] <config>  Start the beacon")
 	fmt.Fprintln(os.Stderr, "  generate-config <output-file>                      Generate example config file")
+	fmt.Fprintln(os.Stderr, "  doctor <config>                                    Validate config + probe watchtower/RPC reachability")
 	fmt.Fprintln(os.Stderr, "  keygen <keys-dir>                                  Generate Noise keypair")
 	fmt.Fprintln(os.Stderr, "  version [-v]                                       Print the build version")
 }

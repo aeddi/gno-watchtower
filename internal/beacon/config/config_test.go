@@ -143,3 +143,18 @@ func TestGenerate_WritesPlaceholders(t *testing.T) {
 		t.Errorf("expected keys_dir placeholder in generated config")
 	}
 }
+
+// TestLoad_AcceptsFreshGenerateConfig asserts that Load accepts the output of
+// Generate verbatim. The doctor subcommand takes a config path and reports
+// each placeholder as "not configured" — that requires Load to not reject
+// placeholder URLs at the scheme-check stage. Matches sentinel's behaviour.
+func TestLoad_AcceptsFreshGenerateConfig(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "beacon.toml")
+	if err := config.Generate(p); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.Load(p); err != nil {
+		t.Errorf("Load on fresh generate-config output must succeed; got %v", err)
+	}
+}

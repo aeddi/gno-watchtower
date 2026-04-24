@@ -84,6 +84,54 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "online"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "offline",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "online",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "catching_up"
             },
             "properties": [
@@ -349,6 +397,17 @@
           "refId": "I",
           "format": "table",
           "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "max by (validator) (sentinel_validator_online{validator=~\"$validator\"}) or max by (validator) (sentinel_rpc_reachable{validator=~\"$validator\"}) * 0",
+          "legendFormat": "{{validator}}",
+          "refId": "J",
+          "format": "table",
+          "instant": true
         }
       ],
       "title": "RPC snapshot",
@@ -374,6 +433,7 @@
               "Time 7": true,
               "Time 8": true,
               "Time 9": true,
+              "Time 10": true,
               "Value #F": true,
               "Value #H": true,
               "Value #I": true,
@@ -388,19 +448,21 @@
               "Value #D": "catching_up",
               "Value #E": "behind",
               "sentry_moniker": "sentry",
-              "Value #G": "peers_via_sentry"
+              "Value #G": "peers_via_sentry",
+              "Value #J": "online"
             },
             "indexByName": {
               "validator": 0,
-              "sentry": 1,
-              "height": 2,
-              "behind": 3,
-              "peers": 4,
-              "peers_via_sentry": 5,
-              "pex": 6,
-              "pex_sentry": 7,
-              "mempool": 8,
-              "catching_up": 9
+              "Value #J": 1,
+              "sentry": 2,
+              "height": 3,
+              "behind": 4,
+              "peers": 5,
+              "peers_via_sentry": 6,
+              "pex": 7,
+              "pex_sentry": 8,
+              "mempool": 9,
+              "catching_up": 10
             }
           }
         },
@@ -410,6 +472,7 @@
             "include": {
               "names": [
                 "validator",
+                "online",
                 "sentry",
                 "height",
                 "behind",
@@ -1054,6 +1117,17 @@
           "instant": true,
           "legendFormat": "",
           "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "max by (address, pub_key_bech32) (last_over_time(sentinel_rpc_validator_set_power{pub_key_bech32!=\"\"}[1d]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "refId": "E"
         }
       ],
       "title": "Per-validator voting power",
@@ -1080,21 +1154,27 @@
               "instance 2": true,
               "instance 3": true,
               "Value #D": true,
+              "Value #E": true,
               "Time 4": true,
+              "Time 5": true,
               "job 4": true,
-              "instance 4": true
+              "job 5": true,
+              "instance 4": true,
+              "instance 5": true
             },
             "renameByName": {
               "Value #A": "power",
               "Value #B": "online",
-              "Value #C": "can_lose"
+              "Value #C": "can_lose",
+              "pub_key_bech32": "pub_key"
             },
             "indexByName": {
-              "address": 0,
-              "validator": 1,
-              "power": 2,
-              "online": 3,
-              "can_lose": 4
+              "validator": 0,
+              "address": 1,
+              "pub_key_bech32": 2,
+              "power": 3,
+              "online": 4,
+              "can_lose": 5
             }
           }
         },
@@ -1102,7 +1182,14 @@
           "id": "filterFieldsByName",
           "options": {
             "include": {
-              "names": ["address", "validator", "power", "online", "can_lose"]
+              "names": [
+                "validator",
+                "address",
+                "pub_key",
+                "power",
+                "online",
+                "can_lose"
+              ]
             }
           }
         }
