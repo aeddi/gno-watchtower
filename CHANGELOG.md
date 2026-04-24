@@ -1,5 +1,49 @@
 # Changelog
 
+## [1.2.0](https://github.com/aeddi/gno-watchtower/compare/v1.1.0...v1.2.0) (2026-04-24)
+
+
+### Features
+
+* **beacon:** add doctor subcommand ([feb982c](https://github.com/aeddi/gno-watchtower/commit/feb982cda0a724bb77e2af95619b01c7dc925a83))
+* **dashboard:** add auth failure, banned IP, and rate-limit panels ([103cd92](https://github.com/aeddi/gno-watchtower/commit/103cd92094ebce153b87cae417f3c869cee8dfe5))
+* **dashboard:** add online column to RPC snapshot panel ([cf1162e](https://github.com/aeddi/gno-watchtower/commit/cf1162e11c101b0117d78bc453585bfc5a698c21))
+* **dashboard:** add pub_key column and reorder voting-power panel ([2c365a3](https://github.com/aeddi/gno-watchtower/commit/2c365a36fdf3f091e9a677d3e02d3a710b0f6b2a))
+* **deploy:** add make help, show-validators, version targets ([7fcb96c](https://github.com/aeddi/gno-watchtower/commit/7fcb96cf0632e85ab060ad768e73134c63bd2517))
+* **deploy:** enable JSON access logging in Caddy ([1551738](https://github.com/aeddi/gno-watchtower/commit/1551738e1bd9fd83a870315abcd08650fdfa7931))
+* **forwarder:** emit pub_key_bech32 label on sentinel_rpc_validator_set_power ([7917e7f](https://github.com/aeddi/gno-watchtower/commit/7917e7fd7babbcdeee49328e4df7e2dd81f2d094))
+* **sentinel/doctor:** add --format=plain for grep-friendly output ([2cd7920](https://github.com/aeddi/gno-watchtower/commit/2cd792017f404c8b5cd3102cf1289341d8489f37))
+* **version:** support ldflags-injected Commit and Built ([940bd52](https://github.com/aeddi/gno-watchtower/commit/940bd523c42a68d0912eaeb83b5e97b3cc6a77b3))
+* **watchtower/auth:** log rejections with structured slog context ([47a2fac](https://github.com/aeddi/gno-watchtower/commit/47a2facd90a26ef544b2e22057a17766a8549c81))
+* **watchtower/config:** validate log_level enum and ban thresholds ([dbda6d7](https://github.com/aeddi/gno-watchtower/commit/dbda6d74f8d2070fe9fbede7f7a92ac84b5a1f8e))
+* **watchtower:** expose watchtower_auth_failures_total counter ([d908728](https://github.com/aeddi/gno-watchtower/commit/d90872881f71c336495609dd2d8dbc113bca0448))
+* **watchtower:** expose watchtower_banned_ips gauge ([870b6d4](https://github.com/aeddi/gno-watchtower/commit/870b6d49b709317d5f74973b551984080d49b310))
+* **watchtower:** expose watchtower_permission_denied_total counter ([f661982](https://github.com/aeddi/gno-watchtower/commit/f6619828ea310339a1eba0d315704972e38a3236))
+
+
+### Bug Fixes
+
+* **beacon/config:** accept placeholder server.url ([ebfb7e3](https://github.com/aeddi/gno-watchtower/commit/ebfb7e3c2f8a4ae3dd88d328135a041a3148462c))
+* **beacon:** demote EOF on auth reject to debug level ([93945d0](https://github.com/aeddi/gno-watchtower/commit/93945d09fb135501d236e50d3d7fcf2a2e68e219))
+* **dashboards:** extend genesis panel lookback from 1h to 1d ([a620225](https://github.com/aeddi/gno-watchtower/commit/a62022570d0a67d7837c84466967c0af76fd780c))
+* **dashboards:** render 0 instead of 'No data' on healthy-zero counter panels ([36f70ce](https://github.com/aeddi/gno-watchtower/commit/36f70ce360f8158ec13e0bd9a74c867a1320a7e0))
+* **dashboard:** use pre-rename key in RPC snapshot indexByName ([9c112a1](https://github.com/aeddi/gno-watchtower/commit/9c112a114aa3e186e7cfbbd342cbb8786f889565))
+* **deploy:** rebuild watchtower without docker cache on make up ([1f15379](https://github.com/aeddi/gno-watchtower/commit/1f15379bd1250ef9785daffeabed2d997bd0bc47))
+* **deploy:** rename config.env to .env so docker compose auto-loads it ([a5500cd](https://github.com/aeddi/gno-watchtower/commit/a5500cdf790e0dd95964a0d2f44a536c7b5970ca))
+* **deploy:** SIGHUP watchtower on validator add/remove instead of restart ([4e6ba94](https://github.com/aeddi/gno-watchtower/commit/4e6ba948de8c468a261a7360c5491193b8577c59))
+* **deploy:** use 127.0.0.1 in compose healthchecks to avoid IPv6 race ([63af64c](https://github.com/aeddi/gno-watchtower/commit/63af64cf73238d5a6ef31fda59d722e5b1dfe832))
+* **doctor:** dial-probe OTLP address before binding so live sentinels pass ([d8f2fd7](https://github.com/aeddi/gno-watchtower/commit/d8f2fd7cc3c1cbc6bdb0ada60f6f795a036cf80e))
+* **doctor:** route noise:// watchtower URLs through Noise transport ([9aec8a2](https://github.com/aeddi/gno-watchtower/commit/9aec8a21d1ed19a8f921ab99cc3994e486f6fb8a))
+* **logger:** uppercase slog attr keys so systemd journal keeps them ([cdafdaa](https://github.com/aeddi/gno-watchtower/commit/cdafdaa34dcb672be86b5daabffdb7514bad2f1c))
+* **loki:** disable discover_log_levels to drop detected_level duplicate ([73d5f0e](https://github.com/aeddi/gno-watchtower/commit/73d5f0ea2646dfba70fc639c1c0cf7cf70c93d8e))
+* **sentinel:** default metadata to config_path even in docker mode ([71447db](https://github.com/aeddi/gno-watchtower/commit/71447db9f77377cd17a0505e075f30d438f0b72a))
+* **sentinel:** emit rpc_reachable scalar per RPC poll ([ecf2209](https://github.com/aeddi/gno-watchtower/commit/ecf2209e3e07e4839963ef1d31153baf734da6c3))
+* **sentinel:** generate-config writes real refresh-interval defaults ([789cf12](https://github.com/aeddi/gno-watchtower/commit/789cf12b55de046d82a64a4fd96491787beaa2ac))
+* **sentinel:** include url attr in rpc endpoint error logs ([23053de](https://github.com/aeddi/gno-watchtower/commit/23053de1fc1ca14e555f63fbdaee20dae863db2d))
+* **watchtower/forwarder:** strip ts and level from Loki push body ([4743898](https://github.com/aeddi/gno-watchtower/commit/4743898cfbaf20ad4f3c227835ef5b371866e6b5))
+* **watchtower:** extract rpc_reachable into sentinel_rpc_reachable gauge ([596cef6](https://github.com/aeddi/gno-watchtower/commit/596cef6c61854b1497e0374eaa40f6e3e9323301))
+* **watchtower:** return 403 not 429 when auth-banned IP is rejected ([df57319](https://github.com/aeddi/gno-watchtower/commit/df5731939916ace86149b4f02b8ff9275f1fd04c))
+
 ## [1.1.0](https://github.com/aeddi/gno-watchtower/compare/v1.0.0...v1.1.0) (2026-04-21)
 
 
