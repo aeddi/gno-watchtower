@@ -117,6 +117,21 @@ func Generate(w io.Writer) error {
 	return err
 }
 
+// minRateLimitBurst is the floor for security.rate_limit_burst. A sentinel
+// opens 4 concurrent streams (rpc + metrics + logs + otlp) and a burst below
+// that would rate-limit a healthy validator's first-tick fan-out.
+const minRateLimitBurst = 4
+
+// validPermissions enumerates every value accepted in a validator's
+// permissions list. Keep in sync with the collectors that enforce these
+// names at request time (internal/watchtower/handlers).
+var validPermissions = map[string]struct{}{
+	"rpc":     {},
+	"metrics": {},
+	"logs":    {},
+	"otlp":    {},
+}
+
 func (c *Config) validate() error {
 	if c.Server.ListenAddr == "" {
 		return fmt.Errorf("server.listen_addr is required")
@@ -129,6 +144,9 @@ func (c *Config) validate() error {
 	}
 	if c.Security.RateLimitRPS <= 0 {
 		return fmt.Errorf("security.rate_limit_rps must be > 0")
+	}
+	if c.Security.RateLimitBurst < minRateLimitBurst {
+		return fmt.Errorf("security.rate_limit_burst must be >= %d (sentinel sends rpc + metrics + logs + otlp concurrently)", minRateLimitBurst)
 	}
 	if c.Security.BanThreshold <= 0 {
 		return fmt.Errorf("security.ban_threshold must be > 0")
@@ -145,6 +163,11 @@ func (c *Config) validate() error {
 			return fmt.Errorf("validators.%s and validators.%s share the same token — each validator must have a unique token", other, name)
 		}
 		seenTokens[v.Token] = name
+		for _, p := range v.Permissions {
+			if _, ok := validPermissions[p]; !ok {
+				return fmt.Errorf("validators.%s.permissions contains unknown value %q (allowed: rpc, metrics, logs, otlp)", name, p)
+			}
+		}
 	}
 	return nil
 }
