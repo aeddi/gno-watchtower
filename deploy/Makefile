@@ -48,7 +48,7 @@ add-validator:  ## Add a validator (usage: make add-validator name=val-01 permis
 		"$$PERMS" \
 		"$(logs_min_level)" \
 		>> watchtower.toml; \
-	$(COMPOSE) restart watchtower; \
+	$(COMPOSE) exec -T watchtower kill -HUP 1; \
 	echo ""; \
 	echo "Validator $(name) added. Bearer token (paste into sentinel config):"; \
 	echo "$$TOKEN"
@@ -57,4 +57,4 @@ add-validator:  ## Add a validator (usage: make add-validator name=val-01 permis
 remove-validator:  ## Remove a validator (usage: make remove-validator name=val-01)
 	@if [ -z "$(name)" ]; then echo "ERROR: name is required"; exit 1; fi
 	@python3 -c "import re; f=open('watchtower.toml','r'); c=f.read(); f.close(); u=re.sub(r'\n\[validators\.$(name)\].*?(?=\n\[|\Z)','',c,flags=re.S|re.M); f=open('watchtower.toml','w'); f.write(u); f.close(); print('Validator $(name) removed from watchtower.toml')"
-	@$(COMPOSE) restart watchtower
+	@$(COMPOSE) exec -T watchtower kill -HUP 1
