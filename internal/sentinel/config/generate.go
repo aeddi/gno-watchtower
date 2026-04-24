@@ -60,22 +60,22 @@ func buildAlternatives(cfg *Config, env *Environment) []alternative {
 		})
 	}
 
-	// ---- Metadata config path/cmd alternative
+	// ---- Metadata config_get_cmd alternative to config_path
+	// config_path is always the primary — config_get_cmd requires a docker (or
+	// other) CLI reachable from the sentinel process, which doesn't hold in
+	// containerised sentinel deployments. In docker mode we pre-fill the
+	// alternative with the detected container name to save one edit for
+	// operators who are running the sentinel on the host.
+	cmdValue := "docker exec <container> gnoland config get %s --raw"
 	if env.Docker != nil {
-		alts = append(alts, alternative{
-			afterKey: "config_get_cmd",
-			comment:  "Alternative: read config file directly",
-			key:      "config_path",
-			value:    placeholderConfigPath,
-		})
-	} else {
-		alts = append(alts, alternative{
-			afterKey: "config_path",
-			comment:  "Alternative: run a command to get config values (e.g. via docker exec)",
-			key:      "config_get_cmd",
-			value:    "docker exec <container> gnoland config get %s --raw",
-		})
+		cmdValue = fmt.Sprintf("docker exec %s gnoland config get %%s --raw", env.Docker.ContainerName)
 	}
+	alts = append(alts, alternative{
+		afterKey: "config_path",
+		comment:  "Alternative: run a shell command (requires the command to be reachable from the sentinel process — not the case for containerised sentinels without a bundled CLI)",
+		key:      "config_get_cmd",
+		value:    cmdValue,
+	})
 
 	return alts
 }

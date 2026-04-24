@@ -185,8 +185,8 @@ type MetadataConfig struct {
 	CheckInterval Duration `toml:"check_interval"`
 	ForceInterval Duration `toml:"force_interval" comment:"re-emit config regardless of changes at this interval"`
 
-	ConfigPath   string `toml:"config_path,omitempty"`
-	ConfigGetCmd string `toml:"config_get_cmd,omitempty" comment:"use %s as placeholder for the config key name"`
+	ConfigPath   string `toml:"config_path,omitempty" comment:"path to gnoland's config.toml; when the sentinel runs in a container, bind-mount the config dir into the sentinel so this path resolves"`
+	ConfigGetCmd string `toml:"config_get_cmd,omitempty" comment:"use %s as placeholder for the config key name; requires the command to be reachable from the sentinel process"`
 }
 
 // SelfConfig holds the sentinel self-stats collector settings. The collector

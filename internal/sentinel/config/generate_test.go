@@ -61,8 +61,11 @@ func TestBuildAlternatives_DockerMode(t *testing.T) {
 	if alts[0].section != "logs" || alts[0].key != "journald_unit" {
 		t.Errorf("alt[0]: section=%q key=%q", alts[0].section, alts[0].key)
 	}
-	// Metadata: config_path as alternative to config_get_cmd
-	if alts[1].afterKey != "config_get_cmd" || alts[1].key != "config_path" {
+	// Metadata: config_get_cmd as commented alternative to config_path.
+	// config_path is the default in docker mode too — config_get_cmd requires a
+	// docker CLI in the sentinel's environment, which containerised sentinels
+	// typically don't ship.
+	if alts[1].afterKey != "config_path" || alts[1].key != "config_get_cmd" {
 		t.Errorf("alt[1]: afterKey=%q key=%q", alts[1].afterKey, alts[1].key)
 	}
 }
@@ -107,6 +110,22 @@ func TestMarshalDefaultConfig_ValidTOML(t *testing.T) {
 	}
 	if !strings.Contains(output, "# docker or journald") {
 		t.Error("missing comment for logs.source")
+	}
+}
+
+// Generated config must flag the container-deployment caveat on config_path —
+// silent "sh: docker: not found" failures under config_get_cmd are the common
+// footgun for containerised sentinels. The comment keeps that visible in the
+// file operators actually edit.
+func TestMarshalDefaultConfig_ConfigPathMentionsBindMount(t *testing.T) {
+	cfg := DefaultConfig()
+	data, err := toml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	output := string(data)
+	if !strings.Contains(output, "bind-mount") {
+		t.Errorf("expected config_path comment to mention bind-mount, got:\n%s", output)
 	}
 }
 
