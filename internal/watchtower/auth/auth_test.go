@@ -1,7 +1,10 @@
 package auth_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -406,5 +409,80 @@ func TestAuth_RecordsMetricsOnFailureAndBan(t *testing.T) {
 		if !strings.Contains(text, w) {
 			t.Errorf("missing line:\n  want: %s\n\nscrape:\n%s", w, text)
 		}
+	}
+}
+
+func TestAuth_LogsInvalidTokenAtInfo_BannedAtWarn(t *testing.T) {
+	// Auth failures with no stdout trail are a blind spot: operators learn of
+	// rejections only via /metrics counters. The middleware must emit a
+	// structured log line per failure — INFO for invalid_token (routine, but
+	// auditable) and WARN for banned (loud enough to notice).
+	a := auth.New(map[string]config.ValidatorConfig{
+		"val-01": {Token: "good-token"},
+	}, 1, time.Minute) // ban on first failure → second request is banned path
+
+	buf := &bytes.Buffer{}
+	a.SetLogger(slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+
+	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Request 1: invalid token → INFO log; also arms the ban (threshold=1).
+	req1 := httptest.NewRequest(http.MethodPost, "/rpc", nil)
+	req1.Header.Set("Authorization", "Bearer abcdef1234567890")
+	req1.RemoteAddr = "7.7.7.7:1234"
+	handler.ServeHTTP(httptest.NewRecorder(), req1)
+
+	// Request 2: banned IP → WARN log (reason=banned).
+	req2 := httptest.NewRequest(http.MethodPost, "/metrics", nil)
+	req2.Header.Set("Authorization", "Bearer good-token") // valid token, but IP is banned
+	req2.RemoteAddr = "7.7.7.7:1234"
+	handler.ServeHTTP(httptest.NewRecorder(), req2)
+
+	var entries []map[string]any
+	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		var e map[string]any
+		if err := json.Unmarshal([]byte(line), &e); err != nil {
+			t.Fatalf("bad JSON log line %q: %v", line, err)
+		}
+		entries = append(entries, e)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("want 2 log entries, got %d: %s", len(entries), buf.String())
+	}
+
+	// Entry 1: invalid_token at INFO.
+	if entries[0]["level"] != "INFO" {
+		t.Errorf("entry 1 level: got %v, want INFO", entries[0]["level"])
+	}
+	if entries[0]["reason"] != "invalid_token" {
+		t.Errorf("entry 1 reason: got %v, want invalid_token", entries[0]["reason"])
+	}
+	if entries[0]["ip"] != "7.7.7.7" {
+		t.Errorf("entry 1 ip: got %v, want 7.7.7.7", entries[0]["ip"])
+	}
+	if entries[0]["path"] != "/rpc" {
+		t.Errorf("entry 1 path: got %v, want /rpc", entries[0]["path"])
+	}
+	if entries[0]["token_prefix"] != "abcdef12" {
+		t.Errorf("entry 1 token_prefix: got %v, want abcdef12", entries[0]["token_prefix"])
+	}
+
+	// Entry 2: banned at WARN.
+	if entries[1]["level"] != "WARN" {
+		t.Errorf("entry 2 level: got %v, want WARN", entries[1]["level"])
+	}
+	if entries[1]["reason"] != "banned" {
+		t.Errorf("entry 2 reason: got %v, want banned", entries[1]["reason"])
+	}
+	if entries[1]["ip"] != "7.7.7.7" {
+		t.Errorf("entry 2 ip: got %v, want 7.7.7.7", entries[1]["ip"])
+	}
+	if entries[1]["path"] != "/metrics" {
+		t.Errorf("entry 2 path: got %v, want /metrics", entries[1]["path"])
 	}
 }

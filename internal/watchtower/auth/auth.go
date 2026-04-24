@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -55,6 +56,7 @@ type Authenticator struct {
 	ips          map[string]*ipRecord
 	lastCleanup  time.Time
 	metrics      MetricsSink
+	log          *slog.Logger
 }
 
 // New creates an Authenticator from the token index in cfg.Validators.
@@ -68,6 +70,7 @@ func New(validators map[string]config.ValidatorConfig, banThreshold int, banDura
 		banThreshold: banThreshold,
 		banDuration:  banDuration,
 		ips:          make(map[string]*ipRecord),
+		log:          slog.New(slog.DiscardHandler),
 	}
 }
 
@@ -77,6 +80,13 @@ func New(validators map[string]config.ValidatorConfig, banThreshold int, banDura
 // short — the wire-up site in cmd/watchtower pays the extra line.
 func (a *Authenticator) SetMetrics(m MetricsSink) {
 	a.metrics = m
+}
+
+// SetLogger installs a slog.Logger for auth-rejection structured logs. Optional:
+// unset Authenticators (tests, pre-wire-up) get a discard logger from New() so
+// the middleware can call a.log.* unconditionally without nil checks.
+func (a *Authenticator) SetLogger(l *slog.Logger) {
+	a.log = l
 }
 
 // Reload atomically replaces the validator token map.
@@ -104,6 +114,12 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			if a.metrics != nil {
 				a.metrics.RecordAuthFailure("banned")
 			}
+			a.log.Warn("auth rejected",
+				"reason", "banned",
+				"ip", ip,
+				"path", r.URL.Path,
+				"token_prefix", tokenPrefix(bearerToken(r)),
+			)
 			http.Error(w, "banned", http.StatusForbidden)
 			return
 		}
@@ -118,6 +134,12 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			if a.metrics != nil {
 				a.metrics.RecordAuthFailure("invalid_token")
 			}
+			a.log.Info("auth rejected",
+				"reason", "invalid_token",
+				"ip", ip,
+				"path", r.URL.Path,
+				"token_prefix", tokenPrefix(token),
+			)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -217,6 +239,16 @@ func bearerToken(r *http.Request) string {
 		return ""
 	}
 	return token
+}
+
+// tokenPrefix returns up to the first 8 characters of s. Logged on auth
+// rejection to give operators enough signal to correlate a specific client
+// without leaking the full bearer token into Loki.
+func tokenPrefix(s string) string {
+	if len(s) > 8 {
+		return s[:8]
+	}
+	return s
 }
 
 // remoteIP returns the caller's IP for ban bookkeeping.
