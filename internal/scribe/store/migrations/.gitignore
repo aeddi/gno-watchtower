@@ -1,0 +1,3 @@
+# Migration SQL files are first-class project artifacts; override the global
+# *.sql ignore rule so future numbered migrations are tracked by default.
+!*.sql
