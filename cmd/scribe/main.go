@@ -2,7 +2,7 @@
 package main
 
 import (
-	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -12,43 +12,43 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		usage()
-		os.Exit(1)
-	}
-	switch os.Args[1] {
-	case "version":
-		versionCmd(os.Args[2:], os.Stdout)
-	default:
-		usage()
+	if err := dispatch(os.Args[1:], os.Stdout); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func versionCmd(args []string, out io.Writer) {
-	fs := flag.NewFlagSet("version", flag.ExitOnError)
+func dispatch(args []string, out io.Writer) error {
+	if len(args) == 0 {
+		return usage(out)
+	}
+	switch args[0] {
+	case "version":
+		return versionCmd(args[1:], out)
+	case "run", "doctor", "generate-config", "backfill":
+		return errors.New("not yet implemented")
+	default:
+		return usage(out)
+	}
+}
+
+func usage(out io.Writer) error {
+	fmt.Fprintln(out, "usage: scribe <subcommand> [args]")
+	fmt.Fprintln(out, "subcommands: run, doctor, generate-config, backfill, version")
+	return errors.New("unknown subcommand")
+}
+
+func versionCmd(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("version", flag.ContinueOnError)
+	fs.SetOutput(out)
 	verbose := fs.Bool("v", false, "verbose: include commit, build time, Go toolchain")
 	if err := fs.Parse(args); err != nil {
-		os.Exit(1)
+		return err
 	}
 	if *verbose {
-		fmt.Fprint(out, version.Long())
+		fmt.Fprint(out, "scribe "+version.Long())
 	} else {
-		fmt.Fprintln(out, version.Short())
+		fmt.Fprintln(out, "scribe "+version.Short())
 	}
-}
-
-func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: scribe <command> [args]")
-	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, "Commands:")
-	fmt.Fprintln(os.Stderr, "  version [-v]  Print the build version")
-}
-
-// captureVersionOutput runs versionCmd with args and returns the output as a string.
-// Used only by tests.
-func captureVersionOutput(args []string) string {
-	var buf bytes.Buffer
-	versionCmd(args, &buf)
-	return buf.String()
+	return nil
 }

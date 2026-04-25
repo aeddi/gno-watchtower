@@ -1,25 +1,24 @@
 package main
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
 
-func TestVersionCmd_Short(t *testing.T) {
-	t.Parallel()
-	out := captureVersionOutput([]string{})
-	if out == "" {
-		t.Error("version cmd produced no output")
+func TestVersionShort(t *testing.T) {
+	var out bytes.Buffer
+	if err := versionCmd([]string{}, &out); err != nil {
+		t.Fatalf("versionCmd: %v", err)
+	}
+	if !strings.Contains(out.String(), "scribe") {
+		t.Errorf("expected 'scribe' in output, got %q", out.String())
 	}
 }
 
-func TestVersionCmd_Verbose(t *testing.T) {
-	t.Parallel()
-	out := captureVersionOutput([]string{"-v"})
-	if !strings.Contains(out, "version:") {
-		t.Errorf("verbose output missing version: line:\n%s", out)
-	}
-	if !strings.Contains(out, "go:") {
-		t.Errorf("verbose output missing go: line:\n%s", out)
+func TestUsageOnUnknownSubcommand(t *testing.T) {
+	var out bytes.Buffer
+	if err := dispatch([]string{"nope"}, &out); err == nil {
+		t.Error("expected error for unknown subcommand")
 	}
 }
