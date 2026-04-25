@@ -89,10 +89,63 @@ type Op struct {
 	FromBackfill bool // priority shim: live=false drains first
 }
 
-// Forward declarations — fields populated in Task 1.2.
-type (
-	Event           struct{}
-	SampleValidator struct{}
-	SampleChain     struct{}
-	Anchor          struct{}
-)
+// Event mirrors a row in the events table.
+type Event struct {
+	EventID    string         `json:"event_id"`
+	ClusterID  string         `json:"cluster_id"`
+	Time       time.Time      `json:"time"`
+	IngestTime time.Time      `json:"ingest_time"`
+	Kind       string         `json:"kind"`
+	Subject    string         `json:"subject"`
+	Payload    map[string]any `json:"payload"`
+	Provenance Provenance     `json:"provenance"`
+}
+
+// SampleValidator mirrors a row in the samples_validator table. Pointer fields
+// represent NULL when nil (only populated on warm rollup).
+type SampleValidator struct {
+	ClusterID       string
+	Validator       string
+	Time            time.Time
+	Tier            int8
+	Height          int64
+	VotingPower     int64
+	CatchingUp      bool
+	MempoolTxs      int32
+	MempoolTxsMax   *int32
+	MempoolCached   int32
+	CPUPct          float32
+	CPUPctMax       *float32
+	MemPct          float32
+	MemPctMax       *float32
+	DiskPct         float32
+	NetRxBps        float32
+	NetTxBps        float32
+	PeerCountIn     int16
+	PeerCountInMin  *int16
+	PeerCountOut    int16
+	PeerCountOutMin *int16
+	LastObserved    time.Time
+}
+
+// SampleChain mirrors a row in the samples_chain table.
+type SampleChain struct {
+	ClusterID        string
+	Time             time.Time
+	Tier             int8
+	BlockHeight      int64
+	OnlineCount      int16
+	OnlineCountMin   *int16
+	CatchingUpCount  int16
+	ValsetSize       int16
+	TotalVotingPower int64
+}
+
+// Anchor mirrors a row in the state_anchors table.
+type Anchor struct {
+	ClusterID     string         `json:"cluster_id"`
+	Subject       string         `json:"subject"`
+	Time          time.Time      `json:"t"`
+	FullState     map[string]any `json:"full_state"`
+	EventsThrough string         `json:"events_through"` // last event_id covered
+}
