@@ -58,6 +58,9 @@ func (n *Normalizer) Run(ctx context.Context) {
 func (n *Normalizer) dispatch(ctx context.Context, o Observation) {
 	for _, h := range n.handlers {
 		for _, op := range h.Handle(ctx, o) {
+			if o.FromBackfill {
+				op.FromBackfill = true
+			}
 			select {
 			case n.out <- op:
 			case <-ctx.Done():

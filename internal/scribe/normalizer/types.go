@@ -23,6 +23,7 @@ const (
 type Observation struct {
 	Lane         Lane
 	IngestTime   time.Time
+	FromBackfill bool // when true, emitted Ops will be tagged FromBackfill
 	Metric       *vm.Sample
 	MetricQuery  string // PromQL that produced this Sample (for provenance)
 	MetricSeries *vm.Series
