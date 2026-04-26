@@ -25,7 +25,9 @@ func dispatch(args []string, out io.Writer) error {
 	switch args[0] {
 	case "version":
 		return versionCmd(args[1:], out)
-	case "run", "doctor", "generate-config", "backfill":
+	case "run":
+		return runCmd(args[1:], out)
+	case "doctor", "generate-config", "backfill":
 		return errors.New("not yet implemented")
 	default:
 		return usage(out)
