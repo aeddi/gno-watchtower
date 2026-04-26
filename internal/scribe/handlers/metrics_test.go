@@ -47,3 +47,113 @@ func TestHeightAdvancedEmitsOnChange(t *testing.T) {
 		t.Errorf("expected 1 op for unchanged height, got %d", len(ops))
 	}
 }
+
+func TestOnlineEmitsOfflineThenOnline(t *testing.T) {
+	h := NewOnline("c1")
+	now := time.Now().UTC()
+
+	emit := func(v float64, t time.Time) []types.Op {
+		return h.Handle(context.Background(), normalizer.Observation{
+			Lane:        normalizer.LaneFast,
+			IngestTime:  t,
+			Metric:      &vm.Sample{Labels: map[string]string{"validator": "node-1"}, Time: t, Value: v},
+			MetricQuery: "sentinel_validator_online",
+		})
+	}
+
+	if ops := emit(1, now); len(ops) != 0 {
+		t.Fatalf("first observation must seed without event; got %d ops", len(ops))
+	}
+	// 1 -> 0 transition: went_offline.
+	ops := emit(0, now.Add(time.Second))
+	if len(ops) != 1 || ops[0].Event.Kind != "validator.went_offline" {
+		t.Fatalf("expected went_offline, got %+v", ops)
+	}
+	// 0 -> 1 transition: came_online.
+	ops = emit(1, now.Add(2*time.Second))
+	if len(ops) != 1 || ops[0].Event.Kind != "validator.came_online" {
+		t.Fatalf("expected came_online, got %+v", ops)
+	}
+}
+
+func TestPeersUpsertsSampleByDirection(t *testing.T) {
+	h := NewPeers("c1")
+	now := time.Now().UTC()
+	ops := h.Handle(context.Background(), normalizer.Observation{
+		Lane:        normalizer.LaneFast,
+		IngestTime:  now,
+		Metric:      &vm.Sample{Labels: map[string]string{"validator": "node-1", "direction": "in"}, Time: now, Value: 3},
+		MetricQuery: "sentinel_rpc_peers",
+	})
+	if len(ops) != 1 || ops[0].Kind != types.OpUpsertSampleValidator {
+		t.Fatalf("expected sample upsert, got %+v", ops)
+	}
+	if ops[0].SampleValid.PeerCountIn != 3 {
+		t.Errorf("PeerCountIn=%d want 3", ops[0].SampleValid.PeerCountIn)
+	}
+}
+
+func TestMempoolUpsertsSample(t *testing.T) {
+	h := NewMempool("c1")
+	now := time.Now().UTC()
+	ops := h.Handle(context.Background(), normalizer.Observation{
+		Lane:        normalizer.LaneFast,
+		IngestTime:  now,
+		Metric:      &vm.Sample{Labels: map[string]string{"validator": "node-1"}, Time: now, Value: 5},
+		MetricQuery: "sentinel_rpc_mempool_txs",
+	})
+	if len(ops) != 1 || ops[0].SampleValid.MempoolTxs != 5 {
+		t.Errorf("got %+v", ops)
+	}
+}
+
+func TestVotingPowerUpsertsSample(t *testing.T) {
+	h := NewVotingPower("c1")
+	now := time.Now().UTC()
+	ops := h.Handle(context.Background(), normalizer.Observation{
+		Lane:        normalizer.LaneFast,
+		IngestTime:  now,
+		Metric:      &vm.Sample{Labels: map[string]string{"validator": "node-1"}, Time: now, Value: 100},
+		MetricQuery: "sentinel_rpc_validator_voting_power",
+	})
+	if len(ops) != 1 || ops[0].SampleValid.VotingPower != 100 {
+		t.Errorf("got %+v", ops)
+	}
+}
+
+func TestValsetSizeAggregatesChainSample(t *testing.T) {
+	h := NewValsetSize("c1")
+	now := time.Now().UTC()
+
+	// First batch: feed two member observations at the same time.
+	for _, vp := range []float64{100, 200} {
+		_ = h.Handle(context.Background(), normalizer.Observation{
+			Lane:        normalizer.LaneFast,
+			IngestTime:  now,
+			Metric:      &vm.Sample{Labels: map[string]string{"address": "g1abc"}, Time: now, Value: vp},
+			MetricQuery: "sentinel_rpc_validator_set_power",
+		})
+	}
+	// Aggregate is computed per poll-tick. ValsetSize aggregates by Metric.Time;
+	// the third call with a NEW time emits the chain sample for the previous tick.
+	later := now.Add(time.Second)
+	ops := h.Handle(context.Background(), normalizer.Observation{
+		Lane:        normalizer.LaneFast,
+		IngestTime:  later,
+		Metric:      &vm.Sample{Labels: map[string]string{"address": "g1xyz"}, Time: later, Value: 50},
+		MetricQuery: "sentinel_rpc_validator_set_power",
+	})
+	// First poll's aggregate: 2 members, total VP = 300. Should land in samples_chain.
+	if len(ops) == 0 {
+		t.Fatal("no chain sample emitted at tick rollover")
+	}
+	var sawChain bool
+	for _, op := range ops {
+		if op.Kind == types.OpUpsertSampleChain && op.SampleChain.ValsetSize == 2 && op.SampleChain.TotalVotingPower == 300 {
+			sawChain = true
+		}
+	}
+	if !sawChain {
+		t.Errorf("expected chain sample with size=2 totalVP=300, got %+v", ops)
+	}
+}
