@@ -22,6 +22,12 @@ func (s *Server) handleEventsStreamImpl(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+	// Send the response prologue + an SSE comment line so http clients don't
+	// block on Get() waiting for the first byte. Without this the scanner side
+	// can't start reading until the first real event arrives.
+	_, _ = fmt.Fprint(w, ": ready\n\n")
+	flusher.Flush()
 
 	// Optional: replay since Last-Event-ID.
 	if since := r.Header.Get("Last-Event-ID"); since != "" {

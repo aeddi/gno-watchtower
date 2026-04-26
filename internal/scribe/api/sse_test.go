@@ -48,16 +48,32 @@ func TestSSEDeliversNewEvents(t *testing.T) {
 		w.Submit(types.Op{Kind: types.OpInsertEvent, Event: &ev})
 	}()
 
-	scn := bufio.NewScanner(resp.Body)
-	deadline := time.Now().Add(2 * time.Second)
-	for scn.Scan() {
-		if time.Now().After(deadline) {
-			break
+	// Read in a goroutine so we can bound the wait without blocking on Scan().
+	lines := make(chan string, 16)
+	go func() {
+		defer close(lines)
+		scn := bufio.NewScanner(resp.Body)
+		for scn.Scan() {
+			lines <- scn.Text()
 		}
-		line := scn.Text()
-		if strings.HasPrefix(line, "data: ") && strings.Contains(line, "\"kind\":\"x\"") {
-			return
+	}()
+
+	deadline := time.After(3 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			// Closing the body unblocks the scanner goroutine before the test exits.
+			_ = resp.Body.Close()
+			t.Fatal("did not receive event over SSE within deadline")
+		case line, ok := <-lines:
+			if !ok {
+				_ = resp.Body.Close()
+				t.Fatal("SSE stream ended before event arrived")
+			}
+			if strings.HasPrefix(line, "data: ") && strings.Contains(line, "\"kind\":\"x\"") {
+				_ = resp.Body.Close()
+				return
+			}
 		}
 	}
-	t.Fatal("did not receive event over SSE")
 }
