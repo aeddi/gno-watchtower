@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aeddi/gno-watchtower/internal/scribe/normalizer"
+	"github.com/aeddi/gno-watchtower/internal/scribe/scribemetrics"
 	"github.com/aeddi/gno-watchtower/internal/scribe/sources/loki"
 )
 
@@ -18,11 +19,18 @@ type LogsLane struct {
 	streams       []string
 	overlapWindow time.Duration
 	out           chan<- normalizer.Observation
+	metrics       *scribemetrics.Registry
 }
 
 // NewLogsLane returns a LogsLane ready to run.
 func NewLogsLane(base string, streams []string, overlap time.Duration, out chan<- normalizer.Observation) *LogsLane {
 	return &LogsLane{base: base, streams: streams, overlapWindow: overlap, out: out}
+}
+
+// WithMetrics attaches an optional metrics registry. Returns l for chaining.
+func (l *LogsLane) WithMetrics(m *scribemetrics.Registry) *LogsLane {
+	l.metrics = m
+	return l
 }
 
 // Run starts one goroutine per stream and waits for all to exit. It returns
@@ -66,8 +74,13 @@ func (l *LogsLane) tailLoop(ctx context.Context, q string) {
 					Lane: normalizer.LaneLogs, IngestTime: time.Now().UTC(),
 					LogEntry: &e, LogQuery: q,
 				}:
+					if l.metrics != nil {
+						l.metrics.IngestObservations.WithLabelValues("logs").Inc()
+					}
 				default:
-					// Buffer full — drop and let self-stats surface the loss.
+					if l.metrics != nil {
+						l.metrics.IngestDrops.WithLabelValues("logs", "buffer_full").Inc()
+					}
 				}
 			case err := <-errCh:
 				if err != nil && ctx.Err() == nil {
@@ -75,6 +88,9 @@ func (l *LogsLane) tailLoop(ctx context.Context, q string) {
 				}
 				break read
 			}
+		}
+		if l.metrics != nil {
+			l.metrics.IngestBackoff.WithLabelValues("logs").Set(backoff.Seconds())
 		}
 		t := time.NewTimer(backoff)
 		select {
@@ -85,6 +101,10 @@ func (l *LogsLane) tailLoop(ctx context.Context, q string) {
 		}
 		if backoff < 60*time.Second {
 			backoff *= 2
+		} else {
+			if l.metrics != nil {
+				l.metrics.IngestBackoff.WithLabelValues("logs").Set(0)
+			}
 		}
 	}
 }

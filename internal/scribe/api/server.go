@@ -6,8 +6,10 @@ import (
 	"net/http"
 
 	"github.com/aeddi/gno-watchtower/internal/scribe/cache"
+	"github.com/aeddi/gno-watchtower/internal/scribe/scribemetrics"
 	"github.com/aeddi/gno-watchtower/internal/scribe/store"
 	"github.com/aeddi/gno-watchtower/internal/scribe/writer"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Deps groups dependencies the API handlers need.
@@ -16,7 +18,7 @@ type Deps struct {
 	Cache     *cache.Cache
 	Writer    *writer.Writer
 	ClusterID string
-	// Metrics is added in Phase 11; keep the field optional for now.
+	Metrics   *scribemetrics.Registry
 }
 
 // Server wraps the read-only HTTP API.
@@ -42,6 +44,9 @@ func (s *Server) http() http.Handler {
 	mux.HandleFunc("/api/event-kinds", s.handleEventKindsImpl)
 	mux.HandleFunc("/api/backfill", s.handleBackfillImpl)
 	mux.HandleFunc("/api/backfill/", s.handleBackfillIDImpl)
+	if s.deps.Metrics != nil {
+		mux.Handle("/metrics", promhttp.HandlerFor(s.deps.Metrics.Registry, promhttp.HandlerOpts{}))
+	}
 	return mux
 }
 

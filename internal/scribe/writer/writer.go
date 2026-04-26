@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aeddi/gno-watchtower/internal/scribe/scribemetrics"
 	"github.com/aeddi/gno-watchtower/internal/scribe/store"
 	"github.com/aeddi/gno-watchtower/internal/scribe/types"
 )
@@ -21,6 +22,8 @@ type Config struct {
 	// BatchWindow is the maximum time to wait before flushing a partial batch.
 	// Zero defaults to 250ms.
 	BatchWindow time.Duration
+	// Metrics is optional; if non-nil, the writer records self-stats.
+	Metrics *scribemetrics.Registry
 }
 
 // Writer is the single-writer goroutine fronting the Store. It accepts Ops on
@@ -104,6 +107,10 @@ func (w *Writer) Run(ctx context.Context) error {
 		if total == 0 {
 			return
 		}
+		var startFlush time.Time
+		if w.cfg.Metrics != nil {
+			startFlush = time.Now()
+		}
 		// Best-effort retry once on transient error.
 		for attempt := 0; attempt < 2; attempt++ {
 			err := w.store.WriteBatch(ctx, batch)
@@ -111,9 +118,25 @@ func (w *Writer) Run(ctx context.Context) error {
 				break
 			}
 			if attempt == 1 {
+				if w.cfg.Metrics != nil {
+					w.cfg.Metrics.WriterErrors.WithLabelValues("commit").Inc()
+				}
 				panic(err)
 			}
 			time.Sleep(50 * time.Millisecond)
+		}
+		if w.cfg.Metrics != nil {
+			w.cfg.Metrics.WriterBatchDuration.Observe(time.Since(startFlush).Seconds())
+			for _, e := range batch.Events {
+				w.cfg.Metrics.EventsWritten.WithLabelValues(e.Kind).Inc()
+			}
+			if n := len(batch.SamplesValidator) + len(batch.SamplesChain); n > 0 {
+				w.cfg.Metrics.SamplesWritten.Add(float64(n))
+			}
+			if n := len(batch.Anchors); n > 0 {
+				w.cfg.Metrics.AnchorsWritten.Add(float64(n))
+			}
+			w.cfg.Metrics.WriterQueueDepth.Set(0)
 		}
 		w.broadcast(committed)
 		batch = store.Batch{}
