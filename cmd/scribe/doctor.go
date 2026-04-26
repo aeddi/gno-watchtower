@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/aeddi/gno-watchtower/internal/scribe/config"
@@ -60,8 +61,15 @@ func doctorCmd(args []string, out io.Writer) error {
 	}
 	s, err := store.Open(dbPath)
 	if err != nil {
-		fmt.Fprintf(out, "FAIL store: %v\n", err)
-		bad = append(bad, "store")
+		// DuckDB single-writer lock: scribe is already running against this DB.
+		// That's informational, not a failure — doctor in a live cluster is the
+		// expected case.
+		if strings.Contains(err.Error(), "Conflicting lock") {
+			fmt.Fprintf(out, "OK   store: %s in use by running scribe (lock held)\n", dbPath)
+		} else {
+			fmt.Fprintf(out, "FAIL store: %v\n", err)
+			bad = append(bad, "store")
+		}
 	} else {
 		v, _ := s.SchemaVersion(ctx)
 		fmt.Fprintf(out, "OK   store: %s schema_version=%d\n", dbPath, v)
