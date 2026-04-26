@@ -48,7 +48,7 @@ func (h *Height) Handle(_ context.Context, o normalizer.Observation) []types.Op 
 	// +1ns offset avoids PK collision when sibling metric handlers (Mempool,
 	// VotingPower, Peers) write at the same VM-reported metric time.
 	sv := types.SampleValidator{
-		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time.Add(1 * time.Nanosecond), Tier: 0,
+		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time.Add(1 * time.Microsecond), Tier: 0,
 		Height: height, LastObserved: o.Metric.Time,
 	}
 	ops = append(ops, types.Op{Kind: types.OpUpsertSampleValidator, SampleValid: &sv})
@@ -171,9 +171,9 @@ func (h *Peers) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	}
 	// +2ns / +3ns offsets avoid PK collision with sibling handlers writing the
 	// same (cluster, validator) at the same metric time.
-	offset := 2 * time.Nanosecond
+	offset := 2 * time.Microsecond
 	if o.MetricQuery == "outbound_peers_gauge" {
-		offset = 3 * time.Nanosecond
+		offset = 3 * time.Microsecond
 	}
 	sv := types.SampleValidator{ClusterID: h.cluster, Validator: val, Time: o.Metric.Time.Add(offset), Tier: 0}
 	switch o.MetricQuery {
@@ -203,7 +203,7 @@ func (h *Mempool) Handle(_ context.Context, o normalizer.Observation) []types.Op
 	val := o.Metric.Labels["validator"]
 	// +4ns offset avoids PK collision with sibling handlers.
 	sv := types.SampleValidator{
-		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time.Add(4 * time.Nanosecond), Tier: 0,
+		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time.Add(4 * time.Microsecond), Tier: 0,
 		MempoolTxs: int32(o.Metric.Value),
 	}
 	return []types.Op{{Kind: types.OpUpsertSampleValidator, SampleValid: &sv}}
@@ -225,7 +225,7 @@ func (h *VotingPower) Handle(_ context.Context, o normalizer.Observation) []type
 	val := o.Metric.Labels["validator"]
 	// +5ns offset avoids PK collision with sibling handlers.
 	sv := types.SampleValidator{
-		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time.Add(5 * time.Nanosecond), Tier: 0,
+		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time.Add(5 * time.Microsecond), Tier: 0,
 		VotingPower: int64(o.Metric.Value),
 	}
 	return []types.Op{{Kind: types.OpUpsertSampleValidator, SampleValid: &sv}}
