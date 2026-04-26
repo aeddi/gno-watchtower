@@ -1,0 +1,1 @@
+{"time":"2026-04-25T10:14:33Z","level":"INFO","module":"consensus","msg":"Signed and pushed vote","height":1234,"round":0,"type":"Prevote","validator address":"g1abc123def456","timestamp":"2026-04-25T10:14:33Z"}

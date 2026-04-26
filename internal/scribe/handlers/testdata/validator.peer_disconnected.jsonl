@@ -1,0 +1,1 @@
+{"time":"2026-04-25T10:14:33Z","level":"ERROR","module":"p2p","msg":"Stopping peer for error","peer":"g1peer567890@192.168.1.2:26656","err":"read tcp: use of closed network connection"}

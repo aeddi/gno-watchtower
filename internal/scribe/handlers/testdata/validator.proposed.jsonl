@@ -1,0 +1,1 @@
+{"time":"2026-04-25T10:14:33Z","level":"INFO","module":"consensus","msg":"enterPropose: Our turn to propose","proposer":"g1abc123def456","privValidator":"g1abc123def456","height":1234,"round":0}
