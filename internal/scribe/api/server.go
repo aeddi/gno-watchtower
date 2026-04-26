@@ -34,7 +34,7 @@ func (s *Server) Handler() http.Handler { return s.http() }
 func (s *Server) http() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", s.handleHealth)
-	mux.HandleFunc("/api/events", s.handleEvents)
+	mux.HandleFunc("/api/events", s.handleEventsImpl)
 	mux.HandleFunc("/api/events/stream", s.handleEventsStream)
 	mux.HandleFunc("/api/state", s.handleState)
 	mux.HandleFunc("/api/samples", s.handleSamples)
@@ -68,10 +68,6 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 }
 
 // All other handlers below return 501 for now; subsequent Phase-8 tasks fill them in.
-func (s *Server) handleEvents(w http.ResponseWriter, _ *http.Request) {
-	writeError(w, 501, "not_implemented", "", "")
-}
-
 func (s *Server) handleEventsStream(w http.ResponseWriter, _ *http.Request) {
 	writeError(w, 501, "not_implemented", "", "")
 }
