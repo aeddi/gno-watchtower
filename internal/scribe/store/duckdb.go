@@ -455,6 +455,189 @@ func (s *duckStore) StorageBytes(ctx context.Context) (map[string]int64, error) 
 	return out, nil
 }
 
+// ---- Compaction
+
+func (s *duckStore) CompactValidatorSamples(ctx context.Context, cluster string, before time.Time, bucket time.Duration) (int64, int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var rowsIn int64
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM samples_validator WHERE cluster_id = ? AND tier = 0 AND t < ?`,
+		cluster, before).Scan(&rowsIn); err != nil {
+		return 0, 0, err
+	}
+	if rowsIn == 0 {
+		return 0, 0, tx.Commit()
+	}
+
+	bucketSecs := int64(bucket.Seconds())
+	insertQ := fmt.Sprintf(`
+        INSERT INTO samples_validator
+        SELECT cluster_id, validator,
+               TIMESTAMP 'epoch' + (CAST(epoch(t)/%d AS BIGINT) * %d) * INTERVAL '1 second' AS t,
+               1 AS tier,
+               max(height), arg_max(voting_power, t),
+               arg_max(catching_up, t),
+               CAST(avg(mempool_txs) AS INTEGER), max(mempool_txs),
+               CAST(avg(mempool_cached) AS INTEGER),
+               avg(cpu_pct), max(cpu_pct),
+               avg(mem_pct), max(mem_pct),
+               avg(disk_pct), avg(net_rx_bps), avg(net_tx_bps),
+               CAST(avg(peer_count_in) AS SMALLINT), min(peer_count_in),
+               CAST(avg(peer_count_out) AS SMALLINT), min(peer_count_out),
+               max(last_observed)
+        FROM samples_validator
+        WHERE cluster_id = ? AND tier = 0 AND t < ?
+        GROUP BY cluster_id, validator,
+                 CAST(epoch(t)/%d AS BIGINT)
+        ON CONFLICT (cluster_id, validator, t) DO UPDATE SET
+              tier = 1, height = EXCLUDED.height, voting_power = EXCLUDED.voting_power,
+              catching_up = EXCLUDED.catching_up,
+              mempool_txs = EXCLUDED.mempool_txs, mempool_txs_max = EXCLUDED.mempool_txs_max,
+              mempool_cached = EXCLUDED.mempool_cached,
+              cpu_pct = EXCLUDED.cpu_pct, cpu_pct_max = EXCLUDED.cpu_pct_max,
+              mem_pct = EXCLUDED.mem_pct, mem_pct_max = EXCLUDED.mem_pct_max,
+              disk_pct = EXCLUDED.disk_pct,
+              net_rx_bps = EXCLUDED.net_rx_bps, net_tx_bps = EXCLUDED.net_tx_bps,
+              peer_count_in = EXCLUDED.peer_count_in, peer_count_in_min = EXCLUDED.peer_count_in_min,
+              peer_count_out = EXCLUDED.peer_count_out, peer_count_out_min = EXCLUDED.peer_count_out_min,
+              last_observed = EXCLUDED.last_observed`,
+		bucketSecs, bucketSecs, bucketSecs)
+	res, err := tx.ExecContext(ctx, insertQ, cluster, before)
+	if err != nil {
+		return 0, 0, fmt.Errorf("compact insert: %w", err)
+	}
+	rowsOut, _ := res.RowsAffected()
+
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM samples_validator WHERE cluster_id = ? AND tier = 0 AND t < ?`,
+		cluster, before); err != nil {
+		return 0, 0, fmt.Errorf("compact delete: %w", err)
+	}
+
+	return rowsIn, rowsOut, tx.Commit()
+}
+
+func (s *duckStore) CompactChainSamples(ctx context.Context, cluster string, before time.Time, bucket time.Duration) (int64, int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var rowsIn int64
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM samples_chain WHERE cluster_id = ? AND tier = 0 AND t < ?`,
+		cluster, before).Scan(&rowsIn); err != nil {
+		return 0, 0, err
+	}
+	if rowsIn == 0 {
+		return 0, 0, tx.Commit()
+	}
+
+	bs := int64(bucket.Seconds())
+	insertQ := fmt.Sprintf(`
+        INSERT INTO samples_chain
+        SELECT cluster_id,
+               TIMESTAMP 'epoch' + (CAST(epoch(t)/%d AS BIGINT) * %d) * INTERVAL '1 second' AS t,
+               1, max(block_height),
+               CAST(avg(online_count) AS SMALLINT), min(online_count),
+               CAST(avg(catching_up_count) AS SMALLINT),
+               arg_max(valset_size, t), arg_max(total_voting_power, t)
+        FROM samples_chain
+        WHERE cluster_id = ? AND tier = 0 AND t < ?
+        GROUP BY cluster_id, CAST(epoch(t)/%d AS BIGINT)
+        ON CONFLICT (cluster_id, t) DO UPDATE SET
+          tier=1, block_height=EXCLUDED.block_height,
+          online_count=EXCLUDED.online_count, online_count_min=EXCLUDED.online_count_min,
+          catching_up_count=EXCLUDED.catching_up_count,
+          valset_size=EXCLUDED.valset_size, total_voting_power=EXCLUDED.total_voting_power`,
+		bs, bs, bs)
+	res, err := tx.ExecContext(ctx, insertQ, cluster, before)
+	if err != nil {
+		return 0, 0, err
+	}
+	rowsOut, _ := res.RowsAffected()
+
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM samples_chain WHERE cluster_id = ? AND tier = 0 AND t < ?`, cluster, before); err != nil {
+		return 0, 0, err
+	}
+
+	return rowsIn, rowsOut, tx.Commit()
+}
+
+// ---- Time-bucketed sample queries
+
+func (s *duckStore) BucketValidatorSamples(ctx context.Context, q SamplesQuery) ([]ValidatorBucket, error) {
+	bs := int64(q.Step.Seconds())
+	if bs <= 0 {
+		bs = 60
+	}
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`
+        SELECT TIMESTAMP 'epoch' + (CAST(epoch(t)/%d AS BIGINT) * %d) * INTERVAL '1 second' AS bt,
+               max(height), arg_max(voting_power, t),
+               avg(mempool_txs), max(mempool_txs),
+               avg(cpu_pct), max(cpu_pct), avg(mem_pct), max(mem_pct),
+               avg(disk_pct), avg(net_rx_bps), avg(net_tx_bps),
+               avg(peer_count_in), min(peer_count_in),
+               avg(peer_count_out), min(peer_count_out)
+        FROM samples_validator
+        WHERE cluster_id = ? AND validator = ? AND t >= ? AND t <= ?
+        GROUP BY bt ORDER BY bt`, bs, bs),
+		q.ClusterID, q.Subject, q.From, q.To)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ValidatorBucket
+	for rows.Next() {
+		var b ValidatorBucket
+		if err := rows.Scan(&b.T, &b.Height, &b.VotingPower,
+			&b.MempoolTxs, &b.MempoolTxsMax,
+			&b.CPUPct, &b.CPUPctMax, &b.MemPct, &b.MemPctMax,
+			&b.DiskPct, &b.NetRxBps, &b.NetTxBps,
+			&b.PeerCountIn, &b.PeerCountInMin,
+			&b.PeerCountOut, &b.PeerCountOutMin); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+func (s *duckStore) BucketChainSamples(ctx context.Context, q SamplesQuery) ([]ChainBucket, error) {
+	bs := int64(q.Step.Seconds())
+	if bs <= 0 {
+		bs = 60
+	}
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`
+        SELECT TIMESTAMP 'epoch' + (CAST(epoch(t)/%d AS BIGINT) * %d) * INTERVAL '1 second' AS bt,
+               max(block_height), avg(online_count), min(online_count),
+               avg(catching_up_count), arg_max(valset_size, t), arg_max(total_voting_power, t)
+        FROM samples_chain WHERE cluster_id = ? AND t >= ? AND t <= ?
+        GROUP BY bt ORDER BY bt`, bs, bs),
+		q.ClusterID, q.From, q.To)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ChainBucket
+	for rows.Next() {
+		var b ChainBucket
+		if err := rows.Scan(&b.T, &b.BlockHeight, &b.OnlineCount, &b.OnlineCountMin,
+			&b.CatchingUpCount, &b.ValsetSize, &b.TotalVotingPower); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
 // GetLatestSampleValidator returns the most recent sample for (cluster, validator)
 // at or before at, or nil if none exists.
 func (s *duckStore) GetLatestSampleValidator(ctx context.Context, cluster, validator string, at time.Time) (*types.SampleValidator, error) {
