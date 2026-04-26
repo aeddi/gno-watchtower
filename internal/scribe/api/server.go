@@ -38,8 +38,8 @@ func (s *Server) http() http.Handler {
 	mux.HandleFunc("/api/events/stream", s.handleEventsStream)
 	mux.HandleFunc("/api/state", s.handleStateImpl)
 	mux.HandleFunc("/api/samples", s.handleSamplesImpl)
-	mux.HandleFunc("/api/subjects", s.handleSubjects)
-	mux.HandleFunc("/api/event-kinds", s.handleEventKinds)
+	mux.HandleFunc("/api/subjects", s.handleSubjectsImpl)
+	mux.HandleFunc("/api/event-kinds", s.handleEventKindsImpl)
 	mux.HandleFunc("/api/backfill", s.handleBackfill)
 	mux.HandleFunc("/api/backfill/", s.handleBackfillID)
 	return mux
@@ -69,14 +69,6 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 // All other handlers below return 501 for now; subsequent Phase-8 tasks fill them in.
 func (s *Server) handleEventsStream(w http.ResponseWriter, _ *http.Request) {
-	writeError(w, 501, "not_implemented", "", "")
-}
-
-func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
-	writeError(w, 501, "not_implemented", "", "")
-}
-
-func (s *Server) handleEventKinds(w http.ResponseWriter, _ *http.Request) {
 	writeError(w, 501, "not_implemented", "", "")
 }
 
