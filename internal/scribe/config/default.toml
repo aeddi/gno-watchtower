@@ -35,11 +35,9 @@ queries = [
 
 [ingest.logs]
 streams = [
-  '{validator=~".+", module="consensus"}',
-  '{validator=~".+", module="mempool"}',
-  '{validator=~".+", module="p2p"}',
-  '{validator=~".+", module="state"}',
-  '{validator=~".+", module="vm"}',
+  # Single broad stream — `module` is a JSON body field in gnoland's slog output,
+  # not a Loki label. Per-handler `msg` substring matching does the discrimination.
+  '{validator=~".+"}',
 ]
 overlap_window = "5s"
 
