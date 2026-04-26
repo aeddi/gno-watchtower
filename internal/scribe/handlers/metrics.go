@@ -45,8 +45,10 @@ func (h *Height) Handle(_ context.Context, o normalizer.Observation) []types.Op 
 	ops := make([]types.Op, 0, 2)
 
 	// Always upsert sample (delta-filter is store-side / writer-side).
+	// +1ns offset avoids PK collision when sibling metric handlers (Mempool,
+	// VotingPower, Peers) write at the same VM-reported metric time.
 	sv := types.SampleValidator{
-		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time, Tier: 0,
+		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time.Add(1 * time.Nanosecond), Tier: 0,
 		Height: height, LastObserved: o.Metric.Time,
 	}
 	ops = append(ops, types.Op{Kind: types.OpUpsertSampleValidator, SampleValid: &sv})
@@ -167,7 +169,13 @@ func (h *Peers) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	if val == "" {
 		return nil
 	}
-	sv := types.SampleValidator{ClusterID: h.cluster, Validator: val, Time: o.Metric.Time, Tier: 0}
+	// +2ns / +3ns offsets avoid PK collision with sibling handlers writing the
+	// same (cluster, validator) at the same metric time.
+	offset := 2 * time.Nanosecond
+	if o.MetricQuery == "outbound_peers_gauge" {
+		offset = 3 * time.Nanosecond
+	}
+	sv := types.SampleValidator{ClusterID: h.cluster, Validator: val, Time: o.Metric.Time.Add(offset), Tier: 0}
 	switch o.MetricQuery {
 	case "inbound_peers_gauge":
 		sv.PeerCountIn = int16(o.Metric.Value)
@@ -193,8 +201,9 @@ func (h *Mempool) Handle(_ context.Context, o normalizer.Observation) []types.Op
 		return nil
 	}
 	val := o.Metric.Labels["validator"]
+	// +4ns offset avoids PK collision with sibling handlers.
 	sv := types.SampleValidator{
-		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time, Tier: 0,
+		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time.Add(4 * time.Nanosecond), Tier: 0,
 		MempoolTxs: int32(o.Metric.Value),
 	}
 	return []types.Op{{Kind: types.OpUpsertSampleValidator, SampleValid: &sv}}
@@ -214,8 +223,9 @@ func (h *VotingPower) Handle(_ context.Context, o normalizer.Observation) []type
 		return nil
 	}
 	val := o.Metric.Labels["validator"]
+	// +5ns offset avoids PK collision with sibling handlers.
 	sv := types.SampleValidator{
-		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time, Tier: 0,
+		ClusterID: h.cluster, Validator: val, Time: o.Metric.Time.Add(5 * time.Nanosecond), Tier: 0,
 		VotingPower: int64(o.Metric.Value),
 	}
 	return []types.Op{{Kind: types.OpUpsertSampleValidator, SampleValid: &sv}}
