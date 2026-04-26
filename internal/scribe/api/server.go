@@ -40,8 +40,8 @@ func (s *Server) http() http.Handler {
 	mux.HandleFunc("/api/samples", s.handleSamplesImpl)
 	mux.HandleFunc("/api/subjects", s.handleSubjectsImpl)
 	mux.HandleFunc("/api/event-kinds", s.handleEventKindsImpl)
-	mux.HandleFunc("/api/backfill", s.handleBackfill)
-	mux.HandleFunc("/api/backfill/", s.handleBackfillID)
+	mux.HandleFunc("/api/backfill", s.handleBackfillImpl)
+	mux.HandleFunc("/api/backfill/", s.handleBackfillIDImpl)
 	return mux
 }
 
@@ -65,12 +65,4 @@ func writeError(w http.ResponseWriter, status int, code, detail, requestID strin
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
-}
-
-func (s *Server) handleBackfill(w http.ResponseWriter, _ *http.Request) {
-	writeError(w, 501, "not_implemented", "", "")
-}
-
-func (s *Server) handleBackfillID(w http.ResponseWriter, _ *http.Request) {
-	writeError(w, 501, "not_implemented", "", "")
 }
