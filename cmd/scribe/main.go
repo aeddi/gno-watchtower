@@ -32,7 +32,7 @@ func dispatch(args []string, out io.Writer) error {
 	case "doctor":
 		return doctorCmd(args[1:], out)
 	case "backfill":
-		return errors.New("not yet implemented")
+		return backfillCmd(args[1:], out)
 	default:
 		return usage(out)
 	}
