@@ -3,6 +3,7 @@ module github.com/aeddi/gno-watchtower
 go 1.25.0
 
 require (
+	github.com/coder/websocket v1.8.14
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/duckdb/duckdb-go/v2 v2.10502.0
