@@ -157,15 +157,21 @@ func NewPeers(cluster string) *Peers { return &Peers{cluster: cluster} }
 func (Peers) Name() string { return "peers" }
 
 func (h *Peers) Handle(_ context.Context, o normalizer.Observation) []types.Op {
-	if o.Metric == nil || o.MetricQuery != "sentinel_rpc_peers" {
+	// gnoland exports peer counts via OTLP as inbound_peers_gauge and
+	// outbound_peers_gauge (no `direction` label — the direction is in the
+	// metric name). Each metric carries `{validator}`.
+	if o.Metric == nil {
 		return nil
 	}
 	val := o.Metric.Labels["validator"]
+	if val == "" {
+		return nil
+	}
 	sv := types.SampleValidator{ClusterID: h.cluster, Validator: val, Time: o.Metric.Time, Tier: 0}
-	switch o.Metric.Labels["direction"] {
-	case "in":
+	switch o.MetricQuery {
+	case "inbound_peers_gauge":
 		sv.PeerCountIn = int16(o.Metric.Value)
-	case "out":
+	case "outbound_peers_gauge":
 		sv.PeerCountOut = int16(o.Metric.Value)
 	default:
 		return nil

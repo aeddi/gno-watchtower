@@ -18,10 +18,13 @@ interval = "3s"
 queries = [
   "sentinel_rpc_latest_block_height",
   "sentinel_validator_online",
-  "sentinel_rpc_peers",
   "sentinel_rpc_mempool_txs",
   "sentinel_rpc_validator_voting_power",
   "sentinel_rpc_validator_set_power",
+  # Peer counts come from gnoland's OTLP push (`inbound_peers_gauge` /
+  # `outbound_peers_gauge`), not the sentinel RPC poll.
+  "inbound_peers_gauge",
+  "outbound_peers_gauge",
 ]
 
 [ingest.slow]
