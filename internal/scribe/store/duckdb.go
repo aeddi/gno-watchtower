@@ -299,6 +299,162 @@ func (s *duckStore) QueryEvents(ctx context.Context, q EventQuery) ([]types.Even
 	return out, nextCursor, nil
 }
 
+// ---- Remaining Store interface methods
+
+func (s *duckStore) GetLatestSampleChain(ctx context.Context, cluster string, at time.Time) (*types.SampleChain, error) {
+	row := s.db.QueryRowContext(ctx, `
+        SELECT cluster_id, t, tier, block_height, online_count, online_count_min,
+               catching_up_count, valset_size, total_voting_power
+        FROM samples_chain WHERE cluster_id = ? AND t <= ?
+        ORDER BY t DESC LIMIT 1`, cluster, at)
+	var c types.SampleChain
+	if err := row.Scan(&c.ClusterID, &c.Time, &c.Tier,
+		&c.BlockHeight, &c.OnlineCount, &c.OnlineCountMin,
+		&c.CatchingUpCount, &c.ValsetSize, &c.TotalVotingPower); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (s *duckStore) GetLatestAnchor(ctx context.Context, cluster, subject string, at time.Time) (*types.Anchor, error) {
+	row := s.db.QueryRowContext(ctx, `
+        SELECT cluster_id, subject, t, full_state, events_through
+        FROM state_anchors WHERE cluster_id = ? AND subject = ? AND t <= ?
+        ORDER BY t DESC LIMIT 1`, cluster, subject, at)
+	var a types.Anchor
+	var full any // DuckDB JSON column: arrives as map/slice already; scan into any then re-roundtrip.
+	if err := row.Scan(&a.ClusterID, &a.Subject, &a.Time, &full, &a.EventsThrough); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if full != nil {
+		b, err := json.Marshal(full)
+		if err != nil {
+			return nil, fmt.Errorf("marshal full_state: %w", err)
+		}
+		if err := json.Unmarshal(b, &a.FullState); err != nil {
+			return nil, fmt.Errorf("unmarshal full_state: %w", err)
+		}
+	}
+	return &a, nil
+}
+
+func (s *duckStore) ListSubjects(ctx context.Context, cluster string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT DISTINCT subject FROM events WHERE cluster_id = ? ORDER BY subject`, cluster)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var sub string
+		if err := rows.Scan(&sub); err != nil {
+			return nil, err
+		}
+		out = append(out, sub)
+	}
+	return out, rows.Err()
+}
+
+func (s *duckStore) UpsertBackfillJob(ctx context.Context, j BackfillJob) error {
+	_, err := s.db.ExecContext(ctx, `
+        INSERT INTO backfill_jobs(id, cluster_id, range_from, range_to, chunk_size_seconds,
+            started_at, last_progress_at, last_processed_chunk_end, status, error_count, last_error)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (id) DO UPDATE SET
+          last_progress_at=EXCLUDED.last_progress_at,
+          last_processed_chunk_end=EXCLUDED.last_processed_chunk_end,
+          status=EXCLUDED.status,
+          error_count=EXCLUDED.error_count,
+          last_error=EXCLUDED.last_error`,
+		j.ID, j.ClusterID, j.From, j.To, int(j.ChunkSize.Seconds()),
+		j.StartedAt, j.LastProgressAt, j.LastProcessedChunkEnd,
+		j.Status, j.ErrorCount, j.LastError)
+	return err
+}
+
+func (s *duckStore) GetBackfillJob(ctx context.Context, id string) (*BackfillJob, error) {
+	row := s.db.QueryRowContext(ctx, `
+        SELECT id, cluster_id, range_from, range_to, chunk_size_seconds,
+               started_at, last_progress_at, last_processed_chunk_end,
+               status, error_count, COALESCE(last_error,'')
+        FROM backfill_jobs WHERE id = ?`, id)
+	var j BackfillJob
+	var chunkSec int
+	if err := row.Scan(&j.ID, &j.ClusterID, &j.From, &j.To, &chunkSec,
+		&j.StartedAt, &j.LastProgressAt, &j.LastProcessedChunkEnd,
+		&j.Status, &j.ErrorCount, &j.LastError); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	j.ChunkSize = time.Duration(chunkSec) * time.Second
+	return &j, nil
+}
+
+func (s *duckStore) ListBackfillJobs(ctx context.Context, cluster string, limit int) ([]BackfillJob, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx, `
+        SELECT id, cluster_id, range_from, range_to, chunk_size_seconds,
+               started_at, last_progress_at, last_processed_chunk_end,
+               status, error_count, COALESCE(last_error,'')
+        FROM backfill_jobs WHERE cluster_id = ?
+        ORDER BY started_at DESC LIMIT ?`, cluster, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []BackfillJob
+	for rows.Next() {
+		var j BackfillJob
+		var chunkSec int
+		if err := rows.Scan(&j.ID, &j.ClusterID, &j.From, &j.To, &chunkSec,
+			&j.StartedAt, &j.LastProgressAt, &j.LastProcessedChunkEnd,
+			&j.Status, &j.ErrorCount, &j.LastError); err != nil {
+			return nil, err
+		}
+		j.ChunkSize = time.Duration(chunkSec) * time.Second
+		out = append(out, j)
+	}
+	return out, rows.Err()
+}
+
+func (s *duckStore) PruneBefore(ctx context.Context, before time.Time) error {
+	for _, q := range []string{
+		`DELETE FROM events WHERE time < ?`,
+		`DELETE FROM samples_validator WHERE t < ?`,
+		`DELETE FROM samples_chain WHERE t < ?`,
+		`DELETE FROM state_anchors WHERE t < ?`,
+	} {
+		if _, err := s.db.ExecContext(ctx, q, before); err != nil {
+			return fmt.Errorf("prune %s: %w", q, err)
+		}
+	}
+	return nil
+}
+
+func (s *duckStore) StorageBytes(ctx context.Context) (map[string]int64, error) {
+	out := map[string]int64{}
+	for _, t := range []string{"events", "samples_validator", "samples_chain", "state_anchors", "backfill_jobs"} {
+		var n int64
+		if err := s.db.QueryRowContext(ctx,
+			fmt.Sprintf("SELECT COUNT(*) FROM %s", t)).Scan(&n); err != nil {
+			return nil, err
+		}
+		out[t] = n // row count is the closest cheap proxy; on-disk bytes via PRAGMA database_size if needed later.
+	}
+	return out, nil
+}
+
 // GetLatestSampleValidator returns the most recent sample for (cluster, validator)
 // at or before at, or nil if none exists.
 func (s *duckStore) GetLatestSampleValidator(ctx context.Context, cluster, validator string, at time.Time) (*types.SampleValidator, error) {
