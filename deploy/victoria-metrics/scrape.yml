@@ -41,6 +41,12 @@ scrape_configs:
       - targets:
           - loki:3100
 
+  - job_name: scribe
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - scribe:8090
+
   - job_name: vm
     scrape_interval: 30s
     static_configs:
