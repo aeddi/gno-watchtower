@@ -65,8 +65,22 @@ func runCmdImpl(ctx context.Context, configPath string, addrCh chan<- string) er
 	})
 
 	hs := []normalizer.Handler{
+		// Metric-driven handlers
 		handlers.NewHeight(cfg.Cluster.ID),
 		handlers.NewOnline(cfg.Cluster.ID),
+		handlers.NewPeers(cfg.Cluster.ID),
+		handlers.NewMempool(cfg.Cluster.ID),
+		handlers.NewVotingPower(cfg.Cluster.ID),
+		handlers.NewValsetSize(cfg.Cluster.ID),
+		// Log-driven handlers
+		handlers.NewProposed(cfg.Cluster.ID),
+		handlers.NewConsensusRoundStep(cfg.Cluster.ID),
+		handlers.NewVoteCast(cfg.Cluster.ID),
+		handlers.NewPeerConnected(cfg.Cluster.ID),
+		handlers.NewPeerDisconnected(cfg.Cluster.ID),
+		handlers.NewBlockCommitted(cfg.Cluster.ID),
+		handlers.NewValsetChanged(cfg.Cluster.ID),
+		handlers.NewTxExecuted(cfg.Cluster.ID),
 	}
 	opCh := make(chan types.Op, 1024)
 	n := normalizer.New(opCh, hs)
