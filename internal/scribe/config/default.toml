@@ -1,0 +1,77 @@
+[server]
+listen_addr = "0.0.0.0:8090"
+
+[cluster]
+id = "gno-cluster-test"
+
+[storage]
+db_path = "/var/lib/scribe/scribe.duckdb"
+
+[sources.victoria_metrics]
+url = "http://victoria-metrics:8428"
+
+[sources.loki]
+url = "http://loki:3100"
+
+[ingest.fast]
+interval = "3s"
+queries = [
+  "sentinel_rpc_latest_block_height",
+  "sentinel_validator_online",
+  "sentinel_rpc_peers",
+  "sentinel_rpc_mempool_txs",
+  "sentinel_rpc_validator_voting_power",
+  "sentinel_rpc_validator_set_power",
+]
+
+[ingest.slow]
+interval = "60s"
+queries = [
+  "rate(block_interval_hist[1m])",
+  "avg(build_block_hist)",
+  "sum(rate(vm_gas_used_hist[1m]))",
+  "histogram_quantile(0.99, rate(http_request_time_hist[1m]))",
+]
+
+[ingest.logs]
+streams = [
+  '{validator=~".+", module="consensus"}',
+  '{validator=~".+", module="mempool"}',
+  '{validator=~".+", module="p2p"}',
+  '{validator=~".+", module="state"}',
+  '{validator=~".+", module="vm"}',
+]
+overlap_window = "5s"
+
+[ingest.lanes]
+buffer_slots    = 500
+backoff_initial = "1s"
+backoff_max     = "60s"
+
+[writer]
+batch_size   = 100
+batch_window = "250ms"
+
+[anchors]
+interval = "1h"
+
+[retention]
+hot_window     = "30d"
+warm_window    = "365d"
+warm_bucket    = "1m"
+prune_after    = "365d"
+compact_at     = "03:00"
+compact_jitter = "30m"
+
+[backfill]
+chunk_size         = "1h"
+default_lookback   = "30d"
+resume_stale_after = "5m"
+
+[sse]
+slow_subscriber_timeout = "5s"
+max_subscribers         = 32
+
+[logging]
+level  = "info"
+format = "json"
