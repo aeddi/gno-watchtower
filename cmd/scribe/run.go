@@ -96,12 +96,35 @@ func runCmdImpl(ctx context.Context, configPath string, addrCh chan<- string) er
 	vmCli := vm.New(cfg.Sources.VM.URL)
 	lokiCli := loki.New(cfg.Sources.Loki.URL)
 
-	fastLane := ingest.NewFastLane(vmCli, cfg.Ingest.Fast.Queries, cfg.Ingest.Fast.Interval.Std(), n.Input(normalizer.LaneFast))
-	slowLane := ingest.NewSlowLane(vmCli, cfg.Ingest.Slow.Queries, cfg.Ingest.Slow.Interval.Std(), n.Input(normalizer.LaneSlow))
-	logsLane := ingest.NewLogsLane(cfg.Sources.Loki.URL, cfg.Ingest.Logs.Streams, cfg.Ingest.Logs.OverlapWindow.Std(), n.Input(normalizer.LaneLogs))
+	fastLane := ingest.NewFastLane(vmCli, cfg.Ingest.Fast.Queries, cfg.Ingest.Fast.Interval.Std(), n.Input(normalizer.LaneFast)).WithMetrics(metrics)
+	slowLane := ingest.NewSlowLane(vmCli, cfg.Ingest.Slow.Queries, cfg.Ingest.Slow.Interval.Std(), n.Input(normalizer.LaneSlow)).WithMetrics(metrics)
+	logsLane := ingest.NewLogsLane(cfg.Sources.Loki.URL, cfg.Ingest.Logs.Streams, cfg.Ingest.Logs.OverlapWindow.Std(), n.Input(normalizer.LaneLogs)).WithMetrics(metrics)
 	go fastLane.Run(ctx)
 	go slowLane.Run(ctx)
 	go logsLane.Run(ctx)
+
+	// Periodic storage-bytes gauge updater. Reads row counts from the store every
+	// 30 s and exposes them as scribe_storage_bytes{table,tier}. Tier label is
+	// fixed to "0" for now since StorageBytes returns row counts not on-disk
+	// bytes (the metric name is misleading; we'll rename when we add real bytes).
+	go func() {
+		t := time.NewTicker(30 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				rows, err := s.StorageBytes(ctx)
+				if err != nil {
+					continue
+				}
+				for table, n := range rows {
+					metrics.StorageBytes.WithLabelValues(table, "0").Set(float64(n))
+				}
+			}
+		}
+	}()
 
 	a := anchor.New(c, w, cfg.Cluster.ID)
 	go a.Run(ctx, cfg.Anchors.Interval.Std())
