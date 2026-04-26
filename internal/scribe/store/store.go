@@ -22,6 +22,9 @@ type Store interface {
 	// Range scans for the read API and projection layer.
 	QueryEvents(ctx context.Context, q EventQuery) ([]types.Event, string /*next_cursor*/, error)
 	GetLatestSampleValidator(ctx context.Context, cluster, validator string, at time.Time) (*types.SampleValidator, error)
+	// GetMergedSampleValidator merges per-column max() across rows in a
+	// `window` ending at `at`. Use this for "current scalars" — see duckdb.go.
+	GetMergedSampleValidator(ctx context.Context, cluster, validator string, at time.Time, window time.Duration) (*types.SampleValidator, error)
 	GetLatestSampleChain(ctx context.Context, cluster string, at time.Time) (*types.SampleChain, error)
 	GetLatestAnchor(ctx context.Context, cluster, subject string, at time.Time) (*types.Anchor, error)
 

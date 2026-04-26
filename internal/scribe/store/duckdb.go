@@ -638,8 +638,10 @@ func (s *duckStore) BucketChainSamples(ctx context.Context, q SamplesQuery) ([]C
 	return out, rows.Err()
 }
 
-// GetLatestSampleValidator returns the most recent sample for (cluster, validator)
-// at or before at, or nil if none exists.
+// GetLatestSampleValidator returns the most recent sample row for
+// (cluster, validator) at or before `at`, or nil if none exists.
+// Use GetMergedSampleValidator when you need merged-across-handlers values
+// (most fast_scalars use cases want that).
 func (s *duckStore) GetLatestSampleValidator(ctx context.Context, cluster, validator string, at time.Time) (*types.SampleValidator, error) {
 	row := s.db.QueryRowContext(ctx, `
         SELECT cluster_id, validator, t, tier,
@@ -664,6 +666,125 @@ func (s *duckStore) GetLatestSampleValidator(ctx context.Context, cluster, valid
 			return nil, nil
 		}
 		return nil, err
+	}
+	return &v, nil
+}
+
+// GetMergedSampleValidator returns a per-column merge of the most recent
+// samples for (cluster, validator) over a `window` ending at `at`.
+//
+// Why merge: per-handler sample writes stagger their `t` by a few µs to avoid
+// PK collisions, and each handler only populates its own scalar column (zeros
+// for the others). A naive "latest row" returns whichever handler wrote last
+// and drops every other column to zero. Aggregating `max()` per column gives
+// every column its real value (handlers other than the column's owner always
+// have 0, so max picks the owner's real value).
+//
+// Returns nil when no rows exist in the window.
+func (s *duckStore) GetMergedSampleValidator(ctx context.Context, cluster, validator string, at time.Time, window time.Duration) (*types.SampleValidator, error) {
+	if window <= 0 {
+		window = 30 * time.Second
+	}
+	row := s.db.QueryRowContext(ctx, `
+        SELECT max(t), max(tier),
+               max(height), max(voting_power), bool_or(catching_up),
+               max(mempool_txs), max(mempool_txs_max), max(mempool_cached),
+               max(cpu_pct), max(cpu_pct_max), max(mem_pct), max(mem_pct_max), max(disk_pct),
+               max(net_rx_bps), max(net_tx_bps),
+               max(peer_count_in), max(peer_count_in_min),
+               max(peer_count_out), max(peer_count_out_min),
+               max(last_observed)
+        FROM samples_validator
+        WHERE cluster_id = ? AND validator = ? AND t <= ? AND t > ?`,
+		cluster, validator, at, at.Add(-window))
+	// Aggregate queries always return one row even when there are no source
+	// rows — every column comes back NULL in that case. So scan everything into
+	// pointer/nullable values, then collapse to nil if `t` (the row's anchor)
+	// is NULL.
+	var (
+		t            *time.Time
+		tier         *int8
+		height       *int64
+		votingPower  *int64
+		catching     *bool
+		mempool      *int32
+		mempoolMax   *int32
+		mempoolCach  *int32
+		cpu          *float32
+		cpuMax       *float32
+		mem          *float32
+		memMax       *float32
+		disk         *float32
+		netRx        *float32
+		netTx        *float32
+		peerIn       *int16
+		peerInMin    *int16
+		peerOut      *int16
+		peerOutMin   *int16
+		lastObserved *time.Time
+	)
+	if err := row.Scan(&t, &tier,
+		&height, &votingPower, &catching,
+		&mempool, &mempoolMax, &mempoolCach,
+		&cpu, &cpuMax, &mem, &memMax, &disk,
+		&netRx, &netTx,
+		&peerIn, &peerInMin, &peerOut, &peerOutMin,
+		&lastObserved); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if t == nil {
+		return nil, nil
+	}
+	v := types.SampleValidator{ClusterID: cluster, Validator: validator, Time: *t}
+	if tier != nil {
+		v.Tier = *tier
+	}
+	if height != nil {
+		v.Height = *height
+	}
+	if votingPower != nil {
+		v.VotingPower = *votingPower
+	}
+	if catching != nil {
+		v.CatchingUp = *catching
+	}
+	if mempool != nil {
+		v.MempoolTxs = *mempool
+	}
+	v.MempoolTxsMax = mempoolMax
+	if mempoolCach != nil {
+		v.MempoolCached = *mempoolCach
+	}
+	if cpu != nil {
+		v.CPUPct = *cpu
+	}
+	v.CPUPctMax = cpuMax
+	if mem != nil {
+		v.MemPct = *mem
+	}
+	v.MemPctMax = memMax
+	if disk != nil {
+		v.DiskPct = *disk
+	}
+	if netRx != nil {
+		v.NetRxBps = *netRx
+	}
+	if netTx != nil {
+		v.NetTxBps = *netTx
+	}
+	if peerIn != nil {
+		v.PeerCountIn = *peerIn
+	}
+	v.PeerCountInMin = peerInMin
+	if peerOut != nil {
+		v.PeerCountOut = *peerOut
+	}
+	v.PeerCountOutMin = peerOutMin
+	if lastObserved != nil {
+		v.LastObserved = *lastObserved
 	}
 	return &v, nil
 }

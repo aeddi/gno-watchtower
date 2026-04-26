@@ -8,6 +8,51 @@ import (
 	"github.com/aeddi/gno-watchtower/internal/scribe/types"
 )
 
+func TestGetMergedSampleValidatorMergesPerHandlerRows(t *testing.T) {
+	s := openTempStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	// Three "handlers" each write a row at the same logical tick but with
+	// staggered µs offsets — each only sets its own column.
+	rows := []types.SampleValidator{
+		{ClusterID: "c1", Validator: "node-1", Time: now.Add(1 * time.Microsecond), Tier: 0, Height: 12345, LastObserved: now},
+		{ClusterID: "c1", Validator: "node-1", Time: now.Add(2 * time.Microsecond), Tier: 0, MempoolTxs: 7},
+		{ClusterID: "c1", Validator: "node-1", Time: now.Add(3 * time.Microsecond), Tier: 0, VotingPower: 42},
+	}
+	for i := range rows {
+		if err := s.WriteBatch(ctx, Batch{SamplesValidator: []types.SampleValidator{rows[i]}}); err != nil {
+			t.Fatalf("write %d: %v", i, err)
+		}
+	}
+
+	got, err := s.GetMergedSampleValidator(ctx, "c1", "node-1", now.Add(time.Second), time.Minute)
+	if err != nil {
+		t.Fatalf("GetMergedSampleValidator: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil")
+	}
+	if got.Height != 12345 {
+		t.Errorf("Height = %d, want 12345", got.Height)
+	}
+	if got.MempoolTxs != 7 {
+		t.Errorf("MempoolTxs = %d, want 7", got.MempoolTxs)
+	}
+	if got.VotingPower != 42 {
+		t.Errorf("VotingPower = %d, want 42", got.VotingPower)
+	}
+
+	// Outside-window query returns nil.
+	stale, err := s.GetMergedSampleValidator(ctx, "c1", "node-1", now.Add(2*time.Hour), 30*time.Second)
+	if err != nil {
+		t.Fatalf("stale: %v", err)
+	}
+	if stale != nil {
+		t.Errorf("expected nil for query outside window, got %+v", stale)
+	}
+}
+
 func TestGetLatestAnchorAndChain(t *testing.T) {
 	s := openTempStore(t)
 	ctx := context.Background()

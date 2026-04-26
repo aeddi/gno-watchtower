@@ -42,7 +42,9 @@ func (s *Server) handleStateImpl(w http.ResponseWriter, r *http.Request) {
 					fastScalars["valset_size"] = c.ValsetSize
 				}
 			} else {
-				if v, _ := s.deps.Store.GetLatestSampleValidator(r.Context(), s.deps.ClusterID, sub, at); v != nil {
+				// Merge across the per-handler rows so each column has its real
+				// value (handlers other than the column's owner write zeros).
+				if v, _ := s.deps.Store.GetMergedSampleValidator(r.Context(), s.deps.ClusterID, sub, at, 30*time.Second); v != nil {
 					fastScalars["height"] = v.Height
 					fastScalars["voting_power"] = v.VotingPower
 					fastScalars["catching_up"] = v.CatchingUp
