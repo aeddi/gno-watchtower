@@ -7,8 +7,62 @@ import (
 	"time"
 
 	"github.com/aeddi/gno-watchtower/internal/scribe/scribemetrics"
+	"github.com/aeddi/gno-watchtower/internal/scribe/store"
 	"github.com/aeddi/gno-watchtower/internal/scribe/types"
 )
+
+// recoveryRule opts into recovery tracking by exposing RecoveryTracker.
+type recoveryRule struct{ tr Tracker }
+
+func (r *recoveryRule) Meta() Meta {
+	return Meta{Code: "rec", Version: 1, Severity: SeverityError, Kinds: []string{"x.*"}}
+}
+func (r *recoveryRule) Evaluate(_ context.Context, _ Trigger, _ Deps, _ Emitter) {}
+func (r *recoveryRule) RecoveryTracker() *Tracker                                { return &r.tr }
+
+// newTempStore opens a duckdb store backed by t.TempDir().
+func newTempStore(t *testing.T) store.Store {
+	t.Helper()
+	dir := t.TempDir()
+	s, err := store.Open(dir + "/scribe.db")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	return s
+}
+
+func TestEngineRehydrateSeedsTrackerFromOpenDiagnostics(t *testing.T) {
+	resetRegistryForTest(t)
+	r := &recoveryRule{}
+	Register(r, "doc")
+
+	st := newTempStore(t)
+	now := time.Now().UTC()
+	_ = st.WriteBatch(context.Background(), store.Batch{Events: []types.Event{
+		{
+			EventID: "01J0", ClusterID: "c1", Time: now, IngestTime: now,
+			Kind: "diagnostic.rec_v1", Subject: "_chain",
+			Severity: "error", State: "open",
+			Payload: map[string]any{"recovery_key": "c1"},
+		},
+	}})
+
+	bc := &stubBroadcaster{events: make(chan types.Event, 1)}
+	cw := &chanWriter{ch: make(chan types.Op, 1)}
+	m := scribemetrics.New()
+	eng, _ := New(Deps{ClusterID: "c1", Now: time.Now}, bc, cw, m, EngineConfig{QueueSize: 4})
+	if err := eng.Rehydrate(context.Background(), st); err != nil {
+		t.Fatalf("Rehydrate: %v", err)
+	}
+
+	if r.tr.OpenCount() != 1 {
+		t.Errorf("OpenCount after rehydrate = %d, want 1", r.tr.OpenCount())
+	}
+	if r.tr.Open("c1", "01J9") {
+		t.Errorf("Open after rehydrate should report existing, not new")
+	}
+}
 
 // chanWriter is a writerSubmitter that forwards Ops to a channel for tests.
 type chanWriter struct{ ch chan types.Op }

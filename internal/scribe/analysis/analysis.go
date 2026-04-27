@@ -8,8 +8,70 @@ import (
 	"time"
 
 	"github.com/aeddi/gno-watchtower/internal/scribe/scribemetrics"
+	"github.com/aeddi/gno-watchtower/internal/scribe/store"
 	"github.com/aeddi/gno-watchtower/internal/scribe/types"
 )
+
+// Rehydrate populates each rule's Tracker from currently-open diagnostic
+// rows in the store. Must be called before Start. Idempotent — calling it
+// twice replaces tracker state with the latest DB read.
+//
+// Rules opt into recovery tracking by exposing RecoveryTracker() *Tracker.
+// Point-in-time rules (no recovery) implement no such method and are skipped.
+func (e *Engine) Rehydrate(ctx context.Context, st store.Store) error {
+	for _, w := range e.workers {
+		tr, ok := w.rule.(interface{ RecoveryTracker() *Tracker })
+		if !ok {
+			continue
+		}
+		entries, err := queryOpenIncidents(ctx, st, e.deps.ClusterID, w.meta.Kind())
+		if err != nil {
+			return fmt.Errorf("rehydrate %s: %w", w.meta.Kind(), err)
+		}
+		tr.RecoveryTracker().Rehydrate(entries)
+		if e.metrics != nil && e.metrics.AnalysisOpenIncidents != nil {
+			e.metrics.AnalysisOpenIncidents.WithLabelValues(w.meta.Kind()).Set(float64(len(entries)))
+		}
+	}
+	return nil
+}
+
+// queryOpenIncidents returns key->event_id for every diagnostic row of `kind`
+// that is `state='open'` and not yet recovered. The recovery key lives in
+// payload.recovery_key — rules that use Tracker MUST populate it on the
+// opening emission so rehydration can reconstruct tracker state.
+func queryOpenIncidents(ctx context.Context, st store.Store, cluster, kind string) (map[string]string, error) {
+	opens, _, err := st.QueryEvents(ctx, store.EventQuery{
+		ClusterID: cluster, Kind: kind, State: "open", Limit: 1000,
+	})
+	if err != nil {
+		return nil, err
+	}
+	recovers, _, err := st.QueryEvents(ctx, store.EventQuery{
+		ClusterID: cluster, Kind: kind, State: "recovered", Limit: 1000,
+	})
+	if err != nil {
+		return nil, err
+	}
+	recovered := map[string]bool{}
+	for _, r := range recovers {
+		if r.Recovers != "" {
+			recovered[r.Recovers] = true
+		}
+	}
+	out := map[string]string{}
+	for _, o := range opens {
+		if recovered[o.EventID] {
+			continue
+		}
+		key, _ := o.Payload["recovery_key"].(string)
+		if key == "" {
+			continue
+		}
+		out[key] = o.EventID
+	}
+	return out, nil
+}
 
 // Broadcaster is the narrow surface of *writer.Writer the engine consumes.
 // Defined as an interface so tests can substitute a stub.

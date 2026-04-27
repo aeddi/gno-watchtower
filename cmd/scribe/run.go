@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/aeddi/gno-watchtower/internal/scribe/analysis"
+	_ "github.com/aeddi/gno-watchtower/internal/scribe/analysis/rules" // registers v1 rules
 	"github.com/aeddi/gno-watchtower/internal/scribe/anchor"
 	"github.com/aeddi/gno-watchtower/internal/scribe/api"
 	"github.com/aeddi/gno-watchtower/internal/scribe/backfill"
@@ -92,6 +94,26 @@ func runCmdImpl(ctx context.Context, configPath string, addrCh chan<- string) er
 	}()
 	go w.Run(ctx)
 	go n.Run(ctx)
+
+	if cfg.Analysis.Enabled {
+		eng, err := analysis.New(
+			analysis.Deps{Store: s, ClusterID: cfg.Cluster.ID, Now: time.Now},
+			w, w, metrics,
+			analysis.EngineConfig{
+				Disabled:     cfg.Analysis.Disabled,
+				RuleOverlays: cfg.Analysis.Rules,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("analysis engine: %w", err)
+		}
+		if err := eng.Rehydrate(ctx, s); err != nil {
+			return fmt.Errorf("analysis rehydrate: %w", err)
+		}
+		if err := eng.Start(ctx); err != nil {
+			return fmt.Errorf("analysis start: %w", err)
+		}
+	}
 
 	vmCli := vm.New(cfg.Sources.VM.URL)
 	lokiCli := loki.New(cfg.Sources.Loki.URL)
