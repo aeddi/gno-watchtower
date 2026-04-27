@@ -1,16 +1,41 @@
 <script setup lang="ts">
-import { NConfigProvider, darkTheme } from 'naive-ui'
 import { computed } from 'vue'
+import { NConfigProvider, darkTheme, lightTheme } from 'naive-ui'
+import { useTimelineStore } from '@/stores/timeline'
+import TopBar from '@/components/TopBar.vue'
+import NetworkGraph from '@/components/NetworkGraph.vue'
+import StatePanel from '@/components/StatePanel.vue'
+import Minimap from '@/components/Minimap.vue'
+import Timeline from '@/components/Timeline.vue'
 import DiagnosticPane from '@/components/DiagnosticPane.vue'
 
-const theme = computed(() => darkTheme)
+const store = useTimelineStore()
+
+const theme = computed(() => {
+    if (store.theme === 'light') return lightTheme
+    if (store.theme === 'dark') return darkTheme
+    // system
+    return matchMedia('(prefers-color-scheme: light)').matches
+        ? lightTheme
+        : darkTheme
+})
 </script>
 
 <template>
     <n-config-provider :theme="theme">
-        <main class="root">
-            <h1>scribe</h1>
-            <DiagnosticPane class="pane" />
+        <main class="app">
+            <TopBar />
+            <section class="top">
+                <div class="graph"><NetworkGraph /></div>
+                <div class="state"><StatePanel /></div>
+            </section>
+            <section class="middle">
+                <Minimap />
+                <Timeline />
+            </section>
+            <section class="bottom">
+                <DiagnosticPane />
+            </section>
         </main>
     </n-config-provider>
 </template>
@@ -27,21 +52,33 @@ body {
     height: 100vh;
     overflow: hidden;
 }
-.root {
-    padding: 1rem;
+.app {
     height: 100vh;
-    box-sizing: border-box;
+    display: grid;
+    grid-template-rows: auto 40fr 25fr 35fr;
+}
+.top {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    border-bottom: 1px solid #30363d;
+    min-height: 0;
+}
+.graph,
+.state {
+    min-height: 0;
+    overflow: hidden;
+}
+.state {
+    border-left: 1px solid #30363d;
+}
+.middle {
     display: flex;
     flex-direction: column;
-}
-.root h1 {
-    margin: 0 0 0.6rem 0;
-    font-size: 1.1rem;
-    color: #7d8590;
-    font-weight: 500;
-}
-.pane {
-    flex: 1;
+    border-bottom: 1px solid #30363d;
     min-height: 0;
+}
+.bottom {
+    min-height: 0;
+    overflow: hidden;
 }
 </style>
