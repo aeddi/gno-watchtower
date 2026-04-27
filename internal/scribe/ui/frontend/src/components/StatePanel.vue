@@ -27,6 +27,8 @@ async function reload() {
             )
             states.value = out
         }
+    } catch {
+        // API unavailable — keep existing state, stay at loading=false.
     } finally {
         loading.value = false
     }

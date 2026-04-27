@@ -55,13 +55,17 @@ const SEV_COLOR: Record<string, string> = {
 }
 
 async function reload() {
-    const r = await api.listEvents({
-        kind: 'diagnostic.*',
-        from: range.value.from,
-        to: range.value.to,
-        limit: 1000,
-    })
-    events.value = r.events
+    try {
+        const r = await api.listEvents({
+            kind: 'diagnostic.*',
+            from: range.value.from,
+            to: range.value.to,
+            limit: 1000,
+        })
+        events.value = r.events
+    } catch {
+        // API unavailable — leave minimap empty.
+    }
 }
 
 onMounted(reload)

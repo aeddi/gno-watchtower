@@ -16,48 +16,51 @@ let renderer: TimelineRenderer | null = null
 
 async function reload() {
     if (!renderer) return
-
-    const subjects = await api.listSubjects()
-    const lanes: Lane[] = subjects.map((id) => ({
-        id,
-        label: id,
-        highlight: store.subjects.includes(id),
-    }))
-    // Hide non-focused validator lanes if exactly one validator is focused.
-    // _chain stays visible; multi-select keeps the selected validators.
-    const visible =
-        store.subjects.length === 1
-            ? lanes.filter(
-                  (l) => l.id === '_chain' || l.id === store.subjects[0]
-              )
-            : lanes
-    renderer.setLanes(visible)
-
-    const r = await api.listEvents({
-        kind: 'diagnostic.*',
-        severity: store.filters.severity.length
-            ? store.filters.severity
-            : undefined,
-        state:
-            store.filters.state.length === 1
-                ? store.filters.state[0]
-                : undefined,
-        to: store.at ?? undefined,
-        limit: 1000,
-    })
-    const items: TimelineItem[] = r.events
-        .filter((e: ScribeEvent) => visible.some((l) => l.id === e.subject))
-        .map((e: ScribeEvent) => ({
-            id: e.event_id,
-            laneId: e.subject,
-            time: new Date(e.time),
-            severity: (e.severity ?? 'warning') as Severity,
-            state: (e.state ?? 'open') as DiagnosticState,
-            label: e.kind,
+    try {
+        const subjects = await api.listSubjects()
+        const lanes: Lane[] = subjects.map((id) => ({
+            id,
+            label: id,
+            highlight: store.subjects.includes(id),
         }))
-    renderer.setItems(items)
-    renderer.setStep(store.step)
-    renderer.setCursor(store.at)
+        // Hide non-focused validator lanes if exactly one validator is focused.
+        // _chain stays visible; multi-select keeps the selected validators.
+        const visible =
+            store.subjects.length === 1
+                ? lanes.filter(
+                      (l) => l.id === '_chain' || l.id === store.subjects[0]
+                  )
+                : lanes
+        renderer.setLanes(visible)
+
+        const r = await api.listEvents({
+            kind: 'diagnostic.*',
+            severity: store.filters.severity.length
+                ? store.filters.severity
+                : undefined,
+            state:
+                store.filters.state.length === 1
+                    ? store.filters.state[0]
+                    : undefined,
+            to: store.at ?? undefined,
+            limit: 1000,
+        })
+        const items: TimelineItem[] = r.events
+            .filter((e: ScribeEvent) => visible.some((l) => l.id === e.subject))
+            .map((e: ScribeEvent) => ({
+                id: e.event_id,
+                laneId: e.subject,
+                time: new Date(e.time),
+                severity: (e.severity ?? 'warning') as Severity,
+                state: (e.state ?? 'open') as DiagnosticState,
+                label: e.kind,
+            }))
+        renderer.setItems(items)
+        renderer.setStep(store.step)
+        renderer.setCursor(store.at)
+    } catch {
+        // API unavailable — leave the timeline empty.
+    }
 }
 
 onMounted(() => {
