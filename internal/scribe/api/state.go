@@ -51,6 +51,9 @@ func (s *Server) handleStateImpl(w http.ResponseWriter, r *http.Request) {
 					fastScalars["mempool_txs"] = v.MempoolTxs
 					fastScalars["cpu_pct"] = v.CPUPct
 					fastScalars["mem_pct"] = v.MemPct
+					if v.BehindSentry != nil {
+						fastScalars["behind_sentry"] = *v.BehindSentry
+					}
 				}
 			}
 			states[sub] = map[string]any{
@@ -73,8 +76,30 @@ func (s *Server) handleStateImpl(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, "store_error", err.Error(), "")
 		return
 	}
+	fastScalars := map[string]any{}
+	if sub == "_chain" {
+		if c, _ := s.deps.Store.GetLatestSampleChain(r.Context(), s.deps.ClusterID, at); c != nil {
+			fastScalars["block_height"] = c.BlockHeight
+			fastScalars["online_count"] = c.OnlineCount
+			fastScalars["valset_size"] = c.ValsetSize
+		}
+	} else {
+		if v, _ := s.deps.Store.GetMergedSampleValidator(r.Context(), s.deps.ClusterID, sub, at, 30*time.Second); v != nil {
+			fastScalars["height"] = v.Height
+			fastScalars["voting_power"] = v.VotingPower
+			fastScalars["catching_up"] = v.CatchingUp
+			fastScalars["mempool_txs"] = v.MempoolTxs
+			fastScalars["cpu_pct"] = v.CPUPct
+			fastScalars["mem_pct"] = v.MemPct
+			if v.BehindSentry != nil {
+				fastScalars["behind_sentry"] = *v.BehindSentry
+			}
+		}
+	}
 	writeJSON(w, 200, map[string]any{
 		"subject": sub, "at": at,
-		"structured": st, "events_replayed": replayed,
+		"fast_scalars":    fastScalars,
+		"structured":      st,
+		"events_replayed": replayed,
 	})
 }

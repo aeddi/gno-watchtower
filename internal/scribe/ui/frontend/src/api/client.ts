@@ -57,7 +57,11 @@ export class ApiClient {
     async getState(
         subject: string,
         at?: Date
-    ): Promise<{ structured: any; events_replayed?: number }> {
+    ): Promise<{
+        structured: any
+        fast_scalars?: Record<string, any>
+        events_replayed?: number
+    }> {
         const url = this.url('/api/state', { subject, at: at?.toISOString() })
         const r = await fetch(url)
         if (!r.ok) throw new Error(`getState: ${r.status} ${r.statusText}`)

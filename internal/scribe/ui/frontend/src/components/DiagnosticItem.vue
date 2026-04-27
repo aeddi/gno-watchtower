@@ -108,9 +108,8 @@ function toggle() {
             </div>
 
             <div v-if="event.recovers" class="paired">
-                <a href="#" @click.prevent="emit('select', event.recovers!)"
-                    >↑ open event {{ event.recovers }}</a
-                >
+                <span class="label">paired open event:</span>
+                <code>{{ event.recovers }}</code>
             </div>
         </div>
     </div>

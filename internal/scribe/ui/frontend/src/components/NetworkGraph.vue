@@ -43,13 +43,16 @@ async function reload() {
             }
         }
 
-        // Per-validator behind_sentry — fetched from /api/state per subject (parallel).
+        // Per-validator behind_sentry comes from `fast_scalars` (sample-derived),
+        // not `structured` (event-projected). The store-side `behind_sentry`
+        // column is populated by the sentinel metric handler when it lands;
+        // until then it's NULL and the shield stays off.
         const behindSentryByNode = new Map<string, boolean>()
         await Promise.all(
             subjects.map(async (s) => {
                 try {
                     const st = await api.getState(s, store.at ?? undefined)
-                    const bs = st.structured?.behind_sentry
+                    const bs = st.fast_scalars?.behind_sentry
                     if (typeof bs === 'boolean') behindSentryByNode.set(s, bs)
                 } catch {
                     /* leave undefined => no shield */

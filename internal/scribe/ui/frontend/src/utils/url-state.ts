@@ -7,7 +7,9 @@ import type {
     ThemeMode,
 } from '@/types'
 import type { useTimelineStore } from '@/stores/timeline'
-import { parseDuration } from '@/utils/duration'
+import { parseDuration, formatDuration } from '@/utils/duration'
+
+const DEFAULT_WINDOW_MS = 12 * 3600 * 1000
 
 type Store = ReturnType<typeof useTimelineStore>
 
@@ -26,10 +28,12 @@ function isOneOf<T extends string>(
 
 export function storeToParams(s: Store): URLSearchParams {
     const p = new URLSearchParams()
-    if (s.at) p.set('at', s.at.toISOString())
+    if (s.at && !isNaN(s.at.getTime())) p.set('at', s.at.toISOString())
     if (s.subjects.length) p.set('subject', s.subjects.join(','))
     if (s.step !== '30s') p.set('step', s.step)
     if (s.graphLayout !== 'circle') p.set('layout', s.graphLayout)
+    if (s.window !== DEFAULT_WINDOW_MS)
+        p.set('window', formatDuration(s.window))
     if (s.filters.severity.length)
         p.set('severity', s.filters.severity.join(','))
     if (s.filters.state.length) p.set('state', s.filters.state.join(','))
@@ -40,7 +44,12 @@ export function storeToParams(s: Store): URLSearchParams {
 
 export function paramsToStore(p: URLSearchParams, s: Store) {
     const at = p.get('at')
-    s.setAt(at ? new Date(at) : null)
+    if (at) {
+        const d = new Date(at)
+        s.setAt(isNaN(d.getTime()) ? null : d)
+    } else {
+        s.setAt(null)
+    }
 
     const subj = p.get('subject')
     s.setSubjects(subj ? subj.split(',').filter(Boolean) : [])
@@ -94,6 +103,7 @@ export function initUrlSync(s: Store) {
                 s.subjects,
                 s.step,
                 s.graphLayout,
+                s.window,
                 s.filters,
                 s.theme,
             ] as const,

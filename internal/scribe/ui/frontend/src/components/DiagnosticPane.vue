@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useTimelineStore } from '@/stores/timeline'
 import { api } from '@/api/client'
+import { EventStream } from '@/api/sse'
 import type { ScribeEvent } from '@/types'
 import DiagnosticItem from './DiagnosticItem.vue'
 
@@ -9,6 +10,23 @@ const store = useTimelineStore()
 const events = ref<ScribeEvent[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+let stream: EventStream | null = null
+
+function passesFilters(e: ScribeEvent): boolean {
+    if (
+        store.filters.severity.length &&
+        (!e.severity || !store.filters.severity.includes(e.severity))
+    )
+        return false
+    if (
+        store.filters.state.length &&
+        (!e.state || !store.filters.state.includes(e.state))
+    )
+        return false
+    if (store.subjects.length === 1 && e.subject !== store.subjects[0])
+        return false
+    return true
+}
 
 async function reload() {
     loading.value = true
@@ -37,13 +55,47 @@ async function reload() {
     }
 }
 
-onMounted(reload)
+function startStream() {
+    stopStream()
+    stream = new EventStream({ kinds: ['diagnostic.*'] }, (e) => {
+        // Only react to diagnostic events that match the current filter scope.
+        if (!e.kind?.startsWith('diagnostic.')) return
+        if (!passesFilters(e)) return
+        // Prepend (newest-at-top) and dedupe by event_id.
+        if (events.value.find((x) => x.event_id === e.event_id)) return
+        events.value = [e, ...events.value].slice(0, 500)
+    })
+}
+
+function stopStream() {
+    stream?.close()
+    stream = null
+}
+
+onMounted(() => {
+    reload()
+    if (store.liveMode) startStream()
+})
+
+onBeforeUnmount(stopStream)
+
 watch([() => store.subjects, () => store.filters, () => store.at], reload, {
     deep: true,
 })
 
+// Live mode toggles the SSE subscription. Pausing closes the stream;
+// going live again re-opens it.
+watch(
+    () => store.liveMode,
+    (live) => {
+        if (live) startStream()
+        else stopStream()
+    }
+)
+
 function onSelect(timeIso: string) {
-    store.setAt(new Date(timeIso))
+    const d = new Date(timeIso)
+    if (!isNaN(d.getTime())) store.setAt(d)
 }
 </script>
 

@@ -4,6 +4,12 @@ import { mount, flushPromises } from '@vue/test-utils'
 import DiagnosticPane from '@/components/DiagnosticPane.vue'
 import { useTimelineStore } from '@/stores/timeline'
 
+// Stub the SSE wrapper so the component's live-mode EventStream doesn't
+// touch jsdom's missing EventSource global.
+vi.mock('@/api/sse', () => ({
+    EventStream: vi.fn().mockImplementation(() => ({ close: vi.fn() })),
+}))
+
 vi.mock('@/api/client', () => ({
     api: {
         listEvents: vi.fn().mockResolvedValue({

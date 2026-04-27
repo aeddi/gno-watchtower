@@ -694,22 +694,27 @@ func (s *duckStore) GetLatestSampleValidator(ctx context.Context, cluster, valid
                cpu_pct, cpu_pct_max, mem_pct, mem_pct_max, disk_pct,
                net_rx_bps, net_tx_bps,
                peer_count_in, peer_count_in_min, peer_count_out, peer_count_out_min,
-               last_observed
+               last_observed, behind_sentry
         FROM samples_validator
         WHERE cluster_id = ? AND validator = ? AND t <= ?
         ORDER BY t DESC LIMIT 1`, cluster, validator, at)
 	var v types.SampleValidator
+	var bs sql.NullBool
 	if err := row.Scan(&v.ClusterID, &v.Validator, &v.Time, &v.Tier,
 		&v.Height, &v.VotingPower, &v.CatchingUp,
 		&v.MempoolTxs, &v.MempoolTxsMax, &v.MempoolCached,
 		&v.CPUPct, &v.CPUPctMax, &v.MemPct, &v.MemPctMax, &v.DiskPct,
 		&v.NetRxBps, &v.NetTxBps,
 		&v.PeerCountIn, &v.PeerCountInMin, &v.PeerCountOut, &v.PeerCountOutMin,
-		&v.LastObserved); err != nil {
+		&v.LastObserved, &bs); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
+	}
+	if bs.Valid {
+		tmp := bs.Bool
+		v.BehindSentry = &tmp
 	}
 	return &v, nil
 }
