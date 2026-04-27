@@ -44,6 +44,8 @@ func (s *Server) http() http.Handler {
 	mux.HandleFunc("/api/event-kinds", s.handleEventKindsImpl)
 	mux.HandleFunc("/api/backfill", s.handleBackfillImpl)
 	mux.HandleFunc("/api/backfill/", s.handleBackfillIDImpl)
+	mux.HandleFunc("/api/rules", s.handleRulesImpl)
+	mux.HandleFunc("/docs/rules/", s.handleDocsRulesImpl)
 	if s.deps.Metrics != nil {
 		mux.Handle("/metrics", promhttp.HandlerFor(s.deps.Metrics.Registry, promhttp.HandlerOpts{}))
 	}

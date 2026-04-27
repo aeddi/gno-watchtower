@@ -74,9 +74,9 @@ func Lookup(kind string) Rule {
 	return registry[kind].rule
 }
 
-// resetRegistryForTest is a test-only helper. Tests call it via t.Helper to
-// isolate registry state; production code never resets the registry.
-func resetRegistryForTest(t interface {
+// ResetRegistryForTest is a test-only helper exported so tests in other
+// packages (e.g. internal/scribe/api) can isolate registry state.
+func ResetRegistryForTest(t interface {
 	Helper()
 	Cleanup(func())
 },
@@ -91,4 +91,13 @@ func resetRegistryForTest(t interface {
 		registry = prev
 		registryMu.Unlock()
 	})
+}
+
+// resetRegistryForTest is a package-internal alias used by analysis tests.
+func resetRegistryForTest(t interface {
+	Helper()
+	Cleanup(func())
+},
+) {
+	ResetRegistryForTest(t)
 }
