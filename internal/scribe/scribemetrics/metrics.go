@@ -24,6 +24,14 @@ type Registry struct {
 	APIRequestDuration  *prometheus.HistogramVec
 	BackfillJobs        *prometheus.GaugeVec
 	BackfillChunks      *prometheus.CounterVec
+
+	AnalysisEvalDuration  *prometheus.HistogramVec
+	AnalysisEmissions     *prometheus.CounterVec
+	AnalysisQueueDrops    *prometheus.CounterVec
+	AnalysisPanics        *prometheus.CounterVec
+	AnalysisOpenIncidents *prometheus.GaugeVec
+	AnalysisStoreErrors   *prometheus.CounterVec
+	AnalysisEmitErrors    *prometheus.CounterVec
 }
 
 func New() *Registry {
@@ -68,6 +76,20 @@ func New() *Registry {
 			prometheus.GaugeOpts{Name: "scribe_backfill_jobs"}, []string{"status"}),
 		BackfillChunks: prometheus.NewCounterVec(
 			prometheus.CounterOpts{Name: "scribe_backfill_chunks_total"}, []string{"result"}),
+		AnalysisEvalDuration: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{Name: "scribe_analysis_eval_duration_seconds"}, []string{"code"}),
+		AnalysisEmissions: prometheus.NewCounterVec(
+			prometheus.CounterOpts{Name: "scribe_analysis_emissions_total"}, []string{"code", "severity", "state"}),
+		AnalysisQueueDrops: prometheus.NewCounterVec(
+			prometheus.CounterOpts{Name: "scribe_analysis_queue_drops_total"}, []string{"code"}),
+		AnalysisPanics: prometheus.NewCounterVec(
+			prometheus.CounterOpts{Name: "scribe_analysis_panics_total"}, []string{"code"}),
+		AnalysisOpenIncidents: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{Name: "scribe_analysis_open_incidents"}, []string{"code"}),
+		AnalysisStoreErrors: prometheus.NewCounterVec(
+			prometheus.CounterOpts{Name: "scribe_analysis_store_errors_total"}, []string{"code"}),
+		AnalysisEmitErrors: prometheus.NewCounterVec(
+			prometheus.CounterOpts{Name: "scribe_analysis_emit_errors_total"}, []string{"code"}),
 	}
 	for _, c := range []prometheus.Collector{
 		m.IngestObservations, m.IngestDrops, m.IngestBackoff,
@@ -76,6 +98,9 @@ func New() *Registry {
 		m.CompactDuration, m.StorageBytes, m.StateCacheSubjects,
 		m.SSESubscribers, m.SSEDrops, m.APIRequests, m.APIRequestDuration,
 		m.BackfillJobs, m.BackfillChunks,
+		m.AnalysisEvalDuration, m.AnalysisEmissions, m.AnalysisQueueDrops,
+		m.AnalysisPanics, m.AnalysisOpenIncidents,
+		m.AnalysisStoreErrors, m.AnalysisEmitErrors,
 	} {
 		r.MustRegister(c)
 	}
