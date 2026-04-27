@@ -52,6 +52,9 @@ func TestValidatorIsolatedOpensAfterSustainedLowPeers(t *testing.T) {
 	if emitted[0].Subject != "val-A" {
 		t.Errorf("subject = %q, want val-A", emitted[0].Subject)
 	}
+	if emitted[0].Payload["recovery_key"] != "c1|val-A" {
+		t.Errorf("recovery_key = %v, want c1|val-A", emitted[0].Payload["recovery_key"])
+	}
 }
 
 func TestValidatorIsolatedRecoversWhenPeersReturn(t *testing.T) {
