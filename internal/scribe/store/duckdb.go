@@ -147,8 +147,8 @@ func (s *duckStore) WriteBatch(ctx context.Context, b Batch) error {
                 cpu_pct, cpu_pct_max, mem_pct, mem_pct_max, disk_pct,
                 net_rx_bps, net_tx_bps,
                 peer_count_in, peer_count_in_min, peer_count_out, peer_count_out_min,
-                last_observed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                behind_sentry, last_observed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (cluster_id, validator, t) DO UPDATE SET
               height=EXCLUDED.height, voting_power=EXCLUDED.voting_power,
               catching_up=EXCLUDED.catching_up,
@@ -160,6 +160,7 @@ func (s *duckStore) WriteBatch(ctx context.Context, b Batch) error {
               net_rx_bps=EXCLUDED.net_rx_bps, net_tx_bps=EXCLUDED.net_tx_bps,
               peer_count_in=EXCLUDED.peer_count_in, peer_count_in_min=EXCLUDED.peer_count_in_min,
               peer_count_out=EXCLUDED.peer_count_out, peer_count_out_min=EXCLUDED.peer_count_out_min,
+              behind_sentry=COALESCE(EXCLUDED.behind_sentry, samples_validator.behind_sentry),
               last_observed=EXCLUDED.last_observed`)
 		if err != nil {
 			return fmt.Errorf("prepare samples_validator: %w", err)
@@ -172,7 +173,7 @@ func (s *duckStore) WriteBatch(ctx context.Context, b Batch) error {
 				v.CPUPct, v.CPUPctMax, v.MemPct, v.MemPctMax, v.DiskPct,
 				v.NetRxBps, v.NetTxBps,
 				v.PeerCountIn, v.PeerCountInMin, v.PeerCountOut, v.PeerCountOutMin,
-				v.LastObserved); err != nil {
+				v.BehindSentry, v.LastObserved); err != nil {
 				stmt.Close()
 				return fmt.Errorf("upsert sample %s/%s: %w", v.ClusterID, v.Validator, err)
 			}
@@ -530,7 +531,8 @@ func (s *duckStore) CompactValidatorSamples(ctx context.Context, cluster string,
                avg(disk_pct), avg(net_rx_bps), avg(net_tx_bps),
                CAST(avg(peer_count_in) AS SMALLINT), min(peer_count_in),
                CAST(avg(peer_count_out) AS SMALLINT), min(peer_count_out),
-               max(last_observed)
+               max(last_observed),
+               bool_or(behind_sentry)
         FROM samples_validator
         WHERE cluster_id = ? AND tier = 0 AND t < ?
         GROUP BY cluster_id, validator,
@@ -546,6 +548,7 @@ func (s *duckStore) CompactValidatorSamples(ctx context.Context, cluster string,
               net_rx_bps = EXCLUDED.net_rx_bps, net_tx_bps = EXCLUDED.net_tx_bps,
               peer_count_in = EXCLUDED.peer_count_in, peer_count_in_min = EXCLUDED.peer_count_in_min,
               peer_count_out = EXCLUDED.peer_count_out, peer_count_out_min = EXCLUDED.peer_count_out_min,
+              behind_sentry = COALESCE(EXCLUDED.behind_sentry, samples_validator.behind_sentry),
               last_observed = EXCLUDED.last_observed`,
 		bucketSecs, bucketSecs, bucketSecs)
 	res, err := tx.ExecContext(ctx, insertQ, cluster, before)
@@ -734,6 +737,7 @@ func (s *duckStore) GetMergedSampleValidator(ctx context.Context, cluster, valid
                max(net_rx_bps), max(net_tx_bps),
                max(peer_count_in), max(peer_count_in_min),
                max(peer_count_out), max(peer_count_out_min),
+               bool_or(behind_sentry),
                max(last_observed)
         FROM samples_validator
         WHERE cluster_id = ? AND validator = ? AND t <= ? AND t > ?`,
@@ -762,6 +766,7 @@ func (s *duckStore) GetMergedSampleValidator(ctx context.Context, cluster, valid
 		peerInMin    *int16
 		peerOut      *int16
 		peerOutMin   *int16
+		behindSentry sql.NullBool
 		lastObserved *time.Time
 	)
 	if err := row.Scan(&t, &tier,
@@ -770,7 +775,7 @@ func (s *duckStore) GetMergedSampleValidator(ctx context.Context, cluster, valid
 		&cpu, &cpuMax, &mem, &memMax, &disk,
 		&netRx, &netTx,
 		&peerIn, &peerInMin, &peerOut, &peerOutMin,
-		&lastObserved); err != nil {
+		&behindSentry, &lastObserved); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -824,6 +829,10 @@ func (s *duckStore) GetMergedSampleValidator(ctx context.Context, cluster, valid
 		v.PeerCountOut = *peerOut
 	}
 	v.PeerCountOutMin = peerOutMin
+	if behindSentry.Valid {
+		tmp := behindSentry.Bool
+		v.BehindSentry = &tmp
+	}
 	if lastObserved != nil {
 		v.LastObserved = *lastObserved
 	}

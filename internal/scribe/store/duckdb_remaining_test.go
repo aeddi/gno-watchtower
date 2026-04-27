@@ -117,6 +117,26 @@ func TestStorageBytesReturnsTables(t *testing.T) {
 	}
 }
 
+func TestSampleValidatorRoundtripBehindSentry(t *testing.T) {
+	s := openTempStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	tru := true
+
+	if err := s.WriteBatch(ctx, Batch{SamplesValidator: []types.SampleValidator{
+		{ClusterID: "c1", Validator: "node-1", Time: now, Tier: 0, Height: 100, BehindSentry: &tru, LastObserved: now},
+	}}); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got, err := s.GetMergedSampleValidator(ctx, "c1", "node-1", now.Add(time.Second), time.Minute)
+	if err != nil {
+		t.Fatalf("merged: %v", err)
+	}
+	if got == nil || got.BehindSentry == nil || *got.BehindSentry != true {
+		t.Errorf("BehindSentry roundtrip failed: %+v", got)
+	}
+}
+
 func TestEventRoundtripPreservesAnalysisColumns(t *testing.T) {
 	s := openTempStore(t)
 	ctx := context.Background()

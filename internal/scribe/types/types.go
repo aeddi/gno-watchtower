@@ -142,6 +142,7 @@ type SampleValidator struct {
 	PeerCountInMin  *int16
 	PeerCountOut    int16
 	PeerCountOutMin *int16
+	BehindSentry    *bool
 	LastObserved    time.Time
 }
 
