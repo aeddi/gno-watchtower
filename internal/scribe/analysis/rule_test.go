@@ -55,3 +55,26 @@ var _ = Diagnostic{
 	Subject: "x", Severity: SeverityError, State: StateOpen,
 	Recovers: "01...", Payload: map[string]any{}, LinkedSignals: []types.SignalLink{},
 }
+
+func TestKindMatch(t *testing.T) {
+	cases := []struct {
+		patterns []string
+		evKind   string
+		want     bool
+	}{
+		{[]string{"validator.vote_cast"}, "validator.vote_cast", true},
+		{[]string{"validator.vote_cast"}, "validator.vote_missed", false},
+		{[]string{"validator.*"}, "validator.vote_cast", true},
+		{[]string{"validator.*"}, "chain.block_committed", false},
+		{[]string{"validator.went_offline", "validator.came_online"}, "validator.came_online", true},
+		{[]string{}, "anything", false},
+		{nil, "anything", false},
+		{[]string{"diagnostic.*"}, "diagnostic.bft_at_risk_v1", true},
+	}
+	for _, tc := range cases {
+		got := KindMatch(tc.patterns, tc.evKind)
+		if got != tc.want {
+			t.Errorf("KindMatch(%v, %q) = %v, want %v", tc.patterns, tc.evKind, got, tc.want)
+		}
+	}
+}

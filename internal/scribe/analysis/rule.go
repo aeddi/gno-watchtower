@@ -7,6 +7,7 @@ package analysis
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aeddi/gno-watchtower/internal/scribe/store"
@@ -106,4 +107,22 @@ type Diagnostic struct {
 type Rule interface {
 	Meta() Meta
 	Evaluate(ctx context.Context, trigger Trigger, deps Deps, emit Emitter)
+}
+
+// KindMatch returns true if evKind matches at least one of the patterns.
+// A pattern ending in ".*" matches any kind with that prefix; otherwise it's
+// an exact-match check.
+func KindMatch(patterns []string, evKind string) bool {
+	for _, p := range patterns {
+		if strings.HasSuffix(p, ".*") {
+			if strings.HasPrefix(evKind, p[:len(p)-1]) { // keep the leading "."
+				return true
+			}
+			continue
+		}
+		if p == evKind {
+			return true
+		}
+	}
+	return false
 }
