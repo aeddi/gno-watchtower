@@ -27,6 +27,16 @@ func NewVoteMissed(cluster string, validators []string, s store.Store, w *writer
 	return &VoteMissed{cluster: cluster, validators: validators, store: s, writer: w}
 }
 
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+func (v *VoteMissed) Meta() Meta {
+	return Meta{
+		Kind:        "validator.vote_missed",
+		Source:      SourceDerived,
+		Description: "Derived: validator did not cast a vote for a committed height.",
+		DocRef:      "/docs/handlers/validator.vote_missed",
+	}
+}
+
 func (v *VoteMissed) Run(ctx context.Context) error {
 	sub := v.writer.Subscribe(64)
 	defer v.writer.Unsubscribe(sub)

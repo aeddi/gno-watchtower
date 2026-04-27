@@ -27,6 +27,16 @@ func NewHeight(cluster string) *Height {
 
 func (h *Height) Name() string { return "height" }
 
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+func (h *Height) Meta() Meta {
+	return Meta{
+		Kind:        "validator.height_advanced",
+		Source:      SourceMetric,
+		Description: "Latest reported block height per validator; emits an event when height advances.",
+		DocRef:      "/docs/handlers/validator.height_advanced",
+	}
+}
+
 func (h *Height) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	if o.Metric == nil || o.MetricQuery != "sentinel_rpc_latest_block_height" {
 		return nil
@@ -98,6 +108,18 @@ func NewOnline(cluster string) *Online {
 
 func (Online) Name() string { return "online" }
 
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+// Online emits two kinds conditionally: validator.came_online (0→1) and
+// validator.went_offline (1→0). The primary kind listed here is came_online.
+func (Online) Meta() Meta {
+	return Meta{
+		Kind:        "validator.came_online",
+		Source:      SourceMetric,
+		Description: "Validator online/offline state transitions; emits came_online or went_offline.",
+		DocRef:      "/docs/handlers/validator.came_online",
+	}
+}
+
 func (h *Online) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	if o.Metric == nil || o.MetricQuery != "sentinel_validator_online" {
 		return nil
@@ -158,6 +180,18 @@ func NewPeers(cluster string) *Peers { return &Peers{cluster: cluster} }
 
 func (Peers) Name() string { return "peers" }
 
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+// Peers only upserts samples_validator (peer_count_in / peer_count_out); it
+// does not emit events. Kind is a descriptive label used by the registry.
+func (Peers) Meta() Meta {
+	return Meta{
+		Kind:        "validator.peers",
+		Source:      SourceMetric,
+		Description: "Inbound and outbound peer counts per validator (sample upsert only, no event).",
+		DocRef:      "/docs/handlers/validator.peers",
+	}
+}
+
 func (h *Peers) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	// gnoland exports peer counts via OTLP as inbound_peers_gauge and
 	// outbound_peers_gauge (no `direction` label — the direction is in the
@@ -196,6 +230,17 @@ func NewMempool(cluster string) *Mempool { return &Mempool{cluster: cluster} }
 
 func (Mempool) Name() string { return "mempool" }
 
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+// Mempool only upserts samples_validator (mempool_txs); it does not emit events.
+func (Mempool) Meta() Meta {
+	return Meta{
+		Kind:        "validator.mempool",
+		Source:      SourceMetric,
+		Description: "Pending mempool transaction count per validator (sample upsert only, no event).",
+		DocRef:      "/docs/handlers/validator.mempool",
+	}
+}
+
 func (h *Mempool) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	if o.Metric == nil || o.MetricQuery != "sentinel_rpc_mempool_txs" {
 		return nil
@@ -217,6 +262,17 @@ type VotingPower struct {
 func NewVotingPower(cluster string) *VotingPower { return &VotingPower{cluster: cluster} }
 
 func (VotingPower) Name() string { return "voting_power" }
+
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+// VotingPower only upserts samples_validator (voting_power); it does not emit events.
+func (VotingPower) Meta() Meta {
+	return Meta{
+		Kind:        "validator.voting_power",
+		Source:      SourceMetric,
+		Description: "Voting power per validator (sample upsert only, no event).",
+		DocRef:      "/docs/handlers/validator.voting_power",
+	}
+}
 
 func (h *VotingPower) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	if o.Metric == nil || o.MetricQuery != "sentinel_rpc_validator_voting_power" {
@@ -250,6 +306,17 @@ func NewValsetSize(cluster string) *ValsetSize {
 }
 
 func (ValsetSize) Name() string { return "valset_size" }
+
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+// ValsetSize only upserts samples_chain (valset_size, total_voting_power); no event.
+func (ValsetSize) Meta() Meta {
+	return Meta{
+		Kind:        "chain.valset_size",
+		Source:      SourceMetric,
+		Description: "Validator set size and total voting power per poll tick (sample upsert only, no event).",
+		DocRef:      "/docs/handlers/chain.valset_size",
+	}
+}
 
 func (h *ValsetSize) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	if o.Metric == nil || o.MetricQuery != "sentinel_rpc_validator_set_power" {

@@ -72,6 +72,16 @@ func NewProposed(cluster string) *Proposed { return &Proposed{cluster: cluster} 
 // Name returns the handler name.
 func (Proposed) Name() string { return "proposed" }
 
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+func (Proposed) Meta() Meta {
+	return Meta{
+		Kind:        "validator.proposed",
+		Source:      SourceLog,
+		Description: "Validator was selected as proposer for a consensus round.",
+		DocRef:      "/docs/handlers/validator.proposed",
+	}
+}
+
 // Handle emits a validator.proposed Op when the log line matches.
 func (h *Proposed) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	if o.LogEntry == nil {
@@ -115,6 +125,16 @@ func NewConsensusRoundStep(cluster string) *ConsensusRoundStep {
 
 // Name returns the handler name.
 func (ConsensusRoundStep) Name() string { return "consensus_round_step" }
+
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+func (ConsensusRoundStep) Meta() Meta {
+	return Meta{
+		Kind:        "validator.consensus.round_step",
+		Source:      SourceLog,
+		Description: "Consensus state-machine step transition (enterPropose/Prevote/Precommit/Commit).",
+		DocRef:      "/docs/handlers/validator.consensus.round_step",
+	}
+}
 
 // Handle emits a validator.consensus.round_step Op when the log line matches.
 func (h *ConsensusRoundStep) Handle(_ context.Context, o normalizer.Observation) []types.Op {
@@ -161,6 +181,16 @@ func NewVoteCast(cluster string) *VoteCast { return &VoteCast{cluster: cluster} 
 
 // Name returns the handler name.
 func (VoteCast) Name() string { return "vote_cast" }
+
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+func (VoteCast) Meta() Meta {
+	return Meta{
+		Kind:        "validator.vote_cast",
+		Source:      SourceLog,
+		Description: "Validator signed and submitted a prevote, precommit, or proposal.",
+		DocRef:      "/docs/handlers/validator.vote_cast",
+	}
+}
 
 // Handle emits a validator.vote_cast Op when the log line matches.
 func (h *VoteCast) Handle(_ context.Context, o normalizer.Observation) []types.Op {
@@ -212,6 +242,16 @@ func NewPeerConnected(cluster string) *PeerConnected { return &PeerConnected{clu
 // Name returns the handler name.
 func (PeerConnected) Name() string { return "peer_connected" }
 
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+func (PeerConnected) Meta() Meta {
+	return Meta{
+		Kind:        "validator.peer_connected",
+		Source:      SourceLog,
+		Description: "A new outbound peer connection was established by the validator.",
+		DocRef:      "/docs/handlers/validator.peer_connected",
+	}
+}
+
 // Handle emits a validator.peer_connected Op when the log line matches.
 func (h *PeerConnected) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	if o.LogEntry == nil {
@@ -257,6 +297,16 @@ func NewPeerDisconnected(cluster string) *PeerDisconnected {
 // Name returns the handler name.
 func (PeerDisconnected) Name() string { return "peer_disconnected" }
 
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+func (PeerDisconnected) Meta() Meta {
+	return Meta{
+		Kind:        "validator.peer_disconnected",
+		Source:      SourceLog,
+		Description: "A peer connection was dropped due to an error.",
+		DocRef:      "/docs/handlers/validator.peer_disconnected",
+	}
+}
+
 // Handle emits a validator.peer_disconnected Op when the log line matches.
 func (h *PeerDisconnected) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	if o.LogEntry == nil {
@@ -301,6 +351,16 @@ func NewBlockCommitted(cluster string) *BlockCommitted { return &BlockCommitted{
 // Name returns the handler name.
 func (BlockCommitted) Name() string { return "block_committed" }
 
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+func (BlockCommitted) Meta() Meta {
+	return Meta{
+		Kind:        "chain.block_committed",
+		Source:      SourceLog,
+		Description: "A block was executed and committed to the chain.",
+		DocRef:      "/docs/handlers/chain.block_committed",
+	}
+}
+
 // Handle emits a chain.block_committed Op when the log line matches.
 func (h *BlockCommitted) Handle(_ context.Context, o normalizer.Observation) []types.Op {
 	if o.LogEntry == nil {
@@ -340,6 +400,16 @@ func NewValsetChanged(cluster string) *ValsetChanged { return &ValsetChanged{clu
 
 // Name returns the handler name.
 func (ValsetChanged) Name() string { return "valset_changed" }
+
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+func (ValsetChanged) Meta() Meta {
+	return Meta{
+		Kind:        "chain.valset_changed",
+		Source:      SourceLog,
+		Description: "The active validator set was updated (additions logged; removals pending phase-14 data).",
+		DocRef:      "/docs/handlers/chain.valset_changed",
+	}
+}
 
 // Handle emits a chain.valset_changed Op when the log line matches.
 func (h *ValsetChanged) Handle(_ context.Context, o normalizer.Observation) []types.Op {
@@ -393,6 +463,16 @@ func NewTxExecuted(cluster string) *TxExecuted { return &TxExecuted{cluster: clu
 
 // Name returns the handler name.
 func (TxExecuted) Name() string { return "tx_executed" }
+
+// Meta returns the descriptor used by the handler registry and /api/handlers.
+func (TxExecuted) Meta() Meta {
+	return Meta{
+		Kind:        "chain.tx_executed",
+		Source:      SourceLog,
+		Description: "A transaction was executed; currently captures only the rejection (failure) path.",
+		DocRef:      "/docs/handlers/chain.tx_executed",
+	}
+}
 
 // Handle emits a chain.tx_executed Op for rejected transactions.
 // TODO(phase-14): add success path once real log lines are validated.
