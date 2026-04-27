@@ -12,18 +12,32 @@ const (
 	ProvenanceLog     ProvenanceType = "log"
 	ProvenanceMetric  ProvenanceType = "metric"
 	ProvenanceDerived ProvenanceType = "derived"
+	ProvenanceRule    ProvenanceType = "rule"
 )
+
+// SignalLink is a resolved (placeholders filled) Loki/VM query the rule built
+// for a specific diagnostic instance. Stored inside Provenance.LinkedSignals.
+type SignalLink struct {
+	Type  string    `json:"type"` // "loki" | "vm"
+	Query string    `json:"query"`
+	URL   string    `json:"url,omitempty"`
+	From  time.Time `json:"from"`
+	To    time.Time `json:"to"`
+}
 
 // Provenance records how scribe knows an event happened.
 // JSON-marshalled into the events.provenance column.
 type Provenance struct {
-	Type    ProvenanceType `json:"type"`
-	Query   string         `json:"query,omitempty"`
-	Rule    string         `json:"rule,omitempty"`
-	LogRefs []LogRef       `json:"log_refs,omitempty"`
-	Metric  *MetricRef     `json:"metric,omitempty"`
-	Inputs  []DerivationIn `json:"inputs,omitempty"`
-	Queries []ProvenanceQ  `json:"queries,omitempty"`
+	Type           ProvenanceType `json:"type"`
+	Query          string         `json:"query,omitempty"`
+	Rule           string         `json:"rule,omitempty"`
+	DocRef         string         `json:"doc_ref,omitempty"`
+	SourceEventIDs []string       `json:"source_event_ids,omitempty"`
+	LinkedSignals  []SignalLink   `json:"linked_signals,omitempty"`
+	LogRefs        []LogRef       `json:"log_refs,omitempty"`
+	Metric         *MetricRef     `json:"metric,omitempty"`
+	Inputs         []DerivationIn `json:"inputs,omitempty"`
+	Queries        []ProvenanceQ  `json:"queries,omitempty"`
 }
 
 type LogRef struct {
@@ -97,6 +111,9 @@ type Event struct {
 	IngestTime time.Time      `json:"ingest_time"`
 	Kind       string         `json:"kind"`
 	Subject    string         `json:"subject"`
+	Severity   string         `json:"severity,omitempty"` // analysis: "warning"|"error"|"critical" or "" for non-diagnostic
+	State      string         `json:"state,omitempty"`    // analysis: "open"|"recovered" or ""
+	Recovers   string         `json:"recovers,omitempty"` // analysis: event_id of opening event when state="recovered"
 	Payload    map[string]any `json:"payload"`
 	Provenance Provenance     `json:"provenance"`
 }
