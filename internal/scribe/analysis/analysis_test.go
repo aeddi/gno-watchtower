@@ -20,6 +20,19 @@ func (r *recoveryRule) Meta() Meta {
 func (r *recoveryRule) Evaluate(_ context.Context, _ Trigger, _ Deps, _ Emitter) {}
 func (r *recoveryRule) RecoveryTracker() *Tracker                                { return &r.tr }
 
+// openingRule opens an incident on every Evaluate. Used to verify the engine
+// refreshes scribe_analysis_open_incidents after Open() transitions.
+type openingRule struct{ tr Tracker }
+
+func (r *openingRule) Meta() Meta {
+	return Meta{Code: "opening", Version: 1, Severity: SeverityWarning, Kinds: []string{"x.*"}}
+}
+
+func (r *openingRule) Evaluate(_ context.Context, _ Trigger, d Deps, _ Emitter) {
+	r.tr.Open(d.ClusterID, "stub-id")
+}
+func (r *openingRule) RecoveryTracker() *Tracker { return &r.tr }
+
 // newTempStore opens a duckdb store backed by t.TempDir().
 func newTempStore(t *testing.T) store.Store {
 	t.Helper()
@@ -244,5 +257,52 @@ func TestEngineTickRuleFiresOnSchedule(t *testing.T) {
 
 	if r.count.Load() < 2 {
 		t.Errorf("tick fired %d times; want >= 2 over 200ms with 30ms period", r.count.Load())
+	}
+}
+
+func TestEngineRefreshesOpenIncidentsGaugeAfterEvaluate(t *testing.T) {
+	resetRegistryForTest(t)
+	r := &openingRule{}
+	Register(r, "doc")
+	bc := &stubBroadcaster{events: make(chan types.Event, 8)}
+	cw := &chanWriter{ch: make(chan types.Op, 8)}
+	m := scribemetrics.New()
+	eng, _ := New(Deps{ClusterID: "c1", Now: time.Now}, bc, cw, m, EngineConfig{QueueSize: 4})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_ = eng.Start(ctx)
+
+	bc.events <- types.Event{EventID: "01J0", Kind: "x.foo", ClusterID: "c1"}
+
+	// Wait until the rule has run at least once.
+	deadline := time.After(2 * time.Second)
+	for r.tr.OpenCount() == 0 {
+		select {
+		case <-deadline:
+			t.Fatalf("rule never opened an incident")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	// Allow the engine's post-Evaluate gauge update to land.
+	time.Sleep(50 * time.Millisecond)
+
+	mfs, _ := m.Registry.Gather()
+	var gauge float64
+	for _, mf := range mfs {
+		if mf.GetName() != "scribe_analysis_open_incidents" {
+			continue
+		}
+		for _, mtr := range mf.GetMetric() {
+			for _, lp := range mtr.GetLabel() {
+				if lp.GetName() == "code" && lp.GetValue() == "diagnostic.opening_v1" {
+					gauge = mtr.GetGauge().GetValue()
+				}
+			}
+		}
+	}
+	if gauge != 1 {
+		t.Errorf("scribe_analysis_open_incidents{code=opening_v1} = %v, want 1", gauge)
 	}
 }

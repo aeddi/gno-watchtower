@@ -243,6 +243,14 @@ func (w *ruleWorker) evaluateOne(ctx context.Context, t Trigger) {
 	if !start.IsZero() {
 		w.metrics.AnalysisEvalDuration.WithLabelValues(w.meta.Kind()).Observe(time.Since(start).Seconds())
 	}
+	// Refresh the open-incidents gauge for recovery-tracking rules. Rehydrate()
+	// seeds it at startup; this keeps it accurate as Open()/Recovered() mutate
+	// the tracker between rehydrations.
+	if w.metrics != nil && w.metrics.AnalysisOpenIncidents != nil {
+		if tr, ok := w.rule.(interface{ RecoveryTracker() *Tracker }); ok {
+			w.metrics.AnalysisOpenIncidents.WithLabelValues(w.meta.Kind()).Set(float64(tr.RecoveryTracker().OpenCount()))
+		}
+	}
 }
 
 func (w *ruleWorker) tickLoop(ctx context.Context) {
