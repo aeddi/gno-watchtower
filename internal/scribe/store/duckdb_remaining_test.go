@@ -116,3 +116,45 @@ func TestStorageBytesReturnsTables(t *testing.T) {
 		}
 	}
 }
+
+func TestEventRoundtripPreservesAnalysisColumns(t *testing.T) {
+	s := openTempStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	open := types.Event{
+		EventID:   "01JCV0BNAQQNKDPQ95R5RAWAZ7",
+		ClusterID: "c1", Time: now, IngestTime: now,
+		Kind: "diagnostic.bft_at_risk_v1", Subject: types.SubjectChain,
+		Severity: "error", State: "open",
+		Payload:    map[string]any{"recovery_key": "c1"},
+		Provenance: types.Provenance{Type: types.ProvenanceRule, Rule: "bft_at_risk_v1", DocRef: "/docs/rules/bft_at_risk_v1"},
+	}
+	rec := types.Event{
+		EventID:   "01JCV0BNAQQNKDPQ95R5RAWAZ8",
+		ClusterID: "c1", Time: now.Add(time.Second), IngestTime: now,
+		Kind: "diagnostic.bft_at_risk_v1", Subject: types.SubjectChain,
+		Severity: "error", State: "recovered", Recovers: open.EventID,
+		Payload:    map[string]any{"recovery_key": "c1"},
+		Provenance: types.Provenance{Type: types.ProvenanceRule, Rule: "bft_at_risk_v1"},
+	}
+	if err := s.WriteBatch(ctx, Batch{Events: []types.Event{open, rec}}); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got, _, err := s.QueryEvents(ctx, EventQuery{ClusterID: "c1", Kind: "diagnostic.bft_at_risk_v1"})
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d events, want 2", len(got))
+	}
+	if got[0].Severity != "error" || got[0].State != "open" {
+		t.Errorf("open row analysis cols not roundtripped: %+v", got[0])
+	}
+	if got[1].State != "recovered" || got[1].Recovers != open.EventID {
+		t.Errorf("recovered row analysis cols not roundtripped: %+v", got[1])
+	}
+	if got[0].Provenance.Rule != "bft_at_risk_v1" || got[0].Provenance.DocRef != "/docs/rules/bft_at_risk_v1" {
+		t.Errorf("provenance roundtrip failed: %+v", got[0].Provenance)
+	}
+}

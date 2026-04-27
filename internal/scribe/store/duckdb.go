@@ -105,8 +105,9 @@ func (s *duckStore) WriteBatch(ctx context.Context, b Batch) error {
 
 	if len(b.Events) > 0 {
 		stmt, err := tx.PrepareContext(ctx, `
-            INSERT INTO events(event_id, cluster_id, time, ingest_time, kind, subject, payload, provenance)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO events(event_id, cluster_id, time, ingest_time, kind, subject,
+                               severity, state, recovers, payload, provenance)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (event_id) DO NOTHING`)
 		if err != nil {
 			return fmt.Errorf("prepare events: %w", err)
@@ -122,9 +123,13 @@ func (s *duckStore) WriteBatch(ctx context.Context, b Batch) error {
 				stmt.Close()
 				return fmt.Errorf("marshal provenance %s: %w", e.EventID, err)
 			}
+			sev := nullableString(e.Severity)
+			st := nullableString(e.State)
+			rec := nullableString(e.Recovers)
 			if _, err := stmt.ExecContext(ctx,
 				e.EventID, e.ClusterID, e.Time, e.IngestTime,
-				e.Kind, e.Subject, string(payload), string(prov)); err != nil {
+				e.Kind, e.Subject, sev, st, rec,
+				string(payload), string(prov)); err != nil {
 				stmt.Close()
 				return fmt.Errorf("insert event %s: %w", e.EventID, err)
 			}
@@ -263,8 +268,9 @@ func (s *duckStore) QueryEvents(ctx context.Context, q EventQuery) ([]types.Even
 		args = append(args, q.Cursor)
 	}
 	args = append(args, q.Limit+1) // peek for cursor
-	sqlText := `SELECT event_id, cluster_id, time, ingest_time, kind, subject, payload, provenance
-	            FROM events WHERE ` + where + ` ORDER BY event_id ASC LIMIT ?`
+	sqlText := `SELECT event_id, cluster_id, time, ingest_time, kind, subject,
+                       severity, state, recovers, payload, provenance
+                FROM events WHERE ` + where + ` ORDER BY event_id ASC LIMIT ?`
 	rows, err := s.db.QueryContext(ctx, sqlText, args...)
 	if err != nil {
 		return nil, "", err
@@ -276,9 +282,19 @@ func (s *duckStore) QueryEvents(ctx context.Context, q EventQuery) ([]types.Even
 		// DuckDB JSON columns return parsed values (map/slice), not raw strings.
 		// Scan into any, re-marshal to bytes, then unmarshal into the typed fields.
 		var payload, prov any
+		var sev, st, rec sql.NullString
 		if err := rows.Scan(&e.EventID, &e.ClusterID, &e.Time, &e.IngestTime,
-			&e.Kind, &e.Subject, &payload, &prov); err != nil {
+			&e.Kind, &e.Subject, &sev, &st, &rec, &payload, &prov); err != nil {
 			return nil, "", err
+		}
+		if sev.Valid {
+			e.Severity = sev.String
+		}
+		if st.Valid {
+			e.State = st.String
+		}
+		if rec.Valid {
+			e.Recovers = rec.String
 		}
 		if b, err := json.Marshal(payload); err == nil {
 			_ = json.Unmarshal(b, &e.Payload)
@@ -453,6 +469,18 @@ func (s *duckStore) StorageBytes(ctx context.Context) (map[string]int64, error) 
 		out[t] = n // row count is the closest cheap proxy; on-disk bytes via PRAGMA database_size if needed later.
 	}
 	return out, nil
+}
+
+// ---- Helpers
+
+// nullableString returns sql.NullString for empty-string-as-NULL semantics.
+// Used for the analysis columns severity/state/recovers, which are NULL on
+// non-diagnostic events.
+func nullableString(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: s, Valid: true}
 }
 
 // ---- Compaction
