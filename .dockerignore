@@ -1,0 +1,6 @@
+internal/scribe/ui/frontend/node_modules
+internal/scribe/ui/frontend/dist
+internal/scribe/ui/frontend/.vite
+internal/scribe/ui/frontend/coverage
+internal/scribe/ui/frontend/test-results
+internal/scribe/ui/frontend/playwright-report

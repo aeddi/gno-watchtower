@@ -1,4 +1,4 @@
-.PHONY: test build new-rule new-handler scenarios-analysis
+.PHONY: test build new-rule new-handler scenarios-analysis ui-install ui-dev ui-build ui-test ui-test-e2e
 
 test:
 	go test ./...
@@ -20,3 +20,18 @@ endif
 
 scenarios-analysis:
 	@echo "Run from the gno-cluster repo: .ignore/scripts/scenarios/run-analysis-scenarios.sh"
+
+ui-install:
+	cd internal/scribe/ui/frontend && npm install
+
+ui-dev:
+	cd internal/scribe/ui/frontend && npm run dev
+
+ui-build:
+	cd internal/scribe/ui/frontend && npm run build
+
+ui-test:
+	cd internal/scribe/ui/frontend && npm run test
+
+ui-test-e2e:
+	cd internal/scribe/ui/frontend && npm run test:e2e
