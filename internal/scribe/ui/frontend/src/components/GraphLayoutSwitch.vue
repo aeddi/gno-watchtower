@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NSegmented } from 'naive-ui'
+import { NRadioGroup, NRadioButton } from 'naive-ui'
 import { useTimelineStore } from '@/stores/timeline'
 import type { GraphLayout } from '@/types'
 
@@ -12,10 +12,16 @@ const options: { label: string; value: GraphLayout }[] = [
 </script>
 
 <template>
-    <n-segmented
+    <n-radio-group
         :value="store.graphLayout"
-        :options="options"
         size="small"
         @update:value="(v: GraphLayout) => store.setLayout(v)"
-    />
+    >
+        <n-radio-button
+            v-for="opt in options"
+            :key="opt.value"
+            :value="opt.value"
+            :label="opt.label"
+        />
+    </n-radio-group>
 </template>
