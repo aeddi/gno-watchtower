@@ -76,3 +76,11 @@ max_subscribers         = 32
 [logging]
 level  = "info"
 format = "json"
+
+[analysis]
+enabled  = true
+disabled = []
+
+# Per-rule overlays go under [analysis.rules."diagnostic.<code>_v<version>"].
+# Defaults for every rule's parameters are declared in the rule's Meta.Params,
+# so this section can be left empty for typical setups.

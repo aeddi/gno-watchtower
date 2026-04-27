@@ -70,6 +70,94 @@ format = "json"
 	}
 }
 
+func TestAnalysisConfigParsesRulesAndOverlay(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "scribe.toml")
+	body := `
+[server]
+listen_addr = "127.0.0.1:0"
+
+[cluster]
+id = "c1"
+
+[storage]
+db_path = "/tmp/x.db"
+
+[sources.victoria_metrics]
+url = "http://vm"
+
+[sources.loki]
+url = "http://loki"
+
+[ingest.fast]
+interval = "1s"
+queries = ["up"]
+
+[ingest.slow]
+interval = "30s"
+queries = ["up"]
+
+[ingest.logs]
+streams = ['{validator=~".+"}']
+overlap_window = "5s"
+
+[writer]
+batch_size = 100
+batch_window = "250ms"
+
+[anchors]
+interval = "1h"
+
+[retention]
+hot_window = "24h"
+warm_bucket = "30s"
+prune_after = "30d"
+compact_at = "03:00"
+compact_jitter = "30m"
+
+[backfill]
+chunk_size = "1h"
+resume_stale_after = "1m"
+
+[sse]
+slow_drop_threshold = 8
+
+[logging]
+level = "info"
+format = "json"
+
+[analysis]
+enabled = true
+disabled = ["diagnostic.consensus_slow_v1"]
+
+[analysis.rules."diagnostic.bft_at_risk_v1"]
+voting_power_threshold_pct = 33.33
+
+[analysis.rules."diagnostic.consensus_stuck_v1"]
+threshold_seconds = 60
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.Analysis.Enabled {
+		t.Errorf("Analysis.Enabled = false, want true")
+	}
+	if got := cfg.Analysis.Disabled; len(got) != 1 || got[0] != "diagnostic.consensus_slow_v1" {
+		t.Errorf("Analysis.Disabled = %v", got)
+	}
+	if cfg.Analysis.Rules == nil {
+		t.Fatalf("Analysis.Rules nil")
+	}
+	bft := cfg.Analysis.Rules["diagnostic.bft_at_risk_v1"]
+	if v, ok := bft["voting_power_threshold_pct"].(float64); !ok || v != 33.33 {
+		t.Errorf("bft_at_risk_v1.voting_power_threshold_pct = %v (%T)", bft["voting_power_threshold_pct"], bft["voting_power_threshold_pct"])
+	}
+}
+
 func TestGenerateDefault(t *testing.T) {
 	body, err := DefaultTOML()
 	if err != nil {

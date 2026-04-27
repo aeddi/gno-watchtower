@@ -26,6 +26,7 @@ type Config struct {
 	Backfill  Backfill  `toml:"backfill"`
 	SSE       SSE       `toml:"sse"`
 	Logging   Logging   `toml:"logging"`
+	Analysis  Analysis  `toml:"analysis"`
 }
 
 // Server holds HTTP server settings.
@@ -119,6 +120,15 @@ type Backfill struct {
 type SSE struct {
 	SlowSubscriberTimeout Duration `toml:"slow_subscriber_timeout"`
 	MaxSubscribers        int      `toml:"max_subscribers"`
+}
+
+// Analysis holds analysis-engine settings. Per-rule overlays go under
+// [analysis.rules.<diagnostic.code_vN>] and are passed to the engine as
+// raw map[string]any (typed accessors live in internal/scribe/analysis).
+type Analysis struct {
+	Enabled  bool                      `toml:"enabled"`
+	Disabled []string                  `toml:"disabled"`
+	Rules    map[string]map[string]any `toml:"rules"`
 }
 
 // Logging holds log output settings.
