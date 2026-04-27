@@ -8,6 +8,7 @@ import (
 	"github.com/aeddi/gno-watchtower/internal/scribe/cache"
 	"github.com/aeddi/gno-watchtower/internal/scribe/scribemetrics"
 	"github.com/aeddi/gno-watchtower/internal/scribe/store"
+	"github.com/aeddi/gno-watchtower/internal/scribe/ui"
 	"github.com/aeddi/gno-watchtower/internal/scribe/writer"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -51,6 +52,9 @@ func (s *Server) http() http.Handler {
 	if s.deps.Metrics != nil {
 		mux.Handle("/metrics", promhttp.HandlerFor(s.deps.Metrics.Registry, promhttp.HandlerOpts{}))
 	}
+	// SPA at / — must be last because "/" is a catch-all that http.ServeMux
+	// will match for any path not handled above.
+	mux.Handle("/", ui.Handler())
 	return mux
 }
 
