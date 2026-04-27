@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aeddi/gno-watchtower/internal/scribe/store"
@@ -38,12 +39,19 @@ func (s *Server) handleEventsImpl(w http.ResponseWriter, r *http.Request) {
 	if limit > 1000 {
 		limit = 1000
 	}
-	evs, next, err := s.deps.Store.QueryEvents(r.Context(), store.EventQuery{
+	query := store.EventQuery{
 		ClusterID: s.deps.ClusterID,
 		Subject:   q.Get("subject"),
 		Kind:      q.Get("kind"),
 		From:      from, To: to, Limit: limit, Cursor: q.Get("cursor"),
-	})
+	}
+	if v := q.Get("severity"); v != "" {
+		query.Severity = strings.Split(v, ",")
+	}
+	if v := q.Get("state"); v != "" {
+		query.State = v
+	}
+	evs, next, err := s.deps.Store.QueryEvents(r.Context(), query)
 	if err != nil {
 		writeError(w, 500, "store_error", err.Error(), "")
 		return

@@ -63,6 +63,8 @@ type EventQuery struct {
 	Kind      string // "" = no filter; supports prefix glob "validator.*"
 	From      time.Time
 	To        time.Time
+	Severity  []string // "" = no filter; OR'd via SQL IN ("warning", "error", "critical")
+	State     string   // "" = no filter; "open" | "recovered"
 	Limit     int
 	Cursor    string // event_id strict greater-than
 }

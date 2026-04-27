@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2"
@@ -266,6 +267,18 @@ func (s *duckStore) QueryEvents(ctx context.Context, q EventQuery) ([]types.Even
 	if q.Cursor != "" {
 		where += " AND event_id > ?"
 		args = append(args, q.Cursor)
+	}
+	if len(q.Severity) > 0 {
+		placeholders := make([]string, len(q.Severity))
+		for i, s := range q.Severity {
+			placeholders[i] = "?"
+			args = append(args, s)
+		}
+		where += " AND severity IN (" + strings.Join(placeholders, ",") + ")"
+	}
+	if q.State != "" {
+		where += " AND state = ?"
+		args = append(args, q.State)
 	}
 	args = append(args, q.Limit+1) // peek for cursor
 	sqlText := `SELECT event_id, cluster_id, time, ingest_time, kind, subject,
