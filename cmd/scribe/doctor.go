@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aeddi/gno-watchtower/internal/scribe/analysis"
+	_ "github.com/aeddi/gno-watchtower/internal/scribe/analysis/rules" // load registry for doctor reports
 	"github.com/aeddi/gno-watchtower/internal/scribe/config"
 	"github.com/aeddi/gno-watchtower/internal/scribe/store"
 )
@@ -74,6 +76,19 @@ func doctorCmd(args []string, out io.Writer) error {
 		v, _ := s.SchemaVersion(ctx)
 		fmt.Fprintf(out, "OK   store: %s schema_version=%d\n", dbPath, v)
 		_ = s.Close()
+	}
+
+	codes := analysis.RegisteredCodes()
+	fmt.Fprintf(out, "OK   analysis: %d rules registered\n", len(codes))
+	for _, k := range codes {
+		m := analysis.GetMeta(k)
+		doc := analysis.GetDoc(k)
+		if doc == "" {
+			fmt.Fprintf(out, "FAIL analysis: rule %s has empty doc\n", k)
+			bad = append(bad, "analysis:"+k)
+			continue
+		}
+		fmt.Fprintf(out, "       %s severity=%s tick=%s kinds=%v\n", k, m.Severity, m.TickPeriod, m.Kinds)
 	}
 
 	if len(bad) > 0 {
