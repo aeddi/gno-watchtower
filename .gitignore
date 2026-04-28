@@ -12,6 +12,5 @@ deploy/.env
 
 # OS
 .DS_Store
-.worktrees/
 
 dist/
