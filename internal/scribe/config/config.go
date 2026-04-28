@@ -27,6 +27,12 @@ type Config struct {
 	SSE       SSE       `toml:"sse"`
 	Logging   Logging   `toml:"logging"`
 	Analysis  Analysis  `toml:"analysis"`
+	// Peers maps a gnoland node_id (g1... bech32) to the validator subject
+	// moniker (e.g. "node-3"). Populated by the cluster's generate-configs.sh
+	// from each node's secrets/node_id. Lets peer-event handlers turn the raw
+	// `Peer{MConn{ip} <node_id> dir}` log blob into a friendly subject so the
+	// network-graph UI can draw edges between known validators.
+	Peers map[string]string `toml:"peers"`
 }
 
 // Server holds HTTP server settings.

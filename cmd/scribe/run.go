@@ -22,7 +22,7 @@ import (
 	"github.com/aeddi/gno-watchtower/internal/scribe/compactor"
 	"github.com/aeddi/gno-watchtower/internal/scribe/config"
 	"github.com/aeddi/gno-watchtower/internal/scribe/handlers"
-	_ "github.com/aeddi/gno-watchtower/internal/scribe/handlers/kinds" // registers all event-kind handlers
+	"github.com/aeddi/gno-watchtower/internal/scribe/handlers/kinds"
 	"github.com/aeddi/gno-watchtower/internal/scribe/ingest"
 	"github.com/aeddi/gno-watchtower/internal/scribe/normalizer"
 	"github.com/aeddi/gno-watchtower/internal/scribe/scribemetrics"
@@ -67,9 +67,18 @@ func runCmdImpl(ctx context.Context, configPath string, addrCh chan<- string) er
 		Metrics:     metrics,
 	})
 
+	resolver := kinds.NewMapResolver(cfg.Peers)
 	var hs []normalizer.Handler
 	for _, kind := range handlers.RegisteredKinds() {
-		hs = append(hs, handlers.NewHandler(kind, cfg.Cluster.ID))
+		h := handlers.NewHandler(kind, cfg.Cluster.ID)
+		// Inject the peer-name resolver into handlers that accept one. The
+		// network-graph UI reads payload.peer_subject to draw edges; without
+		// a resolver every peer event ships with peer_subject="" and the graph
+		// stays edgeless.
+		if inj, ok := h.(interface{ SetPeerResolver(kinds.PeerResolver) }); ok {
+			inj.SetPeerResolver(resolver)
+		}
+		hs = append(hs, h)
 	}
 	opCh := make(chan types.Op, 1024)
 	n := normalizer.New(opCh, hs)

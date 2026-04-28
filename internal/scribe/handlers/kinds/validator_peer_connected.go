@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"strings"
 
 	"github.com/aeddi/gno-watchtower/internal/scribe/eventid"
 	"github.com/aeddi/gno-watchtower/internal/scribe/handlers"
@@ -17,10 +16,18 @@ import (
 var validatorPeerConnectedDoc string
 
 // PeerConnected handles "Added peer" log lines and emits validator.peer_connected.
-type PeerConnected struct{ cluster string }
+type PeerConnected struct {
+	cluster  string
+	resolver PeerResolver
+}
 
 // NewPeerConnected returns a PeerConnected handler for the given cluster.
 func NewPeerConnected(cluster string) *PeerConnected { return &PeerConnected{cluster: cluster} }
+
+// SetPeerResolver injects an optional resolver that maps the peer's node_id to
+// the validator subject moniker, so the UI can draw graph edges between known
+// validators instead of dumping raw `Peer{...}` blobs.
+func (h *PeerConnected) SetPeerResolver(r PeerResolver) { h.resolver = r }
 
 func (PeerConnected) Name() string { return "peer_connected" }
 
@@ -42,10 +49,15 @@ func (h *PeerConnected) Handle(_ context.Context, o normalizer.Observation) []ty
 		return nil
 	}
 	peer, _ := m["peer"].(string)
-	// Derive peer_id as the part before '@' if present, else the full value.
-	peerID := peer
-	if at := strings.IndexByte(peer, '@'); at >= 0 {
-		peerID = peer[:at]
+	peerID := ExtractNodeID(peer)
+	if peerID == "" {
+		// Legacy/unparseable: fall back to the raw peer string so we don't
+		// silently drop the event.
+		peerID = peer
+	}
+	peerSubject := ""
+	if h.resolver != nil {
+		peerSubject = h.resolver.Resolve(peer)
 	}
 	val := o.LogEntry.Stream.Labels["validator"]
 	payload := sk.ValidatorPeerConnected{Peer: peer, PeerID: peerID, Direction: "out"}
@@ -57,7 +69,12 @@ func (h *PeerConnected) Handle(_ context.Context, o normalizer.Observation) []ty
 		IngestTime: o.IngestTime,
 		Kind:       payload.Kind(),
 		Subject:    val,
-		Payload:    map[string]any{"peer": peer, "peer_id": peerID, "direction": "out"},
+		Payload: map[string]any{
+			"peer":         peer,
+			"peer_id":      peerID,
+			"peer_subject": peerSubject,
+			"direction":    "out",
+		},
 		Provenance: provenanceFromEntry(o),
 	}
 	return []types.Op{{Kind: types.OpInsertEvent, Event: &ev}}
