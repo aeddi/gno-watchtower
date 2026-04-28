@@ -15,6 +15,9 @@ const store = useTimelineStore()
 const container = ref<HTMLElement>()
 const lastNodes = ref<GraphNode[]>([])
 const lastEdges = ref<GraphEdge[]>([])
+// Compare mode: when on, plain clicks toggle the selection (multi-select).
+// cmd/ctrl-click always toggles regardless of mode, for power users.
+const compareMode = ref(false)
 let renderer: GraphRenderer | null = null
 
 async function reload() {
@@ -67,7 +70,11 @@ async function reload() {
             behindSentry: behindSentryByNode.get(id) ?? false,
         }))
 
-        // Edges from peer events (current snapshot at `at`).
+        // Edges from peer events (current snapshot at `at`). Scribe's peer
+        // handler resolves the raw `Peer{MConn{ip} <node_id> dir}` log blob to
+        // `payload.peer_subject` via scribe.toml's [peers] table — when the
+        // map is missing or stale that field stays empty and the edge is
+        // dropped (better than rendering a phantom node).
         const peerEvents = await api.listEvents({
             kind: 'validator.peer_connected',
             to: store.at ?? undefined,
@@ -76,15 +83,14 @@ async function reload() {
         const edges: GraphEdge[] = []
         const seen = new Set<string>()
         for (const e of peerEvents.events) {
-            const peer = ((e.payload as Record<string, unknown>)?.peer_id ??
-                (e.payload as Record<string, unknown>)?.peer) as
-                | string
-                | undefined
-            if (!peer || !subjects.includes(peer)) continue
-            const key = [e.subject, peer].sort().join('|')
+            const peerSubject = (e.payload as Record<string, unknown>)
+                ?.peer_subject as string | undefined
+            if (!peerSubject || !subjects.includes(peerSubject)) continue
+            if (peerSubject === e.subject) continue // self-edge guard
+            const key = [e.subject, peerSubject].sort().join('|')
             if (seen.has(key)) continue
             seen.add(key)
-            edges.push({ source: e.subject, target: peer })
+            edges.push({ source: e.subject, target: peerSubject })
         }
 
         lastNodes.value = nodes
@@ -107,10 +113,13 @@ function mountRenderer() {
     renderer = new CytoscapeGraphRenderer(container.value)
     renderer.on((ev) => {
         if (ev.type === 'node-click') {
-            if (ev.multi) store.toggleSubject(ev.id)
+            if (ev.multi || compareMode.value) store.toggleSubject(ev.id)
             else store.setSubjects([ev.id])
         } else if (ev.type === 'background-click') {
-            store.setSubjects([])
+            // Background click clears selection only outside compare mode;
+            // in compare mode users routinely miss nodes while panning and
+            // accidentally losing the comparison set is the worse failure.
+            if (!compareMode.value) store.setSubjects([])
         }
     })
     // Push current data into the new renderer if we have it.
@@ -167,7 +176,7 @@ function severityColor(s: GraphNode['severity']) {
 }
 
 function onRowClick(e: MouseEvent, id: string) {
-    if (e.metaKey || e.ctrlKey) store.toggleSubject(id)
+    if (e.metaKey || e.ctrlKey || compareMode.value) store.toggleSubject(id)
     else store.setSubjects([id])
 }
 </script>
@@ -176,6 +185,27 @@ function onRowClick(e: MouseEvent, id: string) {
     <div class="wrapper">
         <header class="ctrls">
             <GraphLayoutSwitch />
+            <button
+                type="button"
+                class="compare-btn"
+                :class="{ active: compareMode }"
+                @click="compareMode = !compareMode"
+                :title="
+                    compareMode
+                        ? 'Exit compare mode (single-select)'
+                        : 'Enter compare mode (multi-select)'
+                "
+            >
+                <span class="icon">{{ compareMode ? '☑' : '☐' }}</span>
+                Compare
+            </button>
+            <span v-if="store.subjects.length > 0" class="selcount">
+                {{ store.subjects.length }} selected
+                <button class="clear" @click="store.setSubjects([])">×</button>
+            </span>
+            <span class="hint" v-if="!compareMode">
+                ⌘-click for multi-select
+            </span>
         </header>
         <div v-if="store.graphLayout === 'table'" class="table-view">
             <table>
@@ -213,8 +243,62 @@ function onRowClick(e: MouseEvent, id: string) {
     height: 100%;
 }
 .ctrls {
-    padding: 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.6rem;
     border-bottom: 1px solid #30363d;
+    font-size: 0.75rem;
+}
+.compare-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    background: transparent;
+    color: #c9d1d9;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+.compare-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.compare-btn.active {
+    background: rgba(88, 166, 255, 0.16);
+    border-color: #58a6ff;
+    color: #58a6ff;
+}
+.compare-btn .icon {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+.selcount {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.45rem;
+    background: rgba(88, 166, 255, 0.16);
+    color: #58a6ff;
+    border-radius: 4px;
+}
+.selcount .clear {
+    background: transparent;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0 0.15rem;
+}
+.selcount .clear:hover {
+    color: #ef4444;
+}
+.hint {
+    margin-left: auto;
+    color: #6e7681;
+    font-size: 0.7rem;
 }
 .graph {
     flex: 1;
