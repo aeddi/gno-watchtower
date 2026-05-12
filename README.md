@@ -181,10 +181,55 @@ Like the sentinel image, the beacon image bootstraps `/etc/beacon/config.toml` a
 
 Then `docker restart beacon`. The beacon's public key is at `/etc/beacon/keys/pubkey` — copy it for the sentinel side.
 
-**Beacon — Native binary + systemd:** mirror [Option 2](#option-2--native-binary--systemd) above with these substitutions:
+**Beacon — Native binary + systemd:**
 
-- archive: `beacon_<version>_<os>_<arch>.tar.gz` (or `go install github.com/aeddi/gno-watchtower/cmd/beacon@latest`)
-- systemd `ExecStart`: `/usr/local/bin/beacon run --log-format=journal /etc/beacon/config.toml`
+Install via release tarball or `go install`:
+
+```sh
+# Either: download a release archive
+# https://github.com/aeddi/gno-watchtower/releases
+tar -xzf beacon_<version>_linux_amd64.tar.gz
+sudo install -m 0755 beacon /usr/local/bin/beacon
+
+# Or: build from source (requires Go 1.25+)
+go install github.com/aeddi/gno-watchtower/cmd/beacon@latest
+```
+
+Generate the Noise keypair, then generate and edit the config:
+
+```sh
+sudo mkdir -p /etc/beacon
+sudo beacon keygen /etc/beacon/keys
+sudo beacon generate-config /etc/beacon/config.toml
+sudo $EDITOR /etc/beacon/config.toml      # set [server] url, [rpc] rpc_url, [metadata] config_path, etc.
+sudo beacon doctor /etc/beacon/config.toml
+```
+
+systemd unit at `/etc/systemd/system/beacon.service`:
+
+```ini
+[Unit]
+Description=Gnoland Beacon
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/beacon run --log-format=journal /etc/beacon/config.toml
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now beacon
+```
+
+After any later config change, run `sudo systemctl restart beacon` to apply.
+
+The beacon's public key is at `/etc/beacon/keys/pubkey` — copy it for the sentinel side.
 
 **Sentinel side:** in `/etc/sentinel/config.toml`, switch the URL scheme to `noise://` and point `[beacon]` at the sentinel's keys directory:
 
