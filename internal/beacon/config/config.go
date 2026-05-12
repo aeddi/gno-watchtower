@@ -118,7 +118,26 @@ func Generate(path string) error {
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
-	return os.WriteFile(path, data, 0o644)
+	result := injectAuthorizedKeys(string(data))
+	return os.WriteFile(path, []byte(result), 0o644)
+}
+
+// injectAuthorizedKeys inserts a commented-out authorized_keys example
+// immediately after the handshake_timeout line in the [beacon] section.
+func injectAuthorizedKeys(tomlStr string) string {
+	const (
+		anchor  = "handshake_timeout ="
+		comment = "# authorized_keys = [\n#   'sentinel_public_key',\n# ]"
+	)
+	lines := strings.Split(tomlStr, "\n")
+	result := make([]string, 0, len(lines)+3)
+	for _, line := range lines {
+		result = append(result, line)
+		if strings.HasPrefix(strings.TrimSpace(line), anchor) {
+			result = append(result, comment)
+		}
+	}
+	return strings.Join(result, "\n")
 }
 
 // IsPlaceholder reports whether s is an unresolved angle-bracket placeholder.
