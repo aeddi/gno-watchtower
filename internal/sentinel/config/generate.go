@@ -32,9 +32,21 @@ func Generate(ctx context.Context, progress, output io.Writer) error {
 	}
 
 	result := injectAlternatives(string(data), buildAlternatives(cfg, env))
+	result += beaconSectionComment
 	_, err = io.WriteString(output, result)
 	return err
 }
+
+// beaconSectionComment is appended to the generated config to remind operators
+// that [beacon] is required when server.url uses the noise:// scheme.
+// The section is omitempty and absent from the marshaled output, so we append
+// it as a commented block rather than relying on struct serialisation.
+const beaconSectionComment = `
+# [beacon]
+# # Noise keys — required when server.url uses the noise:// scheme.
+# keys_dir   = '/etc/sentinel/keys/'
+# public_key = 'beacon_pub_key'  # optional; pins the beacon's identity
+`
 
 // buildAlternatives returns the commented-out alternatives for the metadata section,
 // based on which mode (docker vs native) was detected.
